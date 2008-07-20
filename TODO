@@ -1,0 +1,38 @@
+vic2d - TODO
+
+0) Support open BCs with either method by doing a treecode solution for the
+velocity at the boundary cells. Use the grid as your tree (0-255 is left,
+256-511 is right, then same up-down, etc. Nice! Make it recursive, of course.
+Look in paramesh-vm for hints).
+
+1) Test a circular cylinder in 2D flow, see if I get the same instability at
+Re=40.
+
+2) Add explosion sources (like a point source that appears and disappears)
+or
+2) Make the source field actually work - meaning scale the interpolation
+results by the value of the divergence, but only for vorticity and other
+conserved quantities---don't do it for the color scalar.
+then
+Make a sample movie for Rob
+
+
+0) get multigrid stuff working! - DONE
+2) faster upscaling of output images
+3) include either Poisson/FFT or multigrid solution of diffusion problem (for low Re problems)
+4) compute and write kinetic energy
+5) add input for Boussinesq coefficient - DONE
+6) read papers on MOC for large density-stratified flows (free surface)
+7) for 3D method, test the baroclinicity of the MOC routine for both
+   the velocity and the vorticity advection---is there a difference?
+8) write a windowing program to dynamically display the results
+9) allow reading in a file and starting with those values as
+   either vorticity, heavy/light fluid, or simply scalar value - DONE
+10) allow explicit particle movement (or, pull field vals for a given list of points)
+
+DONE
+1) add support for Stam-style velocity-MOC
+2) allow upscaling of output images--integer, slow
+9) fix the problem with edge vorticity getting zeroed!
+4) allow entry of dimensionless numbers: Reynolds, Schmidt, others - DONE
+5) upgrade to 3D solver, both vorticity and velocity
