@@ -1,7 +1,7 @@
 /*
  * vic2d
  *
- * Copyright 2004-8 Mark J. Stock mstock@umich.edu
+ * Copyright 2004-10 Mark J. Stock mstock@umich.edu
  *
  * a 2D vortex method which uses the method of characteristics for the
  * convection step, and a single explicit step for diffusion and vorticity
@@ -10,56 +10,82 @@
  */
 
 #include "vicmoc.h"
-void compute_and_write_stats(int, float, float, float, int, int, int, int, float***);
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+#include <ctype.h>
+
+float compute_and_write_stats(int, int, float, float, float, int, int, int, int, float***);
+void paint_splat (float,float,float,float,float,float,float,float,float,int,int,int,float**,float**,float**);
+int get_random_color (float***,int,int,float*);
 
 int main(int argc,char **argv) {
 
-   int isStam = FALSE;			// set to TRUE to run Stable Fluids calc
+   int isStam;
    int i,j;
    int nx,ny;
+   int cnx,cny;
    int xbdry,ybdry;
    int ix,iy;
    int step = -1;
    int maxstep = 0;
+   int writeevery;
    int outscale;
+   int use_16bpp = FALSE;
+   int silent = FALSE;
 
-   int sc_cnt = 0;
-   int sc_type[MAX_SCALARS];
    float sc_diffus[MAX_SCALARS];
    int use_TEMP = FALSE;
    int use_DF = FALSE;
    int use_COLOR = FALSE;
+   int reread_color = FALSE;
+   int darkenonly = TRUE;
+   int freeze_flow = FALSE;
+   int freeze_at = -1;
    int use_MASK = FALSE;
    int use_image = FALSE;
-   int sfi,red,green,blue;
+   int use_strong_strat = FALSE;
 
    int writeOutput = TRUE;
    int print_vort = FALSE;
    int print_vel = FALSE;
+   int print_temp = FALSE;
+   int print_mu = FALSE;
 
-   float courant;			// non-dim time step size
-   float reynolds;			// non-dim viscosity
-   float prandtl;			// non-dim thermal diffusivity
-   float schmidt;			// non-dim scalar diffusivity
+   float md,mdlow,mdhigh;		// dimensional momentum diffusivity
+   float vd;				// dimensional viscosity diffusivity
+   float td,tdlow,tdhigh;		// dimensional density diffusivity
+   float cd,cdlow,cdhigh;		// dimensional color diffusivity
    float bn;				// Boussinesq coefficient
+   float dens_ratio;			// ratio of max to min density
    float dt;
+   float courant,courantconst;		// non-dim time step size
    float *freestream;
+   int recalc_vel;
+   int move_colors;
    int gravtype;
+   int ccnidx = 0;
    float *gravity;
    float coeff,yf,thickness;
    float effective_re;
    float px,py,cx,cy,rad,temp,temp2,maxval,minval,scale;
-   float vortscale,velscale;
+   float vortscale,velscale,vmax,velsq;
+   float ccnvmax[VMAXAVG];
+   float randvortscale = -1;
+   float overlay_fraction = 0.01;
    float cputime = 0.;
    float totcputime = 0.;
    float avgcputime = 0.;
    float simtime = 0.;
+   float thisc[3];
 
    float **u[2];			// velocities
    float **a[MAX_SCALARS];		// other scalars
    float **t[MAX_SCALARS];		// temporary velocities, vorticity, etc
    float **mask;			// flow mask
    float **heat;			// constant heat source map
+   float **c[3];			// color image storage
+   float **acc[2];			// Lagrangian acceleration
 
    // bookkeeping
    unsigned long int tics,last_tics;
@@ -77,26 +103,42 @@ int main(int argc,char **argv) {
    char divfilename[160];
    int use_mask_img = FALSE;
    char maskfilename[160];
+   char colorsrcfilename[160];
+   char mdfilename[160];
+   char tdfilename[160];
+   char cdfilename[160];
 
 
    // set default simulation properties
-   nx = 129;
-   ny = 129;
+   nx = 513;
+   ny = 513;
    xbdry = WALL;
    ybdry = WALL;
+   isStam = FALSE;
    courant = 10.0;
+   courantconst = -1.0;
    dt = -1.0;
-   reynolds = 1000.0;
-   prandtl = 0.7;
-   schmidt = 1.;
+   md = 1.e-3;
+   mdlow = -1.;
+   mdhigh = -1.;
+   vd = 1.e-3;
+   cd = 1.e-3;
+   cdlow = -1.;
+   cdhigh = -1.;
    outscale = 1;
-   maxstep = 10000;
+   writeevery = 1;
+   maxstep = 99999;
    bn = 1.;
-   for (i=0; i<MAX_SCALARS; i++) sc_type[i] = -1;
+   dens_ratio = 1.;
+   for (i=0; i<MAX_SCALARS; i++) sc_diffus[i] = 1.e-3;
+   for (i=0; i<MAX_SCALARS; i++) a[i] = NULL;
+   for (i=0; i<MAX_SCALARS; i++) t[i] = NULL;
    writeOutput = TRUE;
    freestream = allocate_1d_array_f(2);
    freestream[0] = 0.0;
    freestream[1] = 0.0;
+   recalc_vel = TRUE;
+   move_colors = TRUE;
    gravtype = 0;
    gravity = allocate_1d_array_f(2);
    gravity[0] = 0.0;
@@ -123,35 +165,92 @@ int main(int argc,char **argv) {
       } else if (strncmp(argv[i], "-cn", 3) == 0) {
          courant = atof(argv[++i]);
 
+      } else if (strncmp(argv[i], "-vf", 3) == 0) {
+         strcpy (vortfilename,argv[++i]);
+         use_vort_img = TRUE;
+      } else if (strncmp(argv[i], "-vscale", 3) == 0) {
+         vortscale = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-vdf", 4) == 0) {
+         strcpy (mdfilename,argv[++i]);
+         mdlow = atof(argv[++i]);
+         mdhigh = atof(argv[++i]);
+         vd = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-muprint", 3) == 0) {
+         print_mu = TRUE;
+      } else if (strncmp(argv[i], "-vd", 3) == 0) {
+         md = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-vprint", 3) == 0) {
+         print_vort = TRUE;
+      } else if (strncmp(argv[i], "-uscale", 3) == 0) {
+         velscale = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-uprint", 3) == 0) {
+         print_vel = TRUE;
+      } else if (strncmp(argv[i], "-freeze", 3) == 0) {
+         freeze_flow = TRUE;
+         if (argc > i+1) {
+            if (isdigit((int)argv[i+1][0]) || isdigit((int)argv[i+1][1])) {
+               // first number after elevation is frame at which to freeze
+               freeze_at = atoi(argv[++i]);
+            }
+         }
+      } else if (strncmp(argv[i], "-constcn", 8) == 0) {
+         courantconst = atof(argv[++i]);
+
       } else if (strncmp(argv[i], "-tf", 3) == 0) {
          strcpy (tempfilename,argv[++i]);
          use_temp_img = TRUE;
          use_TEMP = TRUE;
-      } else if (strncmp(argv[i], "-heat", 4) == 0) {
+      } else if (strncmp(argv[i], "-qf", 3) == 0) {
          strcpy (heatfilename,argv[++i]);
          use_heat_img = TRUE;
          use_TEMP = TRUE;
+      } else if (strncmp(argv[i], "-tdf", 4) == 0) {
+         strcpy (tdfilename,argv[++i]);
+         tdlow = atof(argv[++i]);
+         tdhigh = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-td", 3) == 0) {
+         td = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-tprint", 3) == 0) {
+         print_temp = TRUE;
       } else if (strncmp(argv[i], "-t", 2) == 0) {
          use_TEMP = TRUE;
       } else if (strncmp(argv[i], "-b", 2) == 0) {
          bn = atof(argv[++i]);
-      } else if (strncmp(argv[i], "-pr", 3) == 0) {
-         prandtl = atof(argv[++i]);
+         use_strong_strat = FALSE;
+      } else if (strncmp(argv[i], "-dr", 3) == 0) {
+         dens_ratio = atof(argv[++i]);
+         use_strong_strat = TRUE;
 
       } else if (strncmp(argv[i], "-cf", 3) == 0) {
          strcpy (colorfilename,argv[++i]);
          use_color_img = TRUE;
          use_COLOR = TRUE;
+      } else if (strncmp(argv[i], "-cdf", 4) == 0) {
+         strcpy (cdfilename,argv[++i]);
+         cdlow = atof(argv[++i]);
+         cdhigh = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-cr", 3) == 0) {
+         reread_color = TRUE;
+         //fprintf(stderr,"i is %d and argc is %d\n",i,argc);
+         //fprintf(stderr,"argv[i] is (%s)\n",argv[i]);
+         //fprintf(stderr,"argv[i+1] is (%s)\n",argv[i+1]);
+         //fprintf(stderr,"argv[i+1][1] is (%s)\n",argv[i+1][1]);
+         //fprintf(stderr,"isdigit argv[i+1][0] is %d\n",isdigit((unsigned char)argv[i+1][0]));
+         //fprintf(stderr,"isdigit argv[i+1][1] is %d\n",isdigit((unsigned char)argv[i+1][1]));
+         //exit(0);
+         if (argc > i+1) {
+            if (isdigit(argv[i+1][0]) || isdigit(argv[i+1][1])) {
+               overlay_fraction = atof(argv[++i]);
+               //if (overlay_fraction < 0.0) {
+               //   darkenonly = TRUE;
+               //   overlay_fraction *= -1.;
+               //}
+            }
+         }
+      } else if (strncmp(argv[i], "-cd", 3) == 0) {
+         cd = atof(argv[++i]);
       } else if (strncmp(argv[i], "-c", 2) == 0) {
          use_COLOR = TRUE;
-      } else if (strncmp(argv[i], "-sc", 3) == 0) {
-         schmidt = atof(argv[++i]);
-
-      } else if (strncmp(argv[i], "-vf", 3) == 0) {
-         strcpy (vortfilename,argv[++i]);
-         use_vort_img = TRUE;
-      } else if (strncmp(argv[i], "-re", 3) == 0) {
-         reynolds = atof(argv[++i]);
 
       } else if (strncmp(argv[i], "-df", 3) == 0) {
          strcpy (divfilename,argv[++i]);
@@ -166,10 +265,13 @@ int main(int argc,char **argv) {
       } else if (strncmp(argv[i], "-m", 2) == 0) {
          use_MASK = TRUE;
 
-      } else if (strncmp(argv[i], "-os", 3) == 0) {
+      } else if (strncmp(argv[i], "-ores", 3) == 0) {
          outscale = atoi(argv[++i]);
       } else if (strncmp(argv[i], "-dt", 3) == 0) {
          dt = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-every", 3) == 0) {
+         writeevery = atoi(argv[++i]);
+         if (writeevery < 1) writeevery = 1;
       } else if (strncmp(argv[i], "-step", 5) == 0) {
          maxstep = atoi(argv[++i]);
       } else if (strncmp(argv[i], "-stam", 5) == 0) {
@@ -179,17 +281,20 @@ int main(int argc,char **argv) {
          freestream[1] = atof(argv[++i]);
          xbdry = OPEN;
          ybdry = OPEN;
+      } else if (strncmp(argv[i], "-grav", 2) == 0) {
+         gravity[0] = atof(argv[++i]);
+         gravity[1] = atof(argv[++i]);
 
-      } else if (strncmp(argv[i], "-pvort", 4) == 0) {
-         print_vort = TRUE;
-      } else if (strncmp(argv[i], "-vortscale", 6) == 0) {
-         vortscale = atof(argv[++i]);
-      } else if (strncmp(argv[i], "-pvel", 4) == 0) {
-         print_vel = TRUE;
-      } else if (strncmp(argv[i], "-velscale", 5) == 0) {
-         velscale = atof(argv[++i]);
+
+      } else if (strncmp(argv[i], "-randvortscale", 6) == 0) {
+         randvortscale = atof(argv[++i]);
+
       } else if (strncmp(argv[i], "-noout", 6) == 0) {
          writeOutput = FALSE;
+      } else if (strncmp(argv[i], "-q", 2) == 0) {
+         silent = TRUE;
+      } else if (strncmp(argv[i], "-16", 3) == 0) {
+         use_16bpp = TRUE;
       } else {
          fprintf(stderr,"Unknown option (%s)\n",argv[i]);
          (void) Usage(progname,0);
@@ -197,6 +302,7 @@ int main(int argc,char **argv) {
    }
 
    // set y max bound (if square, yf=1.0, otherwise scale it as xmax=1.0
+   // this is only used in this context in this file, not in the solver!
    yf = (float)(ny-1)/(float)(nx-1);
 
    // set time step (dt), base it on the maximum courant number (max speed of)
@@ -205,7 +311,8 @@ int main(int argc,char **argv) {
      dt = courant/(nx-1);
    else
      courant = dt*(nx-1);
-   fprintf(stdout,"Using dt=%g, or courant number=%g\n",dt,courant);
+   if (!silent) fprintf(stdout,"Using dt=%g, or courant number=%g\n",dt,courant);
+
 
    // -----------------------------------------------
    // Allocate and initialize
@@ -214,77 +321,65 @@ int main(int argc,char **argv) {
    u[XV] = allocate_2d_array_f(nx,ny);
    u[YV] = allocate_2d_array_f(nx,ny);
 
-   // initialize the scalar count
-   sc_cnt = 0;
-
    // one necessary scalar type is vorticity, always at position 0
-   a[sc_cnt] = allocate_2d_array_f(nx,ny);
-   t[sc_cnt] = allocate_2d_array_f(nx,ny);
-   sc_type[sc_cnt] = W2;
+   a[W2] = allocate_2d_array_f(nx,ny);
    // set coefficient of momentum diffusivity
-   sc_diffus[sc_cnt] = 1.0/reynolds;
-   sc_cnt++;
+   sc_diffus[W2] = md;
 
    // split on solution type
    if (isStam) {
 
       // both velocities are scalars, as they must be diffused normally
-      a[sc_cnt] = allocate_2d_array_f(nx,ny);
-      t[sc_cnt] = allocate_2d_array_f(nx,ny);
-      sc_type[sc_cnt] = XV;
+      a[XV] = allocate_2d_array_f(nx,ny);
       // set coefficient of momentum diffusivity
-      sc_diffus[sc_cnt] = 1.0/reynolds;
-      sc_cnt++;
+      sc_diffus[XV] = md;
 
-      a[sc_cnt] = allocate_2d_array_f(nx,ny);
-      t[sc_cnt] = allocate_2d_array_f(nx,ny);
-      sc_type[sc_cnt] = YV;
-      sc_diffus[sc_cnt] = 1.0/reynolds;
-      sc_cnt++;
+      a[YV] = allocate_2d_array_f(nx,ny);
+      sc_diffus[YV] = md;
    }
 
    // set more scalars; this one: density (or temperature)
    if (use_TEMP) {
-      sc_type[sc_cnt] = SF;
       // set thermal diffusivity
-      sc_diffus[sc_cnt] = 1./(reynolds*prandtl);
-      a[sc_cnt] = allocate_2d_array_f(nx,ny);
-      t[sc_cnt] = allocate_2d_array_f(nx,ny);
-      sc_cnt++;
+      sc_diffus[SF] = td;
+      a[SF] = allocate_2d_array_f(nx,ny);
    }
 
    // this one: divergence
    if (use_DF) {
-      sc_type[sc_cnt] = DF;
       // set dilation diffusivity equal to momentum diffusivity,
       // but should really be second viscosity (which is equivalent or greater
       // than momentum diffusivity mu)
-      sc_diffus[sc_cnt] = 1.0/reynolds;
-      a[sc_cnt] = allocate_2d_array_f(nx,ny);
-      t[sc_cnt] = allocate_2d_array_f(nx,ny);
-      sc_cnt++;
+      sc_diffus[DF] = md;
+      a[DF] = allocate_2d_array_f(nx,ny);
    }
 
    // this one: color
    if (use_COLOR) {
-      sc_type[sc_cnt] = RR;
       // set scalar diffusivity
-      sc_diffus[sc_cnt] = 1./(reynolds*schmidt);
-      a[sc_cnt] = allocate_2d_array_f(nx,ny);
-      t[sc_cnt] = allocate_2d_array_f(nx,ny);
-      sc_cnt++;
+      sc_diffus[RR] = cd;
+      a[RR] = allocate_2d_array_f(nx,ny);
       // now green
-      sc_type[sc_cnt] = GG;
-      sc_diffus[sc_cnt] = 1./(reynolds*schmidt);
-      a[sc_cnt] = allocate_2d_array_f(nx,ny);
-      t[sc_cnt] = allocate_2d_array_f(nx,ny);
-      sc_cnt++;
+      sc_diffus[GG] = cd;
+      a[GG] = allocate_2d_array_f(nx,ny);
       // now blue
-      sc_type[sc_cnt] = BB;
-      sc_diffus[sc_cnt] = 1./(reynolds*schmidt);
-      a[sc_cnt] = allocate_2d_array_f(nx,ny);
-      t[sc_cnt] = allocate_2d_array_f(nx,ny);
-      sc_cnt++;
+      sc_diffus[BB] = cd;
+      a[BB] = allocate_2d_array_f(nx,ny);
+   }
+
+   // variable viscosities
+
+   // variable momentum viscosity
+   if (mdlow > 0.0 && mdhigh > 0.0) {
+      if (!silent) fprintf(stdout,"Using variable momentum viscosity\n");
+      // viscosity diffuses with its own special (constant) diffusivity,
+      sc_diffus[MD] = vd;
+      a[MD] = allocate_2d_array_f(nx,ny);
+      // read grayscale PNG of exactly nx by ny resolution
+      read_png(mdfilename,nx,ny,FALSE,FALSE,1.0,FALSE,
+         a[MD],mdlow,mdhigh-mdlow,NULL,-1.0,2.0,NULL,-1.0,2.0);
+      // and flag the vorticity to use this variable viscosity!
+      sc_diffus[W2] = -1.0;
    }
 
    // allocate space for mask
@@ -299,6 +394,23 @@ int main(int argc,char **argv) {
       heat = allocate_2d_array_f(nx,ny);
    } else {
       heat = NULL;
+   }
+
+   // allocate space for acceleration results
+   if (use_strong_strat) {
+      acc[0] = allocate_2d_array_f(nx,ny);
+      acc[1] = allocate_2d_array_f(nx,ny);
+   } else {
+      acc[0] = NULL;
+      acc[1] = NULL;
+   }
+
+   // allocate space for temporary arrays
+   for (i=0; i<MAX_SCALARS; i++) {
+      if (a[i] != NULL) {
+         t[i] = allocate_2d_array_f(nx,ny);
+         if (!silent) fprintf(stdout,"Array %d has diffusivity %g\n",i,sc_diffus[i]);
+      }
    }
 
    // -----------------------------------------------
@@ -403,9 +515,19 @@ int main(int argc,char **argv) {
          }
       }
    }
+   if (randvortscale > 0.0) {
+      // create a random field of vorticity
+      //scale = 20.;
+      scale = randvortscale;
+      for (ix=0; ix<nx; ix++) {
+         for (iy=0; iy<ny; iy++) {
+            a[W2][ix][iy] += scale*(rand()/(float)RAND_MAX - 0.5);
+         }
+      }
+   }
    if (use_vort_img) {
       // read grayscale PNG of exactly nx by ny resolution
-      read_png(vortfilename,nx,ny,FALSE,FALSE,1.0,
+      read_png(vortfilename,nx,ny,FALSE,FALSE,1.0,FALSE,
          a[W2],-1.0,2.0,NULL,-1.0,2.0,NULL,-1.0,2.0);
    }
 
@@ -446,7 +568,7 @@ int main(int argc,char **argv) {
             }
          }
       }
-      if (TRUE) {
+      if (FALSE) {
          // create a solar tower
          cx = 0.5;	// x center
          cy = 0.0;	// y center
@@ -480,7 +602,7 @@ int main(int argc,char **argv) {
       // read in the mask file
       if (use_mask_img) {
          // read grayscale PNG of exactly nx by ny resolution
-         read_png(maskfilename,nx,ny,FALSE,FALSE,1.0,
+         read_png(maskfilename,nx,ny,FALSE,FALSE,1.0,FALSE,
             mask,0.0,1.0,NULL,0.0,1.0,NULL,0.0,1.0);
       }
       // normalize mask, and set 1.0=solid, 0.0=open (input is opposite)
@@ -505,42 +627,105 @@ int main(int argc,char **argv) {
    // Initial velocity solve -------------------------
 
    // if you want to show velocity on the first step, solve for it here
-   find_vels_2d (step,isStam,nx,ny,xbdry,ybdry,freestream,u[XV],u[YV],a[W2],use_MASK,mask);
+   find_vels_2d (silent,step,isStam,nx,ny,xbdry,ybdry,freestream,u[XV],u[YV],a[W2],use_MASK,mask);
+
+   // find vmax (might need this)
+   vmax = 0.;
+   for (i=0; i<nx; i++) {
+      for (j=0; j<ny; j++) {
+         velsq = u[XV][i][j]*u[XV][i][j] + u[YV][i][j]*u[YV][i][j];
+         if (velsq > vmax) vmax = velsq;
+      }
+   }
+   vmax = sqrt(vmax);
+   // initialize the vmax averaging array
+   vmax = courantconst / (dt*(nx+1));
+   for (i=0; i<VMAXAVG; i++) ccnvmax[i] = vmax;
 
 
    // set color ---------------------------------------
 
+   // load in an image containing colors to grab
+   if (FALSE) {
+
+      // the color image from which to grab colors
+      sprintf(colorsrcfilename,"img_2517_th.png");
+      cnx = 50;
+      cny = 33;
+
+      // allocate space and read image
+      c[0] = allocate_2d_array_f(cnx,cny);
+      c[1] = allocate_2d_array_f(cnx,cny);
+      c[2] = allocate_2d_array_f(cnx,cny);
+      read_png (colorsrcfilename,cnx,cny,TRUE,FALSE,1.0,FALSE,
+               c[0],0.0,1.0,c[1],0.0,1.0,c[2],0.0,1.0);
+
+      // later on, grab colors with
+      //(void) get_random_color (c,cnx,cny,thisc);
+   }
+
+
    // first, find what index the scalar uses
    if (use_COLOR) {
-      for (i=0; i<sc_cnt; i++) if (sc_type[i] == RR) red = i;
-      for (i=0; i<sc_cnt; i++) if (sc_type[i] == GG) green = i;
-      for (i=0; i<sc_cnt; i++) if (sc_type[i] == BB) blue = i;
       // zero the arrays
-      for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[red][ix][iy] = 0.0;
-      for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[green][ix][iy] = 0.0;
-      for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[blue][ix][iy] = 0.0;
+      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[RR][ix][iy] = 0.0;
+      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[GG][ix][iy] = 0.0;
+      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[BB][ix][iy] = 0.0;
+      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[RR][ix][iy] = 1.0;
+      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[GG][ix][iy] = 1.0;
+      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[BB][ix][iy] = 1.0;
+      for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[RR][ix][iy] = 0.10546875;
+      for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[GG][ix][iy] = 0.15234375;
+      for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[BB][ix][iy] = 0.05859375;
       if (use_color_img) {
          // read color PNG of exactly nx by ny resolution into
          //   the given fields
-         read_png(colorfilename,nx,ny,TRUE,FALSE,1.0,
-            a[red],0.0,1.0,a[green],0.0,1.0,a[blue],0.0,1.0);
+         read_png (colorfilename,nx,ny,TRUE,FALSE,1.0,FALSE,
+            a[RR],0.0,1.0,a[GG],0.0,1.0,a[BB],0.0,1.0);
+         //read_png (colorfilename,nx,ny,TRUE,FALSE,1.0,FALSE,
+         //   a[RR],-3.0,4.0,a[GG],-3.0,4.0,a[BB],-3.0,4.0);
       }
       if (FALSE) {
          // left is red, right is green
          for (ix=0; ix<nx/2; ix++) {
             for (iy=0; iy<ny; iy++) {
-               a[red][ix][iy] = 1.0;
-               a[green][ix][iy] = 0.91372549;
-               a[blue][ix][iy] = 0.168627451;
+               a[RR][ix][iy] = 1.0;
+               a[GG][ix][iy] = 0.91372549;
+               a[BB][ix][iy] = 0.168627451;
             }
          }
          for (ix=nx/2; ix<nx; ix++) {
             for (iy=0; iy<ny; iy++) {
-               a[red][ix][iy] = 0.1171875;
-               a[green][ix][iy] = 0.0546875;
-               a[blue][ix][iy] = 0.7265625;
+               a[RR][ix][iy] = 0.1171875;
+               a[GG][ix][iy] = 0.0546875;
+               a[BB][ix][iy] = 0.7265625;
             }
          }
+      }
+      if (FALSE) {
+         // first, force background to one color
+         for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[RR][ix][iy] = 235./256.;
+         for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[GG][ix][iy] = 245./256.;
+         for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[BB][ix][iy] = 253./256.;
+         // make splotches of colored spots
+         // startx,starty, endx,endy, radius,cutoff, r,g,b, numspots, nx,ny,ra,ga,ba
+         // blue splat
+         //(void) paint_splat (0.27,0.3, 0.67,0.5, 0.1,2.e+4,
+         //                    0.1171875,0.0546875,0.7265625, 1000,
+         //                    nx,ny,a[RR],a[GG],a[BB]);
+         // variety of splats
+         (void) paint_splat (-1.5,0.0, 1.3,1.0, 0.5,0.9e+3,
+                             141./256.,206./256.,228./256., 1000,
+                             nx,ny,a[RR],a[GG],a[BB]);
+         (void) paint_splat (-0.5,-0.5, 0.5,2.0, 0.4,1.0e+3,
+                             191./256.,226./256.,248./256., 1000,
+                             nx,ny,a[RR],a[GG],a[BB]);
+         (void) paint_splat (2.1,-0.3, 0.9,0.25, 0.3,1.7e+3,
+                             141./256.,206./256.,228./256., 1000,
+                             nx,ny,a[RR],a[GG],a[BB]);
+         (void) paint_splat (-0.2,-0.4, 0.49,0.5, 0.25,2.e+3,
+                             124./256.,155./256.,193./256., 1000,
+                             nx,ny,a[RR],a[GG],a[BB]);
       }
    }
 
@@ -548,34 +733,33 @@ int main(int argc,char **argv) {
 
    // first, find what index the scalar uses
    if (use_TEMP) {
-      for (i=0; i<sc_cnt; i++) if (sc_type[i] == SF) sfi = i;
 
       // zero the array
       for (ix=0; ix<nx; ix++) {
          for (iy=0; iy<ny; iy++) {
-            a[sfi][ix][iy] = 0.0;
+            a[SF][ix][iy] = 0.0;
          }
       }
 
       if (use_temp_img) {
          // read grayscale PNG of exactly nx by ny resolution
-         read_png(tempfilename,nx,ny,FALSE,TRUE,1.0,
-            a[sfi],0.0,1.0,NULL,0.0,1.0,NULL,0.0,1.0);
+         //read_png(tempfilename,nx,ny,FALSE,TRUE,1.0,FALSE,
+         read_png(tempfilename,nx,ny,FALSE,FALSE,1.0,FALSE,
+            a[SF],0.0,1.0,NULL,0.0,1.0,NULL,0.0,1.0);
       }
 
       if (use_heat_img) {
          // read grayscale PNG of exactly nx by ny resolution
-         read_png(heatfilename,nx,ny,FALSE,FALSE,1.0,
+         read_png(heatfilename,nx,ny,FALSE,FALSE,1.0,FALSE,
             heat,0.0,1.0,NULL,0.0,1.0,NULL,0.0,1.0);
 
          for (ix=0; ix<nx; ix++) {
             for (iy=0; iy<ny; iy++) {
-               a[sfi][ix][iy] += heat[ix][iy];
-               if (a[sfi][ix][iy] > 1.0) a[sfi][ix][iy] = 1.0;
+               a[SF][ix][iy] += heat[ix][iy];
+               if (a[SF][ix][iy] > 1.0) a[SF][ix][iy] = 1.0;
             }
          }
       }
-
 
       if (FALSE) {
          // create a sharp blob of scalar
@@ -584,26 +768,26 @@ int main(int argc,char **argv) {
             for (iy=0; iy<ny; iy++) {
                py = (float)iy/(float)(nx-1);
                if (sqrt(pow(px-0.4,2)+pow(py-0.15,2)) < 0.1)
-                  a[sfi][ix][iy] = 10.0;
+                  a[SF][ix][iy] = 10.0;
             }
          }
       }
       if (FALSE) {
          // create a smooth blob of scalar
-         // add_smooth_circular_blob(nx,ny,xbdry,ybdry,a[sfi],0.7,0.15,0.1,1.0);
-         add_smooth_circular_blob(nx,ny,xbdry,ybdry,a[sfi],0.4,0.0,0.07,-1.0);
+         // add_smooth_circular_blob(nx,ny,xbdry,ybdry,a[SF],0.7,0.15,0.1,1.0);
+         add_smooth_circular_blob(nx,ny,xbdry,ybdry,a[SF],0.4,0.0,0.07,-1.0);
       }
       if (FALSE) {
          // create bands of scalar
          for (ix=0; ix<nx; ix++) {
             for (iy=0; iy<ny; iy++) {
-               //a[sfi][ix][iy] = sin((double)(ix*0.2)) +
+               //a[SF][ix][iy] = sin((double)(ix*0.2)) +
                //                 0.2*rand()/RAND_MAX - 0.1;
-               //a[sfi][ix][iy] = 5.*sin((double)(ix*0.2));
+               //a[SF][ix][iy] = 5.*sin((double)(ix*0.2));
                // run109/06
-               //a[sfi][ix][iy] = 5.*sin(410.*(double)(ix)/nx);
+               //a[SF][ix][iy] = 5.*sin(410.*(double)(ix)/nx);
                // run109/07
-               a[sfi][ix][iy] = 0.5 + 0.5*sin(180.*(double)(ix)/nx);
+               a[SF][ix][iy] = 0.5 + 0.5*sin(180.*(double)(ix)/nx);
             }
          }
       }
@@ -611,7 +795,7 @@ int main(int argc,char **argv) {
          // create square bands of scalar
          for (ix=0; ix<nx; ix++) {
             for (iy=0; iy<ny; iy++) {
-               //a[sfi][ix][iy] = sin((double)(ix*0.2)) +
+               //a[SF][ix][iy] = sin((double)(ix*0.2)) +
                //                 0.2*rand()/RAND_MAX - 0.1;
                px = fabs(ix - (float)nx/2.);
                py = fabs(iy - (float)ny/2.);
@@ -619,7 +803,7 @@ int main(int argc,char **argv) {
                else temp = py;
                if (temp > nx/3.1) temp = -M_PI/2.;
                else temp *= 0.3;
-               a[sfi][ix][iy] = 5.*sin(temp);
+               a[SF][ix][iy] = 5.*sin(temp);
             }
          }
       }
@@ -627,11 +811,13 @@ int main(int argc,char **argv) {
          // create a RTI with a sinusoidal interface
          //thickness = 0.001;
          thickness = 2.0/(float)nx;
+         //thickness = 1.0/(float)nx;
          for (ix=0; ix<nx; ix++) {
             px = (ix - (float)nx/2.)/(float)nx;
-            yf = 0.02*sin(px*9.*M_PI);
+            //yf = 0.02*sin(px*9.*M_PI);
+            yf = 0.02*sin(px*8.*M_PI);
             for (iy=0; iy<ny; iy++) {
-               //a[sfi][ix][iy] = sin((double)(ix*0.2)) +
+               //a[SF][ix][iy] = sin((double)(ix*0.2)) +
                //                 0.2*rand()/RAND_MAX - 0.1;
                py = (iy - (float)ny/2.)/(float)ny;
                // now, px,py is [-0.5,0.5]
@@ -647,7 +833,35 @@ int main(int argc,char **argv) {
                   temp += 0.02*rand()/RAND_MAX - 0.01;
                }
                //fprintf(stderr,"%d %d  %g %g  %g  %g\n",ix,iy,px,py,yf,temp);
-               a[sfi][ix][iy] = temp;
+               a[SF][ix][iy] = temp;
+            }
+         }
+      }
+      if (FALSE) {
+         // create another sinusoidal interface (bottom one)
+         //thickness = 0.001;
+         thickness = 2.0/(float)nx;
+         for (ix=0; ix<nx; ix++) {
+            px = (ix - (float)nx/2.)/(float)nx;
+            yf = 0.02*sin(px*9.*M_PI) - 0.02;
+            for (iy=0; iy<ny; iy++) {
+               //a[SF][ix][iy] = sin((double)(ix*0.2)) +
+               //                 0.2*rand()/RAND_MAX - 0.1;
+               py = (iy - (float)ny/2.)/(float)ny;
+               // now, px,py is [-0.5,0.5]
+               if (yf-py > thickness) {
+                  // point is below the curve
+                  temp = 1.;
+               } else if (yf-py < -thickness) {
+                  // point is above the curve
+                  temp = 0.;
+               } else {
+                  // point is very close to the curve
+                  temp = 0.5+0.5*sin(0.5*M_PI*(yf-py)/thickness);
+                  temp += 0.02*rand()/RAND_MAX - 0.01;
+               }
+               //fprintf(stderr,"%d %d  %g %g  %g  %g\n",ix,iy,px,py,yf,temp);
+               a[SF][ix][iy] += temp;
             }
          }
       }
@@ -656,17 +870,17 @@ int main(int argc,char **argv) {
         scale = 10.;
         for (ix=0; ix<nx; ix++) {
           for (iy=0; iy<ny; iy++) {
-            a[sfi][ix][iy] += scale*rand()/RAND_MAX - 0.5*scale + 0.5;
+            a[SF][ix][iy] += scale*rand()/RAND_MAX - 0.5*scale + 0.5;
           }
         }
       }
-      if (TRUE && use_COLOR) {
+      if (FALSE && use_COLOR) {
          // use the brightness component to indicate density!
          for (ix=0; ix<nx; ix++) {
             for (iy=0; iy<ny; iy++) {
-               a[sfi][ix][iy] = 1.0 - 0.6*a[green][ix][iy] -
-                                0.3*a[red][ix][iy] -
-                                0.1*a[blue][ix][iy];
+               a[SF][ix][iy] = 1.0 - 0.6*a[GG][ix][iy] -
+                                0.3*a[RR][ix][iy] -
+                                0.1*a[BB][ix][iy];
             }
          }
       }
@@ -684,71 +898,145 @@ int main(int argc,char **argv) {
 
       // ----------------------------
       // write output
-      if (writeOutput) {
-      if (print_vort) {
-         sprintf(outfileroot,"vort_%05d",step);
-         //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-1.0,2.0,
-         //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-10.0,20.0,
-         //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-250.0,500.0,
-         //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-100.0,200.0,
-         //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-10.0,20.0,
-         write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-vortscale,2.*vortscale,
-                          NULL,0.0,1.0,NULL,0.0,1.0);
-      }
-      if (use_TEMP) {
-         sprintf(outfileroot,"temp_%05d",step);
-         write_png (outfileroot,nx,ny,FALSE,FALSE,a[sfi],0.0,1.0,
-                          NULL,0.0,1.0,NULL,0.0,1.0);
-      }
-      if (use_COLOR) {
-         sprintf(outfileroot,"out_%05d",step);
-         write_png (outfileroot,nx,ny,TRUE,FALSE,a[red],0.0,1.0,
-                          a[green],0.0,1.0,a[blue],0.0,1.0);
-      }
-      if (print_vel) {
-         sprintf(outfileroot,"vel_%05d",step);
-         write_png (outfileroot,nx,ny,TRUE,FALSE,
-                    u[XV],-velscale,2.*velscale,
-                    u[YV],-velscale,2.*velscale,
-                    a[W2],-vortscale,2.*vortscale);
-      }
-      }
+      if (writeOutput && step%writeevery == 0) {
+      //#pragma omp parallel sections private(outfileroot)
+      {
+         //#pragma omp section
+         if (print_vort) {
+            sprintf(outfileroot,"vort_%05d",step);
+            //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-1.0,2.0,
+            //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-10.0,20.0,
+            //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-250.0,500.0,
+            //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-100.0,200.0,
+            //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-10.0,20.0,
+            write_png (outfileroot,nx,ny,FALSE,use_16bpp,
+                       a[W2],-vortscale,2.*vortscale,
+                       NULL,0.0,1.0,
+                       NULL,0.0,1.0);
+         }
+         //#pragma omp section
+         if (print_temp) {
+            sprintf(outfileroot,"temp_%05d",step);
+            write_png (outfileroot,nx,ny,FALSE,use_16bpp,
+                       a[SF],0.0,1.0,
+                       NULL,0.0,1.0,
+                       NULL,0.0,1.0);
+         }
+         //#pragma omp section
+         if (use_COLOR) {
+            sprintf(outfileroot,"out_%05d",step);
+            write_png (outfileroot,nx,ny,TRUE,use_16bpp,
+                       a[RR],0.0,1.0,
+                       a[GG],0.0,1.0,
+                       a[BB],0.0,1.0);
+         }
+         //#pragma omp section
+         if (print_vel) {
+            sprintf(outfileroot,"vel_%05d",step);
+            write_png (outfileroot,nx,ny,TRUE,use_16bpp,
+                       u[XV],-velscale,2.*velscale,
+                       u[YV],-velscale,2.*velscale,
+                       a[W2],-vortscale,2.*vortscale);
+         }
+         //#pragma omp section
+         if (print_mu) {
+            sprintf(outfileroot,"mu_%05d",step);
+            write_png (outfileroot,nx,ny,FALSE,use_16bpp,
+                       a[MD],mdlow,mdhigh-mdlow,
+                       NULL,0.0,1.0,
+                       NULL,0.0,1.0);
+         }
+      } // OMP sections
+      } // if writeOutput && step%writeevery == 0
 
       // check end conditions
       if (step >= maxstep) break;
 
       // accept input (only if interactive scheme)
 
-
       // adjust diffusion coefficients - decay past step 300
       if (FALSE && step > 300) {
-        for (i=0; i<sc_cnt; i++) {
+        for (i=0; i<MAX_SCALARS; i++) {
+          // this will work for the negative diffusivity trigger, too
           sc_diffus[i] *= 1.1;
         }
+      }
+
+      // if we want a constant cn time step, compute it here
+      if (courantconst > 0.0) {
+         // average vmax over a number of steps
+         ccnidx = (ccnidx+1)%VMAXAVG;
+         ccnvmax[ccnidx] = vmax;
+         // if any were zero, reset them
+         for (i=0; i<VMAXAVG; i++) if (ccnvmax[i] < 1.e-6) ccnvmax[i] = vmax;
+         // find new thing
+         vmax = 0.0;
+         for (i=0; i<VMAXAVG; i++) vmax += ccnvmax[i];
+         vmax /= (float)VMAXAVG;
+         // recalculate dt
+         dt = (courantconst/vmax)/(nx+1);
+         if (!silent) fprintf(stderr,"  changing dt to %g\n",dt);
       }
 
       // set the timer
       last_tics = clock();
 
+      // should we test for freeze?
+      if (freeze_flow) {
+         if (step > freeze_at) {
+            recalc_vel = FALSE;
+            move_colors = TRUE;
+         } else {
+            recalc_vel = TRUE;
+            move_colors = FALSE;
+         }
+      }
+
       // take one computational step forward in time
-      effective_re = step_forward_2d (step,isStam,nx,ny,xbdry,ybdry,freestream,
-                        u,a,t,use_MASK,mask,sc_cnt,sc_type,sc_diffus,
-                        gravtype,gravity,dt,bn);
+      effective_re = step_forward_2d (silent,step,isStam,4,
+                        nx,ny,xbdry,ybdry,freestream,
+                        recalc_vel,move_colors,
+                        u,a,t,use_MASK,mask,sc_diffus,
+                        gravtype,gravity,dt,
+                        use_strong_strat,bn,dens_ratio,acc);
 
       // read in the image again and overlay it!
-      if (use_COLOR && FALSE) {
+      if (use_COLOR && reread_color) {
          // read color PNG of exactly nx by ny resolution into
          //   the given fields and overlay it!
-         if (use_image) {
-            read_png(colorfilename,nx,ny,TRUE,TRUE,0.1,
-               a[red],0.0,1.0,a[green],0.0,1.0,a[blue],0.0,1.0);
+         if (use_color_img && reread_color) {
+            //read_png(colorfilename,nx,ny,TRUE,TRUE,0.01,TRUE,
+            //   a[RR],0.0,1.0,a[GG],0.0,1.0,a[BB],0.0,1.0);
+            read_png(colorfilename,nx,ny,TRUE,TRUE,
+               overlay_fraction,darkenonly,
+               a[RR],0.0,1.0,a[GG],0.0,1.0,a[BB],0.0,1.0);
             // use the brightness component to indicate density!
-            for (ix=0; ix<nx; ix++) {
-               for (iy=0; iy<ny; iy++) {
-                  a[sfi][ix][iy] = 1.0 - 0.6*a[green][ix][iy] -
-                                   0.3*a[red][ix][iy] -
-                                   0.1*a[blue][ix][iy];
-               }
+            //for (ix=0; ix<nx; ix++) {
+            //   for (iy=0; iy<ny; iy++) {
+            //      a[SF][ix][iy] = 1.0 - 0.6*a[GG][ix][iy] -
+            //                       0.3*a[RR][ix][iy] -
+            //                       0.1*a[BB][ix][iy];
+            //   }
+            //}
+         }
+      }
+
+      if (FALSE && step%50 == 0 && step < 1001) {
+         printf("Adding splotch %d\n",step);
+         // grab a color and splat the paint
+         (void) get_random_color (c,cnx,cny,thisc);
+         (void) paint_splat (-1.0+3.0*rand()/(float)RAND_MAX, -1.0+3.0*rand()/(float)RAND_MAX,
+                             -1.0+3.0*rand()/(float)RAND_MAX, -1.0+3.0*rand()/(float)RAND_MAX,
+                             0.1+0.5*rand()/(float)RAND_MAX,
+                             (2.e+3)*(0.5+rand()/(float)RAND_MAX),
+                             thisc[0],thisc[1],thisc[2], 1000,
+                             nx,ny,a[RR],a[GG],a[BB]);
+         // reset scalar temperature
+         for (ix=0; ix<nx; ix++) {
+            for (iy=0; iy<ny; iy++) {
+               a[SF][ix][iy] = 1.0 - 0.6*a[GG][ix][iy] -
+                                0.3*a[RR][ix][iy] -
+                                0.1*a[BB][ix][iy];
             }
          }
       }
@@ -757,8 +1045,8 @@ int main(int argc,char **argv) {
       if (use_heat_img) {
          for (ix=0; ix<nx; ix++) {
             for (iy=0; iy<ny; iy++) {
-               a[sfi][ix][iy] += heat[ix][iy];
-               if (a[sfi][ix][iy] > 1.0) a[sfi][ix][iy] = 1.0;
+               a[SF][ix][iy] += heat[ix][iy];
+               if (a[SF][ix][iy] > 1.0) a[SF][ix][iy] = 1.0;
             }
          }
       }
@@ -776,7 +1064,7 @@ int main(int argc,char **argv) {
 
       // write statistics
       if (writeOutput) {
-         compute_and_write_stats(step,dt,simtime,cputime,nx,ny,xbdry,ybdry,u);
+         vmax = compute_and_write_stats(silent,step,dt,simtime,cputime,nx,ny,xbdry,ybdry,u);
       }
 
       // ----------------------------
@@ -785,11 +1073,11 @@ int main(int argc,char **argv) {
    }
 
    // close out the stats file properly
-   if (writeOutput) {
-      compute_and_write_stats(-1,dt,simtime,cputime,nx,ny,xbdry,ybdry,u);
+   if (writeOutput && maxstep > 0) {
+      compute_and_write_stats(silent,-1,dt,simtime,cputime,nx,ny,xbdry,ybdry,u);
    }
 
-   fprintf(stderr,"\nDone.\n");
+   if (!silent) fprintf(stderr,"\nDone.\n");
    exit(0);
 }
 
@@ -797,7 +1085,7 @@ int main(int argc,char **argv) {
 /*
  * Do just what it says
  */
-void compute_and_write_stats(int step, float dt, float simtime, float cputime,
+float compute_and_write_stats(int silent, int step, float dt, float simtime, float cputime,
       int nx, int ny, int xbdry, int ybdry, float ***u) {
 
    int i,j;
@@ -809,7 +1097,7 @@ void compute_and_write_stats(int step, float dt, float simtime, float cputime,
    // if last time through, close file pointer and RETURN
    if (step == -1) {
       fclose(outp);
-      return;
+      return(0.0);
    }
 
    // if first time through, prep stuff
@@ -851,11 +1139,83 @@ void compute_and_write_stats(int step, float dt, float simtime, float cputime,
    cn = vmax*(nx+1)*dt;
 
    // write the stats here
-   fprintf(stdout,"%d %g %g %g %g %g\n",step,simtime,ke,vmax,cn,cputime);
+   if (!silent) fprintf(stdout,"%d %g %g %g %g %g\n",step,simtime,ke,vmax,cn,cputime);
    fprintf(outp,"%d %g %g %g %g %g\n",step,simtime,ke,vmax,cn,cputime);
    fflush(outp);
 
-   return;
+   return(vmax);
+}
+
+
+/*
+ * Drop a groovy paint splat
+ */
+void paint_splat (float sx,float sy, float ex,float ey, float rad,float thresh,
+                  float r,float g,float b, int nspots,
+                  int nx,int ny, float **red,float **grn,float **blu) {
+
+   int i,ix,iy;
+   float cx,cy,px,py,temp;
+   float **spot;
+
+   // must use isosurface of Gaussian-splattered spots
+   // first, create x,y,z locations and strengths of blobs
+   spot = allocate_2d_array_f(nspots,3);
+   for (i=0; i<nspots; i++) {
+      cx = i/(float)nspots;
+      // create two Gaussian random numbers for the spot location
+      px = (float)(rand())/(float)(RAND_MAX);
+      py = (float)(rand())/(float)(RAND_MAX);
+      spot[i][0] = sx+(ex-sx)*cx+rad*(sqrt(-2.*log(px))*cos(2.*M_PI*py));
+      spot[i][1] = sy+(ey-sy)*cx+rad*(sqrt(-2.*log(px))*sin(2.*M_PI*py));
+      // and select a strength for the spot
+      py = (float)(rand())/(float)(RAND_MAX);
+      spot[i][2] = (cx*(1.-cx))*py/sqrt(-2.*log(px));
+   }
+   // now, loop over all pixels, perform a summation to see if the
+   //   pixel is "inside" or "outside" of the isosurface
+   for (ix=0; ix<nx; ix++) {
+      for (iy=0; iy<ny; iy++) {
+         // pixel position
+         px = ix/(float)nx;
+         py = iy/(float)ny;
+         // scalar potential
+         temp = 0.;
+         for (i=0; i<nspots; i++) {
+            cx = spot[i][0] - px;
+            cy = spot[i][1] - py;
+            temp += spot[i][2]/(cx*cx+cy*cy);
+         }
+         //fprintf(stderr,"%d %d  %g\n",ix,iy,temp);
+         if (temp > thresh) {
+            // this is how to do inky color
+            //red[ix][iy] = 1.-4*(1.-r);
+            //grn[ix][iy] = 1.-4*(1.-g);
+            //blu[ix][iy] = 1.-4*(1.-b);
+            // do the color sent
+            red[ix][iy] = r;
+            grn[ix][iy] = g;
+            blu[ix][iy] = b;
+         }
+      }
+   }
+}
+
+
+/*
+ * grab a color from the color image
+ */
+int get_random_color (float ***c, int nx, int ny, float *thisc) {
+
+   int ix,iy;
+
+   // choose random coordinate
+   ix = nx*(float)rand()/(float)RAND_MAX;
+   iy = ny*(float)rand()/(float)RAND_MAX;
+
+   thisc[0] = c[0][ix][iy];
+   thisc[1] = c[1][ix][iy];
+   thisc[2] = c[2][ix][iy];
 }
 
 
@@ -868,50 +1228,61 @@ int Usage(char progname[80],int status) {
    static char **cpp, *help_message[] = {
    "where [-options] are one or more of the following:                         ",
    "                                                                           ",
-   "   -x [int]    resolution in x-direction; default=128                      ",
+   "   -x [int]    resolution in x-direction; default=512                      ",
    "                                                                           ",
-   "   -y [int]    resolution in y-direction; default=128                      ",
+   "   -y [int]    resolution in y-direction; default=512                      ",
    "                                                                           ",
-   "   -px         make domain periodic in x-direction; default is not periodic",
+   "   -px         make domain periodic in x-direction; default is wall bc     ",
    "                                                                           ",
-   "   -py         make domain periodic in y-direction; default is not periodic",
+   "   -py         make domain periodic in y-direction; default is wall bc     ",
    "                                                                           ",
-   "   -o [int]    set output resolution to num times simulation resolution;   ",
-   "               default=1                                                   ",
+   "   -open       make domain open in both directions; default is wall bc     ",
    "                                                                           ",
-   "   -pvel       write velocity field (u_00000.png and v_00000.png)          ",
-   "                                                                           ",
-   "   -velscale [float]                                                       ",
-   "               scale factor for velocity output                            ",
+   "   -fs [float] [float] set freestream in x and y directions, sets open bc  ",
    "                                                                           ",
    "                                                                           ",
-   "   -pvort      write vorticity field (wz_00000.png)                        ",
+   "   -uprint     write velocity field (vel_00000.png RGB )                   ",
    "                                                                           ",
-   "   -vortscale [float]                                                      ",
-   "               scale factor for vorticity output                           ",
+   "   -uscale [float] scale factor for velocity output; default is 1.0        ",
+   "                                                                           ",
+   "   -vprint     write vorticity field (vort_00000.png)                      ",
+   "                                                                           ",
+   "   -vscale [float] scale factor for vorticity output; default is 10.       ",
    "                                                                           ",
    "   -vf [name]  read PNG file and use as initial vorticity field            ",
    "                                                                           ",
-   "   -re [float] set Reynolds number, inverse of momentum diffusivity;       ",
-   "               default=1000                                                ",
+   "   -vd [float] set momentum diffusivity; default is 1.e-3                  ",
+   "                                                                           ",
+   "   -vdf [name] [float] [float] [float]                                     ",
+   "               read PNG file and set variable momentum diffusivity, floats ",
+   "               are min, max diffusivity, viscosity diffusivity             ",
+   "                                                                           ",
+   "   -muprint    write momentum viscosity field (mu_00000.png)               ",
    "                                                                           ",
    "                                                                           ",
-   "   -t          track and print temperature/scalar field (dens_00000.png)   ",
+   "   -t          track temperature/density field                             ",
    "                                                                           ",
-   "   -tf [name]  read PNG file and use as temperature/scalar field           ",
+   "   -tprint     write temperature/density field (temp_00000.png)            ",
    "                                                                           ",
-   "   -b [float]  set the Boussinesq number; default=1                        ",
+   "   -tf [name]  read PNG file and use as temperature/density field          ",
    "                                                                           ",
-   "   -pr [float] set Prandtl number, inverse of thermal diffusivity;         ",
-   "               default=0.7                                                 ",
+   "   -td [float] set temperature/density diffusivity; default is 1.e-3       ",
+   "                                                                           ",
+   "   -b [float]  set the Boussinesq number; default=1, turns off -dr         ",
+   "                                                                           ",
+   "   -dr [float] set the absolute density ratio; def=10., turns off -b       ",
+   "                                                                           ",
+   "                                                                           ",
+   "   -qf [name]  read PNG file and use as heat source field                  ",
    "                                                                           ",
    "                                                                           ",
    "   -c          track and print color scalars (out_00000.png)               ",
    "                                                                           ",
    "   -cf [name]  read PNG file and use as color scalar field                 ",
    "                                                                           ",
-   "   -sc [float] set Schmidt number, inverse of scalar diffusivity;          ",
-   "               default=10.0                                                ",
+   "   -cd [float] set color diffusivity, absolute scale; default is 1.e-3     ",
+   "                                                                           ",
+   "   -cdf [name] read PNG file and set color diffusivity                     ",
    "                                                                           ",
    "                                                                           ",
    "   -div        track and print dilation field (div_00000.png)              ",
@@ -919,7 +1290,8 @@ int Usage(char progname[80],int status) {
    "   -df [name]  read PNG file and use as initial dilation/divergence field  ",
    "                                                                           ",
    "                                                                           ",
-   "   -mf [name]  read PNG file and use as flow mask, black areas are solid   ",
+   "   -mf [name]  read PNG file and use as flow mask, black areas are solid,  ",
+   "               white areas are completely open                             ",
    "                                                                           ",
    "                                                                           ",
    "   -dt [float] set the time step increment, if unused, Courant number will ",
@@ -929,9 +1301,18 @@ int Usage(char progname[80],int status) {
    "               10 to 50 for a small simulation (32 to 128) or 50 to 500    ",
    "               for a larger one (256 to 2048); default=10                  ",
    "                                                                           ",
-   "   -step [int] run only num steps; default=1000                            ",
+   "   -ores [int] set output resolution to num times simulation resolution;   ",
+   "               default=1                                                   ",
    "                                                                           ",
-   "   -stam       use Stam's velocity method-of-characteristics               ",
+   "   -every [int] write only every so many steps, default=1 (every step)     ",
+   "                                                                           ",
+   "   -noout      suppress all file output                                    ",
+   "                                                                           ",
+   "   -step [int] run a fixed number of steps; default=99999                  ",
+   "                                                                           ",
+   "   -stam       use Stam's velocity method-of-characteristics instead of    ",
+   "               the default vorticity m.o.c.                                ",
+   "                                                                           ",
    "                                                                           ",
    "   -help       (in place of infile) returns this help information          ",
    " ",

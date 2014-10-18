@@ -16,6 +16,10 @@
  */
 
 #include "vicmoc.h"
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 
 int main(int argc,char **argv) {
 
@@ -25,9 +29,13 @@ int main(int argc,char **argv) {
    int xbdry,ybdry,zbdry;
    int ix,iy,iz;
    int step = 0;
+   int ccnidx = 0;
    int outscale;
    int writeOutput = TRUE;
    int maxStep;
+   int writeevery;
+   float vmax,velsq;
+   float simtime = 0.;
 
    int sc_cnt = 3;			// all 3 vorticities
    int sc_type[MAX_SCALARS];
@@ -37,19 +45,24 @@ int main(int argc,char **argv) {
    int sfi;
 
    // the field values
-   float courant;
    float reynolds;
    float dt;
    float bn;
    float coeff,Re,yf,zf;
    float px,py,pz,temp,tottemp,avgtemp = 0.0;
+   float courant,courantconst;
+   float *gravity;
+   float *freestream;
+
    float ***u[3];			// all velocities, vorticity, etc
    float ***a[MAX_SCALARS];		// all velocities, vorticity, etc
-   // float ***t[MAX_SCALARS];		// all velocities, vorticity, etc
+   float ***t[MAX_SCALARS];		// all velocities, vorticity, etc
    float ke = 0.;
    float ke_last = 0.;
    float enst = 0.;
    float nu_eff;
+   float vortscale,velscale,scalescale;
+   float ccnvmax[VMAXAVG];
 
    // now for the particles
    int useParticles = FALSE;
@@ -60,6 +73,7 @@ int main(int argc,char **argv) {
 
    // lastly, the bookkeeping
    unsigned long int tics,last_tics;	// timers
+   float **tempArry;
    char outfileroot[70];
    char progname[80];
 
@@ -72,10 +86,21 @@ int main(int argc,char **argv) {
    ybdry = WALL;
    zbdry = WALL;
    courant = 10.0;
+   courantconst = -1.0;
    reynolds = 1000.0;
    outscale = 1;
+   dt = -1.0;
    bn = 1.;
-   maxStep = 999;
+   gravity = allocate_1d_array_f(3);
+   gravity[0] = 0.0;
+   gravity[1] = 0.0;
+   gravity[2] = 1.0;
+   vortscale = 20.0;
+   velscale = 0.3;
+   scalescale = 1.0;
+   writeevery = 1;
+   maxStep = 9999;
+
    // only necessary scalar type is vorticity, always at position 0
    sc_type[0] = WX;
    sc_type[1] = WY;
@@ -106,10 +131,17 @@ int main(int argc,char **argv) {
          outscale = atoi(argv[++i]);
       } else if (strncmp(argv[i], "-cn", 3) == 0) {
          courant = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-constcn", 8) == 0) {
+         courantconst = atof(argv[++i]);
       } else if (strncmp(argv[i], "-b", 2) == 0) {
          bn = atof(argv[++i]);
       } else if (strncmp(argv[i], "-stam", 5) == 0) {
          isStam = TRUE;
+      } else if (strncmp(argv[i], "-dt", 3) == 0) {
+         dt = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-every", 3) == 0) {
+         writeevery = atoi(argv[++i]);
+         if (writeevery < 1) writeevery = 1;
       } else if (strncmp(argv[i], "-step", 5) == 0) {
          maxStep = atoi(argv[++i]);
       } else if (strncmp(argv[i], "-noout", 6) == 0) {
@@ -123,10 +155,17 @@ int main(int argc,char **argv) {
    zf = (float)(nz-1)/(float)(nx-1);
 
    // set time step (dt), base it on the maximum courant number (max speed of)
-   dt = courant/(nx-1);
+   //  but only if courant number is not set
+   if (dt < 0.)
+     dt = courant/(nx-1);
+   else
+     courant = dt*(nx-1);
+   fprintf(stdout,"Using dt=%g, or courant number=%g\n",dt,courant);
 
-   // allocate arrays
-   // three velocities
+   // -----------------------------------------------
+   // Allocate and initialize
+
+   // three velocities first
    u[XV] = allocate_3d_array_f(nx,ny,nz);
    u[YV] = allocate_3d_array_f(nx,ny,nz);
    u[ZV] = allocate_3d_array_f(nx,ny,nz);
@@ -134,26 +173,39 @@ int main(int argc,char **argv) {
    a[WX] = allocate_3d_array_f(nx,ny,nz);
    a[WY] = allocate_3d_array_f(nx,ny,nz);
    a[WZ] = allocate_3d_array_f(nx,ny,nz);
-   // t[WX] = allocate_3d_array_f(nx,ny,nz);
-   // t[WY] = allocate_3d_array_f(nx,ny,nz);
-   // t[WZ] = allocate_3d_array_f(nx,ny,nz);
+   t[WX] = allocate_3d_array_f(nx,ny,nz);
+   t[WY] = allocate_3d_array_f(nx,ny,nz);
+   t[WZ] = allocate_3d_array_f(nx,ny,nz);
    for (i=0; i<3; i++) sc_diffus[i] = 1.0/reynolds;
    if (use_SF) {
       sc_type[sc_cnt] = SF;
       sc_diffus[sc_cnt] = 1.0/reynolds;
       a[sc_cnt] = allocate_3d_array_f(nx,ny,nz);
-      // t[sc_cnt] = allocate_3d_array_f(nx,ny,nz);
+      t[sc_cnt] = allocate_3d_array_f(nx,ny,nz);
       sc_cnt++;
    }
    if (use_DF) {
       sc_type[sc_cnt] = DF;
       sc_diffus[sc_cnt] = 1.0/reynolds;
       a[sc_cnt] = allocate_3d_array_f(nx,ny,nz);
-      // t[sc_cnt] = allocate_3d_array_f(nx,ny,nz);
+      t[sc_cnt] = allocate_3d_array_f(nx,ny,nz);
       sc_cnt++;
    }
 
-   // set initial vorticity (position 0)
+   // allocate space for temporary arrays
+   //for (i=0; i<MAX_SCALARS; i++) {
+   //   if (a[i] != NULL) {
+   //      t[i] = allocate_2d_array_f(nx,ny);
+   //      if (!silent) fprintf(stdout,"Array %d has diffusivity %g\n",i,sc_diffus[i]);
+   //   }
+   //}
+
+   // -----------------------------------------------
+   // Set initial conditions
+
+   // Set vorticity ----------------------------------
+
+   // zero initial vorticity
    for (ix=0; ix<nx; ix++) {
       for (iy=0; iy<ny; iy++) {
          for (iz=0; iz<nz; iz++) {
@@ -205,6 +257,40 @@ int main(int argc,char **argv) {
       // add_hills_spherical_vortex(nx,ny,nz,xbdry,ybdry,zbdry,a,0.6,0.2,0.3,0.1,10.0);
    }
    if (FALSE) {
+      // create a tube of vorticity along x
+      for (ix=0; ix<nx; ix++) {
+         for (iy=0; iy<ny; iy++) {
+            py = (float)iy/(float)(nx-1);
+            for (iz=0; iz<nz; iz++) {
+               pz = (float)iz/(float)(nx-1);
+               px = sqrt(pow(py-0.5,2) + pow(pz-0.3,2));
+               if (px < 0.1) {
+                  a[WX][ix][iy][iz] = 1.0;
+               } else if (px < 0.2) {
+                  a[WX][ix][iy][iz] = 0.5*(cos(M_PI*(px-0.1)/0.1)+1.);
+               }
+            }
+         }
+      }
+   }
+   if (FALSE) {
+      // create a tube of vorticity along x
+      for (ix=0; ix<nx; ix++) {
+         for (iy=0; iy<ny; iy++) {
+            py = (float)iy/(float)(nx-1);
+            for (iz=0; iz<nz; iz++) {
+               pz = (float)iz/(float)(nx-1);
+               px = sqrt(pow(py-0.4,2) + pow(pz-0.7,2));
+               if (px < 0.1) {
+                  a[WX][ix][iy][iz] = -1.0;
+               } else if (px < 0.2) {
+                  a[WX][ix][iy][iz] = -0.5*(cos(M_PI*(px-0.1)/0.1)+1.);
+               }
+            }
+         }
+      }
+   }
+   if (FALSE) {
       // create the atmospheric boundary layer - NEEDS WORK
       for (ix=0; ix<nx; ix++) {
          for (iy=0; iy<ny; iy++) {
@@ -224,7 +310,7 @@ int main(int argc,char **argv) {
       add_smooth_circular_blob_3d(nx,ny,nz,xbdry,ybdry,zbdry,1,a[WY],0.44,0.5,0.08,20.0);
       add_smooth_circular_blob_3d(nx,ny,nz,xbdry,ybdry,zbdry,1,a[WY],0.56,0.5,0.04,-20.0);
    }
-   if (TRUE) {
+   if (FALSE) {
       // create a thick vortex ring
       // two oblique colliding rings:
       add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],
@@ -248,7 +334,7 @@ int main(int argc,char **argv) {
             }
          }
       }
-      if (TRUE) {
+      if (FALSE) {
          // create a sharp blob of scalar
          add_smooth_spherical_blob(nx,ny,nz,xbdry,ybdry,zbdry,a[sfi],0.5,0.5,0.81,0.15,1.0);
          add_smooth_spherical_blob(nx,ny,nz,xbdry,ybdry,zbdry,a[sfi],0.51,0.5,0.2,0.15,-1.0);
@@ -260,6 +346,17 @@ int main(int argc,char **argv) {
       if (FALSE) {
          // create a cube of scalar
          add_cube_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[sfi],0.45,0.45,0.0,0.1,1.0);
+      }
+      if (TRUE) {
+         // columns of scalar
+         for (ix=0; ix<nx; ix++) {
+            for (iy=0; iy<ny; iy++) {
+               for (iz=0; iz<nz; iz++) {
+                  pz = (float)iz/(float)(nz-1);
+                  a[sfi][ix][iy][iz] = 4.8*MAX(0.,-cos(2.*M_PI*pz) + 0.01*rand()/RAND_MAX - 0.8);
+               }
+            }
+         }
       }
       if (FALSE) {
          // columns of scalar
@@ -323,36 +420,97 @@ int main(int argc,char **argv) {
       }
    }
 
+
+   // Initial velocity solve -------------------------
+
+   fprintf(stdout,"Initial velocity solution\n");
+
    // project the vorticity onto a divergence-free field
    make_solenoidal_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ]);
+
+   // if you want to show velocity on the first step, solve for it here
+   vmax = find_vels_3d(step,nx,ny,nz,xbdry,ybdry,zbdry,u[XV],u[YV],u[ZV],a[WX],a[WY],a[WZ]);
+
+   // find vmax (might need this)
+   //vmax = find_vmax(u[XV],u[YV],u[ZV],nx,ny,nz);
+   // initialize the vmax averaging array
+   vmax = courantconst / (dt*(nx+1));
+   for (i=0; i<VMAXAVG; i++) ccnvmax[i] = vmax;
+
+
+   // ----------------------------------
 
    // iterate through time
    step = 0;
    tottemp = 0.0;
    while (TRUE) {
 
-      // fprintf(stdout,"\nBegin step %d\n",step);
+      fprintf(stdout,"\nBegin step %d\n",step);
 
       // ----------------------------
       // write output
-      if (writeOutput) {
-         sprintf(outfileroot,"wy_%04d",step);
-         write_output_3d(outfileroot,nx,ny,nz,a[WY],-10.0,20.0,outscale,FALSE);
-         if (use_SF) {
-            sprintf(outfileroot,"outi_%04d",step);
-            write_output_3d(outfileroot,nx,ny,nz,a[sfi],-0.1,0.2,outscale,TRUE);
-            sprintf(outfileroot,"out_%04d",step);
-            write_output_3d(outfileroot,nx,ny,nz,a[sfi],-0.5,1.0,outscale,FALSE);
+      if (writeOutput && step%writeevery == 0) {
+         if (TRUE) {
+            sprintf(outfileroot,"wx_%04d",step);
+            //write_output_3d(outfileroot,nx,ny,nz,a[WY],-10.0,20.0,outscale,FALSE);
+            write_png (outfileroot,ny,nz,FALSE,FALSE,
+                       a[WX][3],-vortscale,2.*vortscale,
+                       NULL,0.0,1.0,
+                       NULL,0.0,1.0);
          }
-         if (step%10 == 0) {
-         //sprintf(outfileroot,"vel_%04d",step);
-         //write_3d_vtk(outfileroot,nx,ny,nz,u[XV],u[YV],u[ZV]);
-         sprintf(outfileroot,"vort_%04d",step);
-         write_3d_vtk(outfileroot,nx,ny,nz,a[WX],a[WY],a[WZ]);
+
+         if (TRUE) {
+            sprintf(outfileroot,"ux_%04d",step);
+            write_png (outfileroot,ny,nz,FALSE,FALSE,
+                       u[XV][3],-velscale,2.*velscale,
+                       NULL,0.0,1.0,
+                       NULL,0.0,1.0);
+         }
+         if (FALSE) {
+            sprintf(outfileroot,"uy_%04d",step);
+            write_png (outfileroot,ny,nz,FALSE,FALSE,
+                       u[YV][3],-velscale,2.*velscale,
+                       NULL,0.0,1.0,
+                       NULL,0.0,1.0);
+            sprintf(outfileroot,"uz_%04d",step);
+            write_png (outfileroot,ny,nz,FALSE,FALSE,
+                       u[ZV][3],-velscale,2.*velscale,
+                       NULL,0.0,1.0,
+                       NULL,0.0,1.0);
+         }
+         if (use_SF) {
+            //sprintf(outfileroot,"outi_%04d",step);
+            //write_output_3d(outfileroot,nx,ny,nz,a[sfi],-0.1,0.2,outscale,TRUE);
+            //write_png (outfileroot,ny,nz,FALSE,FALSE,
+            //           a[sfi],-scalescale,2.*scalescale,
+            //           NULL,0.0,1.0,
+            //           NULL,0.0,1.0);
+            sprintf(outfileroot,"out_%04d",step);
+            //write_output_3d(outfileroot,nx,ny,nz,a[sfi],-0.5,1.0,outscale,FALSE);
+            write_png (outfileroot,ny,nz,FALSE,FALSE,
+                       a[sfi][3],-scalescale,2.*scalescale,
+                       NULL,0.0,1.0,
+                       NULL,0.0,1.0);
+            // integrated image
+            sprintf(outfileroot,"outi_%04d",step);
+            tempArry = flatten_to_2d(a[sfi],0,nx,ny,nz);
+            write_png (outfileroot,ny,nz,FALSE,FALSE,
+                       tempArry,-scalescale,2.*scalescale,
+                       NULL,0.0,1.0,
+                       NULL,0.0,1.0);
+            free_2d_array_f(tempArry);
+         }
+         //if (step%10 == 0) {
+         if (FALSE) {
+            //sprintf(outfileroot,"vel_%04d",step);
+            //write_3d_vtk(outfileroot,nx,ny,nz,u[XV],u[YV],u[ZV]);
+            sprintf(outfileroot,"vort_%04d",step);
+            write_3d_vtk(outfileroot,nx,ny,nz,a[WX],a[WY],a[WZ]);
          }
          // sprintf(outfileroot,"u_%04d",step);
          // write_output_3d(outfileroot,nx,ny,nz,u[XV],-0.5,1.0,outscale,FALSE);
          // sprintf(outfileroot,"v_%04d",step);
+
          // write_output_3d(outfileroot,nx,ny,nz,u[YV],-0.5,1.0,outscale,FALSE);
          // sprintf(outfileroot,"w_%04d",step);
          // write_output_3d(outfileroot,nx,ny,nz,u[ZV],-0.5,1.0,outscale,FALSE);
@@ -362,13 +520,45 @@ int main(int argc,char **argv) {
          }
       }
 
+      // check end conditions
+      if (step+1 > maxStep) break;
+
       // accept input (only if interactive scheme)
+
+      // if we want a constant cn time step, compute it here
+      if (courantconst > 0.0) {
+         // average vmax over a number of steps
+         ccnidx = (ccnidx+1)%VMAXAVG;
+         ccnvmax[ccnidx] = vmax;
+         // if any were zero, reset them
+         for (i=0; i<VMAXAVG; i++) if (ccnvmax[i] < 1.e-6) ccnvmax[i] = vmax;
+         // find new thing
+         vmax = 0.0;
+         for (i=0; i<VMAXAVG; i++) vmax += ccnvmax[i];
+         vmax /= (float)VMAXAVG;
+         // recalculate dt
+         if ((courantconst/vmax)/(nx+1) < 1.5*dt) {
+            dt = (courantconst/vmax)/(nx+1);
+            fprintf(stderr,"  changing dt to %g\n",dt);
+         } else {
+            dt *= 1.5;
+         }
+      }
 
       // set the timer
       last_tics = clock();
 
       // take one computational step forward in time
-      Re = step_forward_3d(step,isStam,nx,ny,nz,xbdry,ybdry,zbdry,u,a,sc_cnt,sc_type,sc_diffus,dt,bn);
+      Re = step_forward_3d(step,isStam,
+              nx,ny,nz,xbdry,ybdry,zbdry,
+              u,a,t,
+              sc_cnt,sc_type,sc_diffus,
+              dt,
+              bn);
+
+      // find vmax (might need this)
+      vmax = find_vmax (u[XV],u[YV],u[ZV],nx,ny,nz);
+      printf("  effective CN %g\n",vmax*dt*(float)nx);
 
       // calculate energy and enstrophy
       ke_last = ke;
@@ -387,20 +577,19 @@ int main(int argc,char **argv) {
 
       // calculate the total time elapsed, and the time for this last step
       if (writeOutput) {
-      tics = clock();
-      temp = ((float)tics-(float)last_tics)/CLOCKS_PER_SEC;
-      if (temp < 0.0) temp += 4.2949673e+09/(float)CLOCKS_PER_SEC;
-      tottemp += temp;
-      avgtemp = tottemp/(step+1);
-      // fprintf(stdout,"  took %g sec\n",temp);
-      // fprintf(stdout,"  total %g and mean %g sec\n",tottemp,avgtemp);
-      fprintf(stdout,"mean step time: %.3g sec, effective Re %g\n",avgtemp,Re);
+         tics = clock();
+         temp = ((float)tics-(float)last_tics)/CLOCKS_PER_SEC;
+         if (temp < 0.0) temp += 4.2949673e+09/(float)CLOCKS_PER_SEC;
+         tottemp += temp;
+         avgtemp = tottemp/(step+1);
+         // fprintf(stdout,"  took %g sec\n",temp);
+         // fprintf(stdout,"  total %g and mean %g sec\n",tottemp,avgtemp);
+         fprintf(stdout,"  mean step time: %.3g sec, effective Re %g\n",avgtemp,Re);
       }
 
       // ----------------------------
-      // check end conditions
       step++;
-      if (step > maxStep) break;
+      simtime += dt;
    }
 
    fprintf(stderr,"\nDone.\n");
@@ -439,6 +628,8 @@ int Usage(char progname[80],int status) {
    "   -cn [float] set the Courant number, based on a speed of 1.0; try        ",
    "               10 to 50 for a small simulation (32 to 128) or 50 to 500    ",
    "               for a larger one (256 to 2048); default=10                  ",
+   "                                                                           ",
+   "   -dt [float] time step size (if not set, use cn instead)                 ",
    "                                                                           ",
    "   -b [float]  set the Boussinesq number; default=1                        ",
    "                                                                           ",

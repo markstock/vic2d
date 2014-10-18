@@ -8,7 +8,7 @@
 
 int write_output(char*,int,int,float**,float,float,int);
 int write_png (char*, int, int, int, int, float**, float, float, float**, float, float, float**, float, float);
-int read_png (char*, int, int, int, int, float, float**, float, float, float**, float, float, float**, float, float);
+int read_png (char*, int, int, int, int, float, int, float**, float, float, float**, float, float, float**, float, float);
 int write_3d_vtk(char*,int,int,int,float***,float***,float***);
 int write_output_3d(char*,int,int,int,float***,float,float,int,int);
 int write_output_particles_rad(char*,int,float**,float**,float*);
@@ -519,7 +519,7 @@ int write_png (char *outfileroot, int nx, int ny,
  */
 int read_png (char *infile, int nx, int ny,
    int expect_three_channel,
-   int overlay, float overlay_frac,
+   int overlay, float overlay_frac, int darkenonly,
    float **red, float redmin, float redrange,
    float **grn, float grnmin, float grnrange,
    float **blu, float blumin, float blurange) {
@@ -625,10 +625,14 @@ int read_png (char *infile, int nx, int ny,
    // check image type for applicability
    if (bit_depth != 8 && bit_depth != 16) {
      fprintf(stderr,"INCOMPLETE: read_png expect 8-bit or 16-bit images\n");
+     fprintf(stderr,"   bit_depth: %d\n",bit_depth);
+     fprintf(stderr,"   file: %s\n",infile);
      exit(0);
    }
    if (color_type != PNG_COLOR_TYPE_GRAY && color_type != PNG_COLOR_TYPE_RGB) {
-     fprintf(stderr,"INCOMPLETE: read_png expect grayscale or RGB images\n");
+     fprintf(stderr,"INCOMPLETE: read_png expect grayscale (%d) or RGB (%d) images\n",PNG_COLOR_TYPE_GRAY,PNG_COLOR_TYPE_RGB);
+     fprintf(stderr,"   color_type: %d\n",color_type);
+     fprintf(stderr,"   file: %s\n",infile);
      exit(0);
    }
 
@@ -695,12 +699,21 @@ int read_png (char *infile, int nx, int ny,
 
      // no scaling, 16-bit per channel, RGB
      if (high_depth) {
-       if (overlay) {
+       if (overlay && !darkenonly) {
          for (j=ny-1; j>=0; j--) {
            for (i=0; i<nx; i++) {
              red[i][j] = (red[i][j] + overlay_frac*(redmin+redrange*(img[ny-1-j][6*i]*256+img[ny-1-j][6*i+1])/65535.)) / overlay_divisor;
              grn[i][j] = (grn[i][j] + overlay_frac*(grnmin+grnrange*(img[ny-1-j][6*i+2]*256+img[ny-1-j][6*i+3])/65535.)) / overlay_divisor;
              blu[i][j] = (blu[i][j] + overlay_frac*(blumin+blurange*(img[ny-1-j][6*i+4]*256+img[ny-1-j][6*i+5])/65535.)) / overlay_divisor;
+           }
+         }
+       } else if (overlay && darkenonly) {
+         for (j=ny-1; j>=0; j--) {
+           for (i=0; i<nx; i++) {
+             red[i][j] -= overlay_frac*(redmin+redrange*(1.-img[ny-1-j][3*i]/255.));
+             red[i][j] -= overlay_frac*(redmin+redrange*(1.-(img[ny-1-j][6*i]*256+img[ny-1-j][6*i+1])/65535.));
+             grn[i][j] -= overlay_frac*(grnmin+grnrange*(1.-(img[ny-1-j][6*i+2]*256+img[ny-1-j][6*i+3])/65535.));
+             blu[i][j] -= overlay_frac*(blumin+blurange*(1.-(img[ny-1-j][6*i+4]*256+img[ny-1-j][6*i+5])/65535.));
            }
          }
        } else {
@@ -715,12 +728,21 @@ int read_png (char *infile, int nx, int ny,
 
      // no scaling, 8-bit per channel, RGB
      } else {
-       if (overlay) {
+       if (overlay && !darkenonly) {
          for (j=ny-1; j>=0; j--) {
            for (i=0; i<nx; i++) {
              red[i][j] = (red[i][j] + overlay_frac*(redmin+redrange*img[ny-1-j][3*i]/255.)) / overlay_divisor;
              grn[i][j] = (grn[i][j] + overlay_frac*(grnmin+grnrange*img[ny-1-j][3*i+1]/255.)) / overlay_divisor;
              blu[i][j] = (blu[i][j] + overlay_frac*(blumin+blurange*img[ny-1-j][3*i+2]/255.)) / overlay_divisor;
+           }
+         }
+       } else if (overlay && darkenonly) {
+         for (j=ny-1; j>=0; j--) {
+           for (i=0; i<nx; i++) {
+             
+             red[i][j] -= overlay_frac*(redmin+redrange*(1.-img[ny-1-j][3*i]/255.));
+             grn[i][j] -= overlay_frac*(grnmin+grnrange*(1.-img[ny-1-j][3*i+1]/255.));
+             blu[i][j] -= overlay_frac*(blumin+blurange*(1.-img[ny-1-j][3*i+2]/255.));
            }
          }
        } else {

@@ -16,15 +16,17 @@
 #include "png.h"
 
 // this can and should be changed to allow running non-square sims:
+// no: eventually this will support non-square *pixels*, but for now it's broken
 //#define SCALE 1.7777778
 #define SCALE 1.0
+//#define SCALE 0.0857
 
 // these can be changed
 // for ordering of the arrays in "a", they will change depending on what is being tracked
 #define XV 0		// x-velocity
 #define YV 1		// y-velocity
 #define ZV 2		// z-velocity
-#define MAX_SCALARS 9	// must be greater than 3 for vic3d->moc to work
+#define MAX_SCALARS 12	// must be greater than 3 for vic3d->moc to work
 #define WX 0		// vorticity, x-dir, 3D field
 #define WY 1		// vorticity, y-dir, 3D field
 #define WZ 2		// vorticity, z-dir, 3D field
@@ -35,16 +37,23 @@
 #define RR 6		// red
 #define GG 7		// green
 #define BB 8		// blue
+#define MD 9		// viscosity (momentum diffusivity) field (for variable viscosity)
+#define TD 10		// scalar diffusivity field (for variable viscosity)
+#define CD 11		// color diffusivity field (for variable viscosity)
 
 // these don't need to be modified
 #define FLOAT float	// use 4-byte floats or 8-byte doubles; actually, this must
  			// be set to "float" because the gr2.c routines require it
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define TRUE 1
 #define FALSE 0
 #define EPSILON 1.0e-6
 #define WALL 0		// these are for boundary conditions
 #define OPEN 1
 #define PERIODIC 2
+
+#define VMAXAVG 5
 
 // in libvicmoc.c
 extern int add_sharp_circular_blob(int,int,int,int,float**,float,float,float,float);
@@ -56,19 +65,22 @@ extern int add_cube_3d(int,int,int,int,int,int,float***,float,float,float,float,
 extern int add_vortex_ring_3d(int,int,int,int,int,int,float***,float***,float***,float,float,float,float,float,float,float,float,float);
 extern int write_output(char*,int,int,float**,float,float,int);
 extern int write_png (char*, int, int, int, int, float**, float, float, float**, float, float, float**, float, float);
-extern int read_png (char*, int, int, int, int, float, float**, float, float, float**, float, float, float**, float, float);
+extern int read_png (char*, int, int, int, int, float, int, float**, float, float, float**, float, float, float**, float, float);
 extern int write_output_3d(char*,int,int,int,float***,float,float,int,int);
 extern int write_output_particles_rad(char*,int,float**,float**,float*);
 extern int explicit_particle_move_3d(int,int,int,int,int,int,float****,float,float,int,float**,float**);
-extern float step_forward_2d(int,int,int,int,int,int,float*,float***,float***,float***,int,float**,int,int*,float*,int,float*,float,float);
-extern float step_forward_3d(int,int,int,int,int,int,int,int,float****,float****,int,int*,float*,float,float);
+extern float step_forward_2d(int,int,int,int,int,int,int,int,float*,int,int,float***,float***,float***,int,float**,float*,int,float*,float,int,float,float,float***);
+extern float step_forward_3d(int,int,int,int,int,int,int,int,float****,float****,float****,int,int*,float*,float,float);
 extern int make_solenoidal_3d(int,int,int,int,int,int,float***,float***,float***);
 extern float find_energy_3d(int,int,int,int,int,int,float***,float***,float***);
-extern float* allocate_1d_array_f(int);
+extern float find_vmax(float***, float***, float***,int,int,int);
+
+extern float* allocate_1d_array_f(long int);
 extern float** allocate_2d_array_f(int,int);
 extern int free_2d_array_f(float**);
 extern float*** allocate_3d_array_f(int,int,int);
 extern int free_3d_array_f(float***);
+extern float** flatten_to_2d (float***, int, int, int, int);
 
 // in gr23.c
 //extern int hwscrt_(real *a, real *b, integer *m, integer *mbdcnd,

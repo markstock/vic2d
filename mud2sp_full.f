@@ -580,6 +580,7 @@ c     nonspecified boundaries
 c
       do j=jst,jfn
 	y = yc+(j-1)*dly
+c       NOTE: this is where I ignore the call to cofx and prescribe values
 c	call cfy(y,cyy,cy,cey)
 	cyy = 1.
 	cy = 0.
@@ -604,6 +605,7 @@ c
       end do
       do i=ist,ifn
 	x = xa+(i-1)*dlx
+c       NOTE: this is where I ignore the call to cofx and prescribe values
 c	call cfx(x,cxx,cx,cex)
 	cxx = 1.
 	cx = 0.
@@ -1468,7 +1470,7 @@ c     replace line y with point gauss-seidel if
 c     y direction is periodic and ny = 3
 c
       if (nyc .eq. 0 .and. ny .eq. 3) then
-	call rcd2spp(nx,ny,phi,rhs,cofx,cofy)
+	call rmd2spp(nx,ny,phi,rhs,cofx,cofy)
 	return
       end if
       ist = 3
