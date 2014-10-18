@@ -1,5 +1,20 @@
 vic2d - TODO
 
+Add source/sink terms!!!
+  BCs might be hard
+Add new noise types for random vorticity?
+  Or just rely on external programs for input
+Try large sim on tungsten, or ask AMD for compute time
+  24k square sim should fit in 40 GB RAM
+Rewrite .h files the right way---what I have now sucks
+Test creative vorticity input for frozen flow
+  Like, a corporate logo, or a piece of art
+
+Allow color PNGs to be input for scalar fields---it just takes the 
+brightness component instead of throwing an error.
+
+Support variable viscosity for all variables
+
 0) Support open BCs with either method by doing a treecode solution for the
 velocity at the boundary cells. Use the grid as your tree (0-255 is left,
 256-511 is right, then same up-down, etc. Nice! Make it recursive, of course.
