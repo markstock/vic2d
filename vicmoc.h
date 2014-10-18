@@ -13,7 +13,6 @@
 #include <math.h>
 //#include <f2c.h>
 #include <time.h>
-#include "png.h"
 
 // this can and should be changed to allow running non-square sims:
 // no: eventually this will support non-square *pixels*, but for now it's broken

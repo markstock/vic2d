@@ -5,6 +5,9 @@
  */
 
 #include "vicmoc.h"
+#define png_infopp_NULL (png_infopp)NULL
+#define int_p_NULL (int*)NULL
+#include "png.h"
 
 int write_output(char*,int,int,float**,float,float,int);
 int write_png (char*, int, int, int, int, float**, float, float, float**, float, float, float**, float, float);
@@ -614,7 +617,7 @@ int read_png (char *infile, int nx, int ny,
 
    /* Expand grayscale images to the full 8 bits from 1, 2, or 4 bits/pixel */
    if (color_type == PNG_COLOR_TYPE_GRAY && bit_depth < 8)
-      png_set_gray_1_2_4_to_8(png_ptr);
+      png_set_expand_gray_1_2_4_to_8(png_ptr);
 
    /* Optional call to gamma correct and add the background to the palette
     * and update info structure.  REQUIRED if you are expecting libpng to
