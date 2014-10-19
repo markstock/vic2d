@@ -14,6 +14,8 @@
 //#include <f2c.h>
 #include <time.h>
 
+#define M_PI 3.14159265358979323846
+
 // this can and should be changed to allow running non-square sims:
 // no: eventually this will support non-square *pixels*, but for now it's broken
 //#define SCALE 1.7777778
@@ -68,7 +70,7 @@ extern int read_png (char*, int, int, int, int, float, int, float**, float, floa
 extern int write_output_3d(char*,int,int,int,float***,float,float,int,int);
 extern int write_output_particles_rad(char*,int,float**,float**,float*);
 extern int explicit_particle_move_3d(int,int,int,int,int,int,float****,float,float,int,float**,float**);
-extern float step_forward_2d(int,int,int,int,int,int,int,int,float*,int,int,float***,float***,float***,int,float**,float*,int,float*,float,int,float,float,float***);
+extern float step_forward_2d(int,int,int,int,int,int,int,int,float*,int,int,float***,float***,float***,int,float**,float,float*,int,float*,float,int,float,float,float***);
 extern float step_forward_3d(int,int,int,int,int,int,int,int,float****,float****,float****,int,int*,float*,float,float);
 extern int make_solenoidal_3d(int,int,int,int,int,int,float***,float***,float***);
 extern float find_energy_3d(int,int,int,int,int,int,float***,float***,float***);
@@ -80,6 +82,8 @@ extern int free_2d_array_f(float**);
 extern float*** allocate_3d_array_f(int,int,int);
 extern int free_3d_array_f(float***);
 extern float** flatten_to_2d (float***, int, int, int, int);
+
+extern void update_mask_with_blocks (float**, float***, int, int, float);
 
 // in gr23.c
 //extern int hwscrt_(real *a, real *b, integer *m, integer *mbdcnd,

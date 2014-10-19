@@ -15,13 +15,13 @@ int add_smooth_circular_blob (int,int,int,int,float**,float,float,float,float);
 int add_smooth_spherical_blob (int,int,int,int,int,int,float***,float,float,float,float,float);
 
 // simulation routines
-float step_forward_2d (int,int,int,int,int,int,int,int,float*,int,int,float***,float***,float***,int,float**,float*,int,float*,float,int,float,float,float***);
+float step_forward_2d (int,int,int,int,int,int,int,int,float*,int,int,float***,float***,float***,int,float**,float,float*,int,float*,float,int,float,float,float***);
 
 int create_baroclinic_vorticity_2d (int,int,int,int,float**,float**,float,float*,float);
 int create_boundary_vorticity_2d (int,int,int,int,float**,float**,float**,float);
 float diffuse_scalar_2d (int,int,int,int,float**,float**,float,int,float**,float);
 float variable_diffuse_scalar_2d (int,int,int,int,float**,float**,float**,int,float**,float);
-int find_vels_2d (int,int,int,int,int,int,int,float*,float**,float**,float**,int,float**);
+int find_vels_2d (int,int,int,int,int,int,int,float*,float**,float**,float**,int,float**,float);
 int find_gradient_of_scalar_2d (int,int,int,int,float**,float**,float,float**,float);
 int find_gradient_of_scalar_2nd_2d (int,int,int,int,float**,float**,float,float**,float);
 int find_curl_of_vel_2d (int,int,int,int,float**,float**,float**);
@@ -130,7 +130,7 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
     int nx, int ny, int xbdry, int ybdry,
     float *freestream, int recalc_vel, int move_colors,
     float ***u, float ***a, float ***t,
-    int use_MASK,float **mask,
+    int use_MASK, float **mask, float maskerr,
     float sc_diffus[MAX_SCALARS],
     int gravtype, float *grav,
     float dt,
@@ -156,11 +156,6 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
     // regardless of the above, copy 'u' to 'a' so that we can diffuse it later
     (void) copy_2d_field(u[XV], a[XV], nx, ny);
     (void) copy_2d_field(u[YV], a[YV], nx, ny);
-
-    //sprintf(outfileroot,"u_%04d",step+10);
-    //write_output(outfileroot,nx,ny,a[XV],-0.25,0.5,1);
-    //sprintf(outfileroot,"v_%04d",step+10);
-    //write_output(outfileroot,nx,ny,a[YV],-0.25,0.5,1);
 
   } else {
 
@@ -204,13 +199,6 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
     }
   }
 
-  if (isStam) {
-    //sprintf(outfileroot,"u_%04d",step+20);
-    //write_output(outfileroot,nx,ny,t[XV],-0.25,0.5,1);
-    //sprintf(outfileroot,"v_%04d",step+20);
-    //write_output(outfileroot,nx,ny,t[YV],-0.25,0.5,1);
-  }
-
   // again, split on method
   if (isStam) {
 
@@ -228,13 +216,6 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
   // project forward to find the new fields (both)
   if (!silent) fprintf(stderr,"  now in moc_advect_2d\n"); fflush(stderr);
   moc_advect_2d (nx,ny,xbdry,ybdry,u[XV],u[YV],t,a,dt,mocOrder,move_colors);
-
-  if (isStam) {
-    //sprintf(outfileroot,"u_%04d",step+40);
-    //write_output(outfileroot,nx,ny,a[XV],-0.25,0.5,1);
-    //sprintf(outfileroot,"v_%04d",step+40);
-    //write_output(outfileroot,nx,ny,a[YV],-0.25,0.5,1);
-  }
 
   // split on method for advection step
   if (isStam) {
@@ -286,7 +267,7 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
   // find the velocity field from the vorticity field
   if (recalc_vel) {
     if (!silent) fprintf(stderr,"  now in find_vels_2d\n"); fflush(stderr);
-    find_vels_2d (silent,step,isStam,nx,ny,xbdry,ybdry,freestream,u[XV],u[YV],a[W2],use_MASK,mask);
+    find_vels_2d (silent,step,isStam,nx,ny,xbdry,ybdry,freestream,u[XV],u[YV],a[W2],use_MASK,mask,maskerr);
   }
 
   // calculate effective Reynolds number
@@ -787,7 +768,8 @@ float variable_diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,
  */
 int find_vels_2d (int silent, int step,const int isStam,const int nx,const int ny,
       const int xbdry,const int ybdry,float *freestream,
-      float **u,float **v,float **vort,const int use_MASK,float **mask) {
+      float **u,float **v,float **vort,
+      const int use_MASK,float **mask,float maskerr) {
 
    int use_multigrid = TRUE;	// use MUDPACK solver mud2sp.f
    //int use_multigrid = FALSE;	// use FISHPAK solver gr2.c
@@ -817,7 +799,6 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    float muderr = 1.e-4;
    // these are for both
    int ierr;
-   float maskerr = 1.e-3;
    long int iworksize = 3.67*nx*ny+100*nx+2000;	// OK for all?
    static float *work;	// increasing this does not fix hwscrt's problem
    float xs,xf,ys,yf;
@@ -868,7 +849,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
 
    // set maximum number of iterations
    if (use_MASK) {
-      maxstep = 100;
+      maxstep = 1000;
    } else {
       maxstep = 1;
    }

@@ -27,6 +27,7 @@ endif
 ifdef OPENMP
   CFLAGS+=-fopenmp
 endif
+CFLAGS+=-std=c99
 
 ifeq ($(UNAME), Linux)
   LDFLAGS=
@@ -52,7 +53,7 @@ mud3sp.o : mud3sp.f Makefile
 %.o : %.c vicmoc.h Makefile
 	$(CC) $(CFLAGS) $(MACH) -c $<
 
-LIB2D=libvicmoc2d.o utility.o gr2.o mud2sp_full.o
+LIB2D=libvicmoc2d.o utility.o maskops.o gr2.o mud2sp_full.o
 LIB3D=libvicmoc3d.o utility.o gr3.o mud3sp.o mud2sp_full.o
 
 libvicmoc2d.a: $(LIB2D) vicmoc.h Makefile

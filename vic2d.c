@@ -42,6 +42,8 @@ int main(int argc,char **argv) {
    int darkenonly = TRUE;
    int freeze_flow = FALSE;
    int freeze_at = -1;
+   int stop_flow = FALSE;
+   int stop_at = -1;
    int use_MASK = FALSE;
    int use_image = FALSE;
    int use_strong_strat = FALSE;
@@ -78,6 +80,7 @@ int main(int argc,char **argv) {
    float avgcputime = 0.;
    float simtime = 0.;
    float thisc[3];
+   float maskerr;
 
    float **u[2];			// velocities
    float **a[MAX_SCALARS];		// other scalars
@@ -145,6 +148,7 @@ int main(int argc,char **argv) {
    gravity[1] = 1.0;
    vortscale = 10.;
    velscale = 1.;
+   maskerr = 1.e-3;
 
    // read command-line
    (void) strcpy(progname,argv[0]);
@@ -191,6 +195,14 @@ int main(int argc,char **argv) {
             if (isdigit((int)argv[i+1][0]) || isdigit((int)argv[i+1][1])) {
                // first number after elevation is frame at which to freeze
                freeze_at = atoi(argv[++i]);
+            }
+         }
+      } else if (strncmp(argv[i], "-stop", 3) == 0) {
+         stop_flow = TRUE;
+         if (argc > i+1) {
+            if (isdigit((int)argv[i+1][0]) || isdigit((int)argv[i+1][1])) {
+               // first number after elevation is frame at which to stop
+               stop_at = atoi(argv[++i]);
             }
          }
       } else if (strncmp(argv[i], "-constcn", 8) == 0) {
@@ -262,6 +274,8 @@ int main(int argc,char **argv) {
          strcpy (maskfilename,argv[++i]);
          use_mask_img = TRUE;
          use_MASK = TRUE;
+      } else if (strncmp(argv[i], "-me", 3) == 0) {
+         maskerr = atof(argv[++i]);
       } else if (strncmp(argv[i], "-m", 2) == 0) {
          use_MASK = TRUE;
 
@@ -615,12 +629,14 @@ int main(int argc,char **argv) {
          }
       }
       temp = maxval-minval;
+      if (temp > 1.e-5) {
       for (ix=0; ix<nx; ix++) {
          for (iy=0; iy<ny; iy++) {
             mask[ix][iy] = (maxval-mask[ix][iy])/temp;
             if (mask[ix][iy] < 0.0) mask[ix][iy] = 0.0;
             if (mask[ix][iy] > 1.0) mask[ix][iy] = 1.0;
          }
+      }
       }
    }
 
@@ -992,11 +1008,22 @@ int main(int argc,char **argv) {
          }
       }
 
+      // should we test for stop?
+      if (stop_flow) {
+         if (step > stop_at) {
+            recalc_vel = FALSE;
+            move_colors = FALSE;
+         } else {
+            recalc_vel = TRUE;
+            move_colors = TRUE;
+         }
+      }
+
       // take one computational step forward in time
       effective_re = step_forward_2d (silent,step,isStam,4,
                         nx,ny,xbdry,ybdry,freestream,
                         recalc_vel,move_colors,
-                        u,a,t,use_MASK,mask,sc_diffus,
+                        u,a,t,use_MASK,mask,maskerr,sc_diffus,
                         gravtype,gravity,dt,
                         use_strong_strat,bn,dens_ratio,acc);
 
@@ -1019,6 +1046,10 @@ int main(int argc,char **argv) {
             //   }
             //}
          }
+      }
+
+      if (FALSE) {
+         (void) update_mask_with_blocks (mask, a, nx, ny, simtime);
       }
 
       if (FALSE && step%50 == 0 && step < 1001) {
@@ -1290,8 +1321,12 @@ int Usage(char progname[80],int status) {
    "   -df [name]  read PNG file and use as initial dilation/divergence field  ",
    "                                                                           ",
    "                                                                           ",
+   "   -m          track mask field                                            ",
+   "                                                                           ",
    "   -mf [name]  read PNG file and use as flow mask, black areas are solid,  ",
    "               white areas are completely open                             ",
+   "                                                                           ",
+   "   -me [float] set residual error in iterations; default is 1.e-3          ",
    "                                                                           ",
    "                                                                           ",
    "   -dt [float] set the time step increment, if unused, Courant number will ",

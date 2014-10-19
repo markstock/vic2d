@@ -1,5 +1,8 @@
 vic2d - TODO
 
+Add poisson process code to this
+  Look in vort3d for marquee
+
 Add source/sink terms!!!
   BCs might be hard
 Add new noise types for random vorticity?
