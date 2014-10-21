@@ -1036,7 +1036,7 @@ int main(int argc,char **argv) {
       }
 
       // take one computational step forward in time
-      effective_re = step_forward_2d (silent,step,isStam,1,
+      effective_re = step_forward_2d (silent,step,isStam,4,
                         nx,ny,xbdry,ybdry,freestream,
                         recalc_vel,move_colors,
                         u,a,t,use_MASK,mask,maskerr,sc_diffus,
