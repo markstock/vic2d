@@ -2003,12 +2003,12 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
                v0 = v[i][j];
 
                // find position 1 explicit Euler step backwards
-               newx = px-dt*u0;
+               newx = px-dt*velmult*u0;
                if (xbdry == WALL || xbdry == OPEN) {
                   if (newx > xf-EPSILON) newx = xf-EPSILON;
                   if (newx < 0.0+EPSILON) newx = EPSILON;
                }
-               newy = py-dt*v0;
+               newy = py-dt*velmult*v0;
                if (ybdry == WALL || ybdry == OPEN) {
                   if (newy > yf-EPSILON) newy = yf-EPSILON;
                   if (newy < 0.0+EPSILON) newy = EPSILON;
@@ -2023,12 +2023,12 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
                   interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
 
                // find position back 1 step using average of two velocities
-               newx = px-dt*0.5*(u0+u1);
+               newx = px-dt*0.5*velmult*(u0+u1);
                if (xbdry == WALL || xbdry == OPEN) {
                   if (newx > xf-EPSILON) newx = xf-EPSILON;
                   if (newx < 0.0+EPSILON) newx = EPSILON;
                }
-               newy = py-dt*0.5*(v0+v1);
+               newy = py-dt*0.5*velmult*(v0+v1);
                if (ybdry == WALL || ybdry == OPEN) {
                   if (newy > yf-EPSILON) newy = yf-EPSILON;
                   if (newy < 0.0+EPSILON) newy = EPSILON;
@@ -2069,12 +2069,12 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
                v0 = v[i][j];
 
                // find position 1 explicit Euler step backwards
-               newx = px-dt*0.5*u0;
+               newx = px-dt*0.5*velmult*u0;
                if (xbdry == WALL || xbdry == OPEN) {
                   if (newx > xf-EPSILON) newx = xf-EPSILON;
                   if (newx < 0.0+EPSILON) newx = EPSILON;
                }
-               newy = py-dt*0.5*v0;
+               newy = py-dt*0.5*velmult*v0;
                if (ybdry == WALL || ybdry == OPEN) {
                   if (newy > yf-EPSILON) newy = yf-EPSILON;
                   if (newy < 0.0+EPSILON) newy = EPSILON;
@@ -2088,12 +2088,12 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
                   interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
 
                // find position 2 explicit Euler step backwards
-               newx = px-dt*0.5*u1;
+               newx = px-dt*0.5*velmult*u1;
                if (xbdry == WALL || xbdry == OPEN) {
                   if (newx > xf-EPSILON) newx = xf-EPSILON;
                   if (newx < 0.0+EPSILON) newx = EPSILON;
                }
-               newy = py-dt*0.5*v1;
+               newy = py-dt*0.5*velmult*v1;
                if (ybdry == WALL || ybdry == OPEN) {
                   if (newy > yf-EPSILON) newy = yf-EPSILON;
                   if (newy < 0.0+EPSILON) newy = EPSILON;
@@ -2107,12 +2107,12 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
                   interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u2,&v2);
 
                // find position 3 explicit Euler step backwards
-               newx = px-dt*u2;
+               newx = px-dt*velmult*u2;
                if (xbdry == WALL || xbdry == OPEN) {
                   if (newx > xf-EPSILON) newx = xf-EPSILON;
                   if (newx < 0.0+EPSILON) newx = EPSILON;
                }
-               newy = py-dt*v2;
+               newy = py-dt*velmult*v2;
                if (ybdry == WALL || ybdry == OPEN) {
                   if (newy > yf-EPSILON) newy = yf-EPSILON;
                   if (newy < 0.0+EPSILON) newy = EPSILON;
@@ -2127,21 +2127,21 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
 
                // find position back 1 step using average of four velocities
                accx = 0.16666667*(u0+u3+2.*(u1+u2));
-               newx = px-dt*accx;
+               newx = px-dt*velmult*accx;
                if (xbdry == WALL || xbdry == OPEN) {
                   if (newx > xf-EPSILON) newx = xf-EPSILON;
                   if (newx < 0.0+EPSILON) newx = EPSILON;
                }
                accy = 0.16666667*(v0+v3+2.*(v1+v2));
-               newy = py-dt*accy;
+               newy = py-dt*velmult*accy;
                if (ybdry == WALL || ybdry == OPEN) {
                   if (newy > yf-EPSILON) newy = yf-EPSILON;
                   if (newy < 0.0+EPSILON) newy = EPSILON;
                }
 
                // gather an estimate of the acceleration (u1-u0)/dt?
-               accx = (u0-accx)*oodt;
-               accy = (v0-accy)*oodt;
+               accx = velmult*(u0-accx)*oodt;
+               accy = velmult*(v0-accy)*oodt;
                //accmag = pow(accx,2) + pow(accy,2);
                //accmag = sqrt(accmag);
                //fprintf(stdout,"%d %d %g\n",i,j,accmag);
