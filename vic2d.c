@@ -685,7 +685,7 @@ int main(int argc,char **argv) {
    }
 
    // initialize an array of blocks to add during the run
-   if (FALSE) {
+   if (TRUE) {
       populate_block_array(nx,ny);
    }
 
@@ -1036,7 +1036,7 @@ int main(int argc,char **argv) {
       }
 
       // take one computational step forward in time
-      effective_re = step_forward_2d (silent,step,isStam,4,
+      effective_re = step_forward_2d (silent,step,isStam,1,
                         nx,ny,xbdry,ybdry,freestream,
                         recalc_vel,move_colors,
                         u,a,t,use_MASK,mask,maskerr,sc_diffus,
@@ -1064,7 +1064,7 @@ int main(int argc,char **argv) {
          }
       }
 
-      if (FALSE) {
+      if (TRUE) {
          (void) update_mask_with_blocks_2 (mask, a, nx, ny, simtime, dt);
       }
 

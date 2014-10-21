@@ -489,11 +489,14 @@ float diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,float **in,float **ou
      #pragma omp parallel for private(i,j)
      for (i=1;i<nxm1;i++) {
        for (j=1;j<nym1;j++) {
-         //omm = 1.-mask[i][j];
-         omm = mask[i][j];
+         // first attempt 2014-10-20
+         //out[i][j] = in[i][j]
+         //          + mask[i+1][j]*mask[i][j]*mask[i-1][j]*multx*(in[i+1][j]+in[i-1][j]-2.*in[i][j])
+         //          + mask[i][j+1]*mask[i][j]*mask[i][j-1]*multy*(in[i][j+1]+in[i][j-1]-2.*in[i][j]);
+         // see notes 2014-10-21
          out[i][j] = in[i][j]
-                   + mask[i+1][j]*mask[i][j]*mask[i-1][j]*multx*(in[i+1][j]+in[i-1][j]-2.*in[i][j])
-                   + mask[i][j+1]*mask[i][j]*mask[i][j-1]*multy*(in[i][j+1]+in[i][j-1]-2.*in[i][j]);
+                   + mask[i][j]*multx*(mask[i+1][j]*(in[i+1][j]-in[i][j]) + mask[i-1][j]*(in[i-1][j]-in[i][j]))
+                   + mask[i][j]*multy*(mask[i][j+1]*(in[i][j+1]-in[i][j]) + mask[i][j-1]*(in[i][j-1]-in[i][j]));
        }
      }
    } else {
@@ -510,7 +513,6 @@ float diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,float **in,float **ou
    // walls, 2nd order Laplacian
    // then solve for the wall and periodic bdry
    if (xbdry == WALL || xbdry == OPEN) {
-      // for (j=0;j<ny;j++) {
       for (j=1;j<nym1;j++) {
          out[0][j] = in[0][j]
                    + multx*(-in[2][j]+6.*in[1][j]-5.*in[0][j])
