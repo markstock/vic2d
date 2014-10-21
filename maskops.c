@@ -161,7 +161,7 @@ void populate_block_array (int nx, int ny) {
 
             // check rightmost side
             keeptrying = TRUE;
-            while (keeptrying && (block[icnt].endx < ny-1)) {
+            while (keeptrying && (block[icnt].endx < nx-1)) {
                int isbad = FALSE;
                for (int iy=block[icnt].starty; iy<block[icnt].endy; iy++) {
                   if (masked[block[icnt].endx][iy] == TRUE &&
