@@ -18,6 +18,7 @@
 float compute_and_write_stats(int, int, float, float, float, int, int, int, int, float***);
 void paint_splat (float,float,float,float,float,float,float,float,float,int,int,int,float**,float**,float**);
 int get_random_color (float***,int,int,float*);
+int Usage(char[80],int);
 
 int main(int argc,char **argv) {
 
@@ -53,6 +54,7 @@ int main(int argc,char **argv) {
    int print_vel = FALSE;
    int print_temp = FALSE;
    int print_mu = FALSE;
+   int print_mask = FALSE;
 
    float md,mdlow,mdhigh;		// dimensional momentum diffusivity
    float vd;				// dimensional viscosity diffusivity
@@ -197,7 +199,7 @@ int main(int argc,char **argv) {
                freeze_at = atoi(argv[++i]);
             }
          }
-      } else if (strncmp(argv[i], "-stop", 3) == 0) {
+      } else if (strncmp(argv[i], "-stop", 4) == 0) {
          stop_flow = TRUE;
          if (argc > i+1) {
             if (isdigit((int)argv[i+1][0]) || isdigit((int)argv[i+1][1])) {
@@ -276,6 +278,8 @@ int main(int argc,char **argv) {
          use_MASK = TRUE;
       } else if (strncmp(argv[i], "-me", 3) == 0) {
          maskerr = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-mprint", 3) == 0) {
+         print_mask = TRUE;
       } else if (strncmp(argv[i], "-m", 2) == 0) {
          use_MASK = TRUE;
 
@@ -643,7 +647,7 @@ int main(int argc,char **argv) {
    // Initial velocity solve -------------------------
 
    // if you want to show velocity on the first step, solve for it here
-   find_vels_2d (silent,step,isStam,nx,ny,xbdry,ybdry,freestream,u[XV],u[YV],a[W2],use_MASK,mask);
+   find_vels_2d (silent,step,isStam,nx,ny,xbdry,ybdry,freestream,u[XV],u[YV],a[W2],use_MASK,mask,maskerr);
 
    // find vmax (might need this)
    vmax = 0.;
@@ -665,9 +669,9 @@ int main(int argc,char **argv) {
    if (FALSE) {
 
       // the color image from which to grab colors
-      sprintf(colorsrcfilename,"img_2517_th.png");
-      cnx = 50;
-      cny = 33;
+      sprintf(colorsrcfilename,"color_source.png");
+      cnx = 300;
+      cny = 169;
 
       // allocate space and read image
       c[0] = allocate_2d_array_f(cnx,cny);
@@ -680,6 +684,10 @@ int main(int argc,char **argv) {
       //(void) get_random_color (c,cnx,cny,thisc);
    }
 
+   // initialize an array of blocks to add during the run
+   if (FALSE) {
+      populate_block_array(nx,ny);
+   }
 
    // first, find what index the scalar uses
    if (use_COLOR) {
@@ -931,9 +939,17 @@ int main(int argc,char **argv) {
                        NULL,0.0,1.0);
          }
          //#pragma omp section
+         if (print_mask && use_MASK) {
+            sprintf(outfileroot,"mask_%05d",step);
+            write_png (outfileroot,nx,ny,FALSE,FALSE,
+                       mask,0.0,1.0,
+                       NULL,0.0,1.0,
+                       NULL,0.0,1.0);
+         }
+         //#pragma omp section
          if (print_temp) {
             sprintf(outfileroot,"temp_%05d",step);
-            write_png (outfileroot,nx,ny,FALSE,use_16bpp,
+            write_png (outfileroot,nx,ny,FALSE,FALSE,
                        a[SF],0.0,1.0,
                        NULL,0.0,1.0,
                        NULL,0.0,1.0);
@@ -1049,7 +1065,7 @@ int main(int argc,char **argv) {
       }
 
       if (FALSE) {
-         (void) update_mask_with_blocks (mask, a, nx, ny, simtime);
+         (void) update_mask_with_blocks_2 (mask, a, nx, ny, simtime, dt);
       }
 
       if (FALSE && step%50 == 0 && step < 1001) {

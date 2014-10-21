@@ -16,6 +16,8 @@ float*** allocate_3d_array_f(int,int,int);
 int free_3d_array_f(float***);
 float** flatten_to_2d (float***, int, int, int, int);
 
+int** allocate_2d_array_i (int,int);
+int free_2d_array_i (int**);
 
 /*
  * Copy an array
@@ -177,6 +179,29 @@ float*** allocate_3d_array_f(int nx, int ny, int nz) {
 
 int free_3d_array_f(float*** array){
    free(array[0][0]);
+   free(array[0]);
+   free(array);
+   return(0);
+}
+
+
+/*
+ * allocate memory for a two-dimensional array of ints
+ */
+int** allocate_2d_array_i(int nx,int ny) {
+ 
+   int i;
+   int **array = (int **)malloc(nx * sizeof(int *));
+ 
+   array[0] = (int *)malloc(nx * ny * sizeof(int));
+   for (i=1; i<nx; i++)
+      array[i] = array[0] + i * ny;
+ 
+   return(array);
+}
+
+
+int free_2d_array_i(int** array){
    free(array[0]);
    free(array);
    return(0);

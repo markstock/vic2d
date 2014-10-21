@@ -17,15 +17,15 @@ int add_smooth_spherical_blob (int,int,int,int,int,int,float***,float,float,floa
 // simulation routines
 float step_forward_2d (int,int,int,int,int,int,int,int,float*,int,int,float***,float***,float***,int,float**,float,float*,int,float*,float,int,float,float,float***);
 
-int create_baroclinic_vorticity_2d (int,int,int,int,float**,float**,float,float*,float);
+int create_baroclinic_vorticity_2d (int,int,int,int,float**,float**,float**,float,float*,float);
 int create_boundary_vorticity_2d (int,int,int,int,float**,float**,float**,float);
 float diffuse_scalar_2d (int,int,int,int,float**,float**,float,int,float**,float);
 float variable_diffuse_scalar_2d (int,int,int,int,float**,float**,float**,int,float**,float);
-int find_vels_2d (int,int,int,int,int,int,int,float*,float**,float**,float**,int,float**,float);
+int find_vels_2d (int,int,int,int,int,int,int,float*,float**,float**,float**,const int,float**,const float);
 int find_gradient_of_scalar_2d (int,int,int,int,float**,float**,float,float**,float);
-int find_gradient_of_scalar_2nd_2d (int,int,int,int,float**,float**,float,float**,float);
+int find_gradient_of_scalar_2nd_2d (int,int,int,int,float**,float**,float**,float,float**,float);
 int find_curl_of_vel_2d (int,int,int,int,float**,float**,float**);
-int moc_advect_2d (int,int,int,int,float**,float**,float***,float***,float,int,int);
+int moc_advect_2d (int,int,int,int,float **,float**,float**,float***,float***,float,int,int);
 int find_open_boundary_psi (int,int,float**,float,float*,float**);
 float find_biot_savart_u (float,float,int,int,float,float,float**);
 float find_biot_savart_v (float,float,int,int,float,float,float**);
@@ -130,7 +130,7 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
     int nx, int ny, int xbdry, int ybdry,
     float *freestream, int recalc_vel, int move_colors,
     float ***u, float ***a, float ***t,
-    int use_MASK, float **mask, float maskerr,
+    const int use_MASK, float **mask, const float maskerr,
     float sc_diffus[MAX_SCALARS],
     int gravtype, float *grav,
     float dt,
@@ -165,7 +165,7 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
 
     // create new vorticity based on density differences (gradient of scalar)
     if (a[SF] != NULL)
-      create_baroclinic_vorticity_2d (nx,ny,xbdry,ybdry,a[SF],a[W2],dt,grav,bn);
+      create_baroclinic_vorticity_2d (nx,ny,xbdry,ybdry,a[SF],mask,a[W2],dt,grav,bn);
 
     // create new vorticity due to viscous boundaries, etc,
     // sets 'a' vorticity at boundaries
@@ -215,7 +215,7 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
 
   // project forward to find the new fields (both)
   if (!silent) fprintf(stderr,"  now in moc_advect_2d\n"); fflush(stderr);
-  moc_advect_2d (nx,ny,xbdry,ybdry,u[XV],u[YV],t,a,dt,mocOrder,move_colors);
+  moc_advect_2d (nx,ny,xbdry,ybdry,mask,u[XV],u[YV],t,a,dt,mocOrder,move_colors);
 
   // split on method for advection step
   if (isStam) {
@@ -282,7 +282,7 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
  * create vorticity at areas of scalar gradient
  */
 int create_baroclinic_vorticity_2d (int nx,int ny,int xbdry,int ybdry,
-      float **scalar,float **vort,float dt,float *g,float bn) {
+      float **scalar,float **mask,float **vort,float dt,float *g,float bn) {
 
    int i,j;
    //float g[2] = {0.0,-1.0};
@@ -302,7 +302,7 @@ int create_baroclinic_vorticity_2d (int nx,int ny,int xbdry,int ybdry,
    }
 
    // first, find the scalar gradient
-   find_gradient_of_scalar_2nd_2d (nx,ny,xbdry,ybdry,scalar,grad[0],bn,grad[1],bn);
+   find_gradient_of_scalar_2nd_2d (nx,ny,xbdry,ybdry,scalar,mask,grad[0],bn,grad[1],bn);
 
    // then, cross with the gravity vector
    #pragma omp parallel for private(i,j)
@@ -485,88 +485,104 @@ float diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,float **in,float **ou
    for (istep=0; istep<numsteps; istep++) {
 
    // do the middle part of the field, regardless of the BCs
-   //if (use_MASK) {
-   if (FALSE) {
+   if (use_MASK) {
      #pragma omp parallel for private(i,j)
      for (i=1;i<nxm1;i++) {
        for (j=1;j<nym1;j++) {
-         omm = 1.-mask[i][j];
-         out[i][j] = in[i][j] + omm*multx*(in[i+1][j]+in[i-1][j]-2.*in[i][j]) + omm*multy*(in[i][j+1]+in[i][j-1]-2.*in[i][j]);
+         //omm = 1.-mask[i][j];
+         omm = mask[i][j];
+         out[i][j] = in[i][j]
+                   + mask[i+1][j]*mask[i][j]*mask[i-1][j]*multx*(in[i+1][j]+in[i-1][j]-2.*in[i][j])
+                   + mask[i][j+1]*mask[i][j]*mask[i][j-1]*multy*(in[i][j+1]+in[i][j-1]-2.*in[i][j]);
        }
      }
    } else {
      #pragma omp parallel for private(i,j)
      for (i=1;i<nxm1;i++) {
        for (j=1;j<nym1;j++) {
-         out[i][j] = in[i][j] + multx*(in[i+1][j]+in[i-1][j]-2.*in[i][j]) + multy*(in[i][j+1]+in[i][j-1]-2.*in[i][j]);
+         out[i][j] = in[i][j]
+                   + multx*(in[i+1][j]+in[i-1][j]-2.*in[i][j])
+                   + multy*(in[i][j+1]+in[i][j-1]-2.*in[i][j]);
        }
      }
    }
 
+   // walls, 2nd order Laplacian
    // then solve for the wall and periodic bdry
    if (xbdry == WALL || xbdry == OPEN) {
       // for (j=0;j<ny;j++) {
       for (j=1;j<nym1;j++) {
-         // out[0][j] = 0.0;
-         //out[0][j] = in[0][j] + mult*(in[0][j+1]+in[0][j-1]-in[2][j]+6*in[1][j]-7*in[0][j]);
-         out[0][j] = in[0][j] + multx*(-in[2][j]+6.*in[1][j]-5.*in[0][j]) + multy*(in[0][j+1]+in[0][j-1]-2.*in[0][j]);
-         // out[nxm1][j] = 0.0;
-         //out[nxm1][j] = in[nxm1][j] + mult*(in[nxm1][j+1]+in[nxm1][j-1]-in[nx-3][j]+6*in[nx-2][j]-7*in[nxm1][j]);
-         out[nxm1][j] = in[nxm1][j] + multx*(-in[nx-3][j]+6.*in[nx-2][j]-5.*in[nxm1][j]) + multy*(in[nxm1][j+1]+in[nxm1][j-1]-2.*in[nxm1][j]);
+         out[0][j] = in[0][j]
+                   + multx*(-in[2][j]+6.*in[1][j]-5.*in[0][j])
+                   + multy*(in[0][j+1]+in[0][j-1]-2.*in[0][j]);
+         out[nxm1][j] = in[nxm1][j]
+                   + multx*(-in[nx-3][j]+6.*in[nx-2][j]-5.*in[nxm1][j])
+                   + multy*(in[nxm1][j+1]+in[nxm1][j-1]-2.*in[nxm1][j]);
       }
    } else if (xbdry == PERIODIC) {
       for (j=1;j<nym1;j++) {
-         //out[0][j] = in[0][j] + mult*(in[1][j]+in[nx-2][j]+in[0][j+1]+in[0][j-1]-4.0*in[0][j]);
-         out[0][j] = in[0][j] + multx*(in[1][j]+in[nx-2][j]-2.*in[0][j]) + multy*(in[0][j+1]+in[0][j-1]-2.*in[0][j]);
+         out[0][j] = in[0][j]
+                   + multx*(in[1][j]+in[nx-2][j]-2.*in[0][j])
+                   + multy*(in[0][j+1]+in[0][j-1]-2.*in[0][j]);
          out[nxm1][j] = out[0][j];
       }
    }
    if (ybdry == WALL || ybdry == OPEN) {
-      // for (i=0;i<nx;i++) {
       for (i=1;i<nxm1;i++) {
-         // out[i][0] = 0.0;
-         //out[i][0] = in[i][0] + mult*(in[i+1][0]+in[i-1][0]-in[i][2]+6*in[i][1]-7*in[i][0]);
-         out[i][0] = in[i][0] + multx*(in[i+1][0]+in[i-1][0]-2.*in[i][0]) + multy*(-in[i][2]+6.*in[i][1]-5.*in[i][0]);
-         // out[i][nym1] = 0.0;
-         //out[i][nym1] = in[i][nym1] + mult*(in[i+1][nym1]+in[i-1][nym1]-in[i][ny-3]+6*in[i][ny-2]-7*in[i][nym1]);
-         out[i][nym1] = in[i][nym1] + multx*(in[i+1][nym1]+in[i-1][nym1]-2.*in[i][nym1]) + multy*(-in[i][ny-3]+6.*in[i][ny-2]-5.*in[i][nym1]);
+         out[i][0] = in[i][0]
+                   + multx*(in[i+1][0]+in[i-1][0]-2.*in[i][0])
+                   + multy*(-in[i][2]+6.*in[i][1]-5.*in[i][0]);
+         out[i][nym1] = in[i][nym1]
+                   + multx*(in[i+1][nym1]+in[i-1][nym1]-2.*in[i][nym1])
+                   + multy*(-in[i][ny-3]+6.*in[i][ny-2]-5.*in[i][nym1]);
       }
    } else if (ybdry == PERIODIC) {
       for (i=1;i<nxm1;i++) {
-         //out[i][0] = in[i][0] + mult*(in[i+1][0]+in[i-1][0]+in[i][1]+in[i][ny-2]-4.0*in[i][0]);
-         out[i][0] = in[i][0] + multx*(in[i+1][0]+in[i-1][0]-2.*in[i][0]) + multy*(in[i][1]+in[i][ny-2]-2.*in[i][0]);
+         out[i][0] = in[i][0]
+                   + multx*(in[i+1][0]+in[i-1][0]-2.*in[i][0])
+                   + multy*(in[i][1]+in[i][ny-2]-2.*in[i][0]);
          out[i][nym1] = out[i][0];
       }
    }
+
+   // corners, 2nd order Laplacian
    if ((xbdry == WALL && ybdry == WALL) || (xbdry == OPEN && ybdry == OPEN)) {
-      // corner 2nd derivatives for all 4
-      //out[0][0] = in[0][0] + mult*(-in[2][0]-in[0][2]+6*in[1][0]+6*in[0][1]-10*in[0][0]);
-      out[0][0] = in[0][0] + multx*(-in[2][0]+6.*in[1][0]-5.*in[0][0]) + multy*(-in[0][2]+6.*in[0][1]-5.*in[0][0]);
-      //out[0][nym1] = in[0][nym1] + mult*(-in[2][nym1]-in[0][ny-3]+6*in[1][nym1]+6*in[0][ny-2]-10*in[0][nym1]);
-      out[0][nym1] = in[0][nym1] + multx*(-in[2][nym1]+6.*in[1][nym1]-5.*in[0][nym1]) + multy*(-in[0][ny-3]+6.*in[0][ny-2]-5.*in[0][nym1]);
-      //out[nxm1][0] = in[nxm1][0] + mult*(-in[nx-3][0]-in[nxm1][2]+6*in[nx-2][0]+6*in[nxm1][1]-10*in[nxm1][0]);
-      out[nxm1][0] = in[nxm1][0] + multx*(-in[nx-3][0]+6.*in[nx-2][0]-5.*in[nxm1][0]) + multy*(-in[nxm1][2]+6.*in[nxm1][1]-5.*in[nxm1][0]);
-      //out[nxm1][nym1] = in[nxm1][nym1] + mult*(-in[nx-3][nym1]-in[nxm1][ny-3]+6*in[nx-2][nym1]+6*in[nxm1][ny-2]-10*in[nxm1][nym1]);
-      out[nxm1][nym1] = in[nxm1][nym1] + multx*(-in[nx-3][nym1]+6.*in[nx-2][nym1]-5.*in[nxm1][nym1]) + multy*(-in[nxm1][ny-3]+6.*in[nxm1][ny-2]-5.*in[nxm1][nym1]);
+      out[0][0] = in[0][0]
+                   + multx*(-in[2][0]+6.*in[1][0]-5.*in[0][0])
+                   + multy*(-in[0][2]+6.*in[0][1]-5.*in[0][0]);
+      out[0][nym1] = in[0][nym1]
+                   + multx*(-in[2][nym1]+6.*in[1][nym1]-5.*in[0][nym1])
+                   + multy*(-in[0][ny-3]+6.*in[0][ny-2]-5.*in[0][nym1]);
+      out[nxm1][0] = in[nxm1][0]
+                   + multx*(-in[nx-3][0]+6.*in[nx-2][0]-5.*in[nxm1][0])
+                   + multy*(-in[nxm1][2]+6.*in[nxm1][1]-5.*in[nxm1][0]);
+      out[nxm1][nym1] = in[nxm1][nym1]
+                   + multx*(-in[nx-3][nym1]+6.*in[nx-2][nym1]-5.*in[nxm1][nym1])
+                   + multy*(-in[nxm1][ny-3]+6.*in[nxm1][ny-2]-5.*in[nxm1][nym1]);
    } else if (xbdry == WALL && ybdry == PERIODIC) {
       // t-kernel 2nd derivatives for two, then copy
-      //out[0][0] = in[0][0] + mult*(in[0][1]+in[0][ny-2]-in[2][0]+6*in[1][0]-7*in[0][0]);
-      out[0][0] = in[0][0] + multx*(-in[2][0]+6.*in[1][0]-5.*in[0][0]) + multy*(in[0][1]+in[0][ny-2]-2.*in[0][0]);
-      //out[nxm1][0] = in[nxm1][0] + mult*(in[nxm1][1]+in[nxm1][ny-2]-in[nx-3][0]+6*in[nx-2][0]-7*in[nxm1][0]);
-      out[nxm1][0] = in[nxm1][0] + multx*(-in[nx-3][0]+6.*in[nx-2][0]-5.*in[nxm1][0]) + multy*(in[nxm1][1]+in[nxm1][ny-2]-2.*in[nxm1][0]);
+      out[0][0] = in[0][0]
+                   + multx*(-in[2][0]+6.*in[1][0]-5.*in[0][0])
+                   + multy*(in[0][1]+in[0][ny-2]-2.*in[0][0]);
+      out[nxm1][0] = in[nxm1][0]
+                   + multx*(-in[nx-3][0]+6.*in[nx-2][0]-5.*in[nxm1][0])
+                   + multy*(in[nxm1][1]+in[nxm1][ny-2]-2.*in[nxm1][0]);
       out[0][nym1] = out[0][0];
       out[nxm1][nym1] = out[nxm1][0];
    } else if (xbdry == PERIODIC && ybdry == WALL) {
       // t-kernel 2nd derivatives for two, then copy
-      //out[0][0] = in[0][0] + mult*(in[1][0]+in[nx-2][0]-in[0][2]+6*in[0][1]-7*in[0][0]);
-      out[0][0] = in[0][0] + multx*(in[1][0]+in[nx-2][0]-2.*in[0][0]) + multy*(-in[0][2]+6.*in[0][1]-5.*in[0][0]);
-      //out[0][nym1] = in[0][nym1] + mult*(in[1][nym1]+in[nx-2][nym1]-in[0][ny-3]+6*in[0][ny-2]-7*in[0][nym1]);
-      out[0][nym1] = in[0][nym1] + multx*(in[1][nym1]+in[nx-2][nym1]-2.*in[0][nym1]) + multy*(-in[0][ny-3]+6.*in[0][ny-2]-5.*in[0][nym1]);
+      out[0][0] = in[0][0]
+                   + multx*(in[1][0]+in[nx-2][0]-2.*in[0][0])
+                   + multy*(-in[0][2]+6.*in[0][1]-5.*in[0][0]);
+      out[0][nym1] = in[0][nym1]
+                   + multx*(in[1][nym1]+in[nx-2][nym1]-2.*in[0][nym1])
+                   + multy*(-in[0][ny-3]+6.*in[0][ny-2]-5.*in[0][nym1]);
       out[nxm1][0] = out[0][0];
       out[nxm1][nym1] = out[0][nym1];
    } else if (xbdry == PERIODIC && ybdry == PERIODIC) {
-      //out[0][0] = in[0][0] + mult*(in[0][1]+in[0][ny-2]+in[1][0]+in[nx-2][0]-4*in[0][0]);
-      out[0][0] = in[0][0] + multx*(in[1][0]+in[nx-2][0]-2.*in[0][0]) + multy*(in[0][1]+in[0][ny-2]-2.*in[0][0]);
+      out[0][0] = in[0][0]
+                   + multx*(in[1][0]+in[nx-2][0]-2.*in[0][0])
+                   + multy*(in[0][1]+in[0][ny-2]-2.*in[0][0]);
       out[0][nym1] = out[0][0];
       out[nxm1][0] = out[0][0];
       out[nxm1][nym1] = out[0][0];
@@ -582,9 +598,7 @@ float diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,float **in,float **ou
       }
    }
 
-   //if (istep > 1) fprintf(stdout,"."); fflush(stdout);
    }	// end loop over numsteps
-   //if (numsteps > 1) fprintf(stdout,"\n"); fflush(stdout);
 
    return(mult*numsteps);
 }
@@ -769,7 +783,7 @@ float variable_diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,
 int find_vels_2d (int silent, int step,const int isStam,const int nx,const int ny,
       const int xbdry,const int ybdry,float *freestream,
       float **u,float **v,float **vort,
-      const int use_MASK,float **mask,float maskerr) {
+      const int use_MASK,float **mask,const float maskerr) {
 
    int use_multigrid = TRUE;	// use MUDPACK solver mud2sp.f
    //int use_multigrid = FALSE;	// use FISHPAK solver gr2.c
@@ -1156,7 +1170,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    //                    NULL,0.0,1.0);
 
    // now, find the derivatives of streamfunction to make the velocities!
-   find_gradient_of_scalar_2nd_2d (nx,ny,xbdry,ybdry,psi,v,-1.0,u,1.0);
+   find_gradient_of_scalar_2nd_2d (nx,ny,xbdry,ybdry,psi,NULL,v,-1.0,u,1.0);
 
    // if there's a mask, then find the counter-vorticity
    if (use_MASK) {
@@ -1164,8 +1178,10 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
       // first, find counter-velocity
       for (i=0;i<nx;i++) {
          for (j=0;j<ny;j++) {
-            cu[i][j] = -1.0*u[i][j]*mask[i][j];
-            cv[i][j] = -1.0*v[i][j]*mask[i][j];
+            //cu[i][j] = -1.0*u[i][j]*mask[i][j];
+            //cv[i][j] = -1.0*v[i][j]*mask[i][j];
+            cu[i][j] = -1.0*u[i][j]*(1.-mask[i][j]);
+            cv[i][j] = -1.0*v[i][j]*(1.-mask[i][j]);
          }
       }
 
@@ -1195,7 +1211,8 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
             // works well, if all vort with mask>.999 are set to zero
             //vort[i][j] = vort[i][j] + cw[i][j];
             // this should be the bomb.
-            vort[i][j] = (1.-mask[i][j]) * (vort[i][j] + cw[i][j]);
+            //vort[i][j] = (1.-mask[i][j]) * (vort[i][j] + cw[i][j]);
+            vort[i][j] = mask[i][j] * (vort[i][j] + cw[i][j]);
          }
       }
 
@@ -1462,6 +1479,8 @@ int find_biot_savart (float xp,float yp,int nx,int ny,
 
 /*
  * differentiate the a scalar to find the velocity
+ *
+ * NOT USED ANY MORE, see find_gradient_of_scalar_2nd_2d
  */
 int find_gradient_of_scalar_2d (int nx,int ny,int xbdry,int ybdry,float **psi,float **u,float umult,float **v,float vmult) {
 
@@ -1564,17 +1583,14 @@ int find_gradient_of_scalar_2d (int nx,int ny,int xbdry,int ybdry,float **psi,fl
  * differentiate the a scalar to find the velocity
  *
  * use a new method that is 2nd order everywhere
+ * and if mask is not NULL, zeros gradients where mask is present
  */
-int find_gradient_of_scalar_2nd_2d (int nx,int ny,int xbdry,int ybdry,float **psi,float **u,float umult,float **v,float vmult) {
+int find_gradient_of_scalar_2nd_2d (int nx,int ny,int xbdry,int ybdry,float **psi,float **mask,float **u,float umult,float **v,float vmult) {
 
    int i,j;
    int nxm1 = nx-1;
    int nym1 = ny-1;
    FLOAT hxi,hyi;
-
-   // old school, assume 0<x<1
-   //hxi = 0.5*umult*(nxm1)/SCALE;	// negative because vel is neg gradient
-   //hyi = 0.5*vmult*(nxm1);		// and *nxm1 because xsize=1
 
    // new school, max domain is 0..1
    if (nx > ny) {
@@ -1693,6 +1709,58 @@ int find_gradient_of_scalar_2nd_2d (int nx,int ny,int xbdry,int ybdry,float **ps
       i = nxm1; j = nym1;
       u[i][j] = u[0][0];
       v[i][j] = v[0][0];
+   }
+
+   // if there is a mask, many gradients will become zero
+   if (mask != NULL) {
+
+      // first, the cell itself
+      #pragma omp parallel for private(i,j)
+      for (i=0; i<nx; i++) {
+      for (j=0; j<ny; j++) {
+         // partial in x-direction
+         u[i][j] *= mask[i][j];
+         // partial in y-direction
+         v[i][j] *= mask[i][j];
+      }
+      }
+
+      // the cell left
+      #pragma omp parallel for private(i,j)
+      for (i=1; i<nx; i++) {
+      for (j=0; j<ny; j++) {
+         // partial in x-direction
+         u[i][j] *= mask[i-1][j];
+      }
+      }
+
+      // the cell right
+      #pragma omp parallel for private(i,j)
+      for (i=0; i<nxm1; i++) {
+      for (j=0; j<ny; j++) {
+         // partial in x-direction
+         u[i][j] *= mask[i+1][j];
+      }
+      }
+
+      // the cell above
+      #pragma omp parallel for private(i,j)
+      for (i=0; i<nx; i++) {
+      for (j=0; j<nym1; j++) {
+         // partial in y-direction
+         v[i][j] *= mask[i][j+1];
+      }
+      }
+
+      // the cell below
+      #pragma omp parallel for private(i,j)
+      for (i=0; i<nx; i++) {
+      for (j=1; j<ny; j++) {
+         // partial in y-direction
+         v[i][j] *= mask[i][j-1];
+      }
+      }
+
    }
 
    return(0);
@@ -1828,7 +1896,7 @@ int find_curl_of_vel_2d(int nx,int ny,int xbdry,int ybdry,
 /*
  * moc_advect_2d is the implicit scheme for updating the vorticity values
  */
-int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **u,float **v,
+int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,float **v,
    float ***in,float ***out,float dt,int order,int moveColors) {
 
    enum interpMeth {
@@ -1881,89 +1949,102 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **u,float **v,
       // use a 1-step method
       #pragma omp parallel for private(i,px,j,py,newx,newy,k,outvals)
       for (i=0;i<nx;i++) {
-         //px = (float)i/(float)(nx-1);
          px = (float)i * dx;
          for (j=0;j<ny;j++) {
-            //py = (float)j/(float)(ny-1);
-            //py = (float)j/(float)(nx-1);
-            py = (float)j * dx;
-            newx = px-dt*u[i][j];
-            newy = py-dt*v[i][j];
-            if (xbdry == WALL || xbdry == OPEN) {
-               if (newx > xf-EPSILON) newx = xf-EPSILON;
-               if (newx < 0.0+EPSILON) newx = EPSILON;
+            int do_this_pixel = TRUE;
+            float velmult = 1.;
+            if (mask != NULL) {
+               if (mask[i][j] < 1.e-5) do_this_pixel = FALSE;
+               else velmult = mask[i][j];
             }
-            if (ybdry == WALL || ybdry == OPEN) {
-               if (newy > yf-EPSILON) newy = yf-EPSILON;
-               if (newy < 0.0+EPSILON) newy = EPSILON;
+            if (do_this_pixel) {
+               py = (float)j * dx;
+               newx = px-dt*velmult*u[i][j];
+               newy = py-dt*velmult*v[i][j];
+               if (xbdry == WALL || xbdry == OPEN) {
+                  if (newx > xf-EPSILON) newx = xf-EPSILON;
+                  if (newx < 0.0+EPSILON) newx = EPSILON;
+               }
+               if (ybdry == WALL || ybdry == OPEN) {
+                  if (newy > yf-EPSILON) newy = yf-EPSILON;
+                  if (newy < 0.0+EPSILON) newy = EPSILON;
+               }
+               if (interp == cic)
+                  interpolate_array_using_CIC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
+               else if (interp == tsc)
+                  interpolate_array_using_TSC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
+               else
+                  interpolate_array_using_M4p_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
+               for (k=0; k<sc_cnt; k++) tempout[k][i][j] = outvals[k];
+            } else {
+               for (k=0; k<sc_cnt; k++) tempout[k][i][j] = tempin[k][i][j];
             }
-            if (interp == cic)
-               interpolate_array_using_CIC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
-            else if (interp == tsc)
-               interpolate_array_using_TSC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
-            else
-               interpolate_array_using_M4p_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
-            for (k=0; k<sc_cnt; k++) tempout[k][i][j] = outvals[k];
-
          }
       }
    } else if (order == 2) {
       // use a two-step method
       #pragma omp parallel for private(i,px,j,py,u0,u1,v0,v1,newx,newy,k,outvals)
       for (i=0;i<nx;i++) {
-         //px = (float)i/(float)(nx-1);
          px = (float)i * dx;
          for (j=0;j<ny;j++) {
-
-            //py = (float)j/(float)(ny-1);
-            //py = (float)j/(float)(nx-1);
-            py = (float)j * dx;
-            // find vel at px,py
-            u0 = u[i][j];
-            v0 = v[i][j];
-
-            // find position 1 explicit Euler step backwards
-            newx = px-dt*u0;
-            if (xbdry == WALL || xbdry == OPEN) {
-               if (newx > xf-EPSILON) newx = xf-EPSILON;
-               if (newx < 0.0+EPSILON) newx = EPSILON;
-            }
-            newy = py-dt*v0;
-            if (ybdry == WALL || ybdry == OPEN) {
-               if (newy > yf-EPSILON) newy = yf-EPSILON;
-               if (newy < 0.0+EPSILON) newy = EPSILON;
+            int do_this_pixel = TRUE;
+            float velmult = 1.;
+            if (mask != NULL) {
+               if (mask[i][j] < 1.e-5) do_this_pixel = FALSE;
+               else velmult = mask[i][j];
             }
 
-            // find vel at newx,newy
-            if (interp == cic)
-               interpolate_vel_using_CIC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
-            else if (interp == tsc)
-               interpolate_vel_using_TSC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
-            else
-               interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
+            if (do_this_pixel) {
+               py = (float)j * dx;
+               // find vel at px,py
+               u0 = u[i][j];
+               v0 = v[i][j];
 
-            // find position back 1 step using average of two velocities
-            newx = px-dt*0.5*(u0+u1);
-            if (xbdry == WALL || xbdry == OPEN) {
-               if (newx > xf-EPSILON) newx = xf-EPSILON;
-               if (newx < 0.0+EPSILON) newx = EPSILON;
+               // find position 1 explicit Euler step backwards
+               newx = px-dt*u0;
+               if (xbdry == WALL || xbdry == OPEN) {
+                  if (newx > xf-EPSILON) newx = xf-EPSILON;
+                  if (newx < 0.0+EPSILON) newx = EPSILON;
+               }
+               newy = py-dt*v0;
+               if (ybdry == WALL || ybdry == OPEN) {
+                  if (newy > yf-EPSILON) newy = yf-EPSILON;
+                  if (newy < 0.0+EPSILON) newy = EPSILON;
+               }
+
+               // find vel at newx,newy
+               if (interp == cic)
+                  interpolate_vel_using_CIC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
+               else if (interp == tsc)
+                  interpolate_vel_using_TSC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
+               else
+                  interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
+
+               // find position back 1 step using average of two velocities
+               newx = px-dt*0.5*(u0+u1);
+               if (xbdry == WALL || xbdry == OPEN) {
+                  if (newx > xf-EPSILON) newx = xf-EPSILON;
+                  if (newx < 0.0+EPSILON) newx = EPSILON;
+               }
+               newy = py-dt*0.5*(v0+v1);
+               if (ybdry == WALL || ybdry == OPEN) {
+                  if (newy > yf-EPSILON) newy = yf-EPSILON;
+                  if (newy < 0.0+EPSILON) newy = EPSILON;
+               }
+
+               // are we able to calculate the acceleration here?
+
+               // finally, return scalar-valued vorticity from there
+               if (interp == cic)
+                  interpolate_array_using_CIC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
+               else if (interp == tsc)
+                  interpolate_array_using_TSC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
+               else
+                  interpolate_array_using_M4p_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
+               for (k=0; k<sc_cnt; k++) tempout[k][i][j] = outvals[k];
+            } else {
+               for (k=0; k<sc_cnt; k++) tempout[k][i][j] = tempin[k][i][j];
             }
-            newy = py-dt*0.5*(v0+v1);
-            if (ybdry == WALL || ybdry == OPEN) {
-               if (newy > yf-EPSILON) newy = yf-EPSILON;
-               if (newy < 0.0+EPSILON) newy = EPSILON;
-            }
-
-            // are we able to calculate the acceleration here?
-
-            // finally, return scalar-valued vorticity from there
-            if (interp == cic)
-               interpolate_array_using_CIC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
-            else if (interp == tsc)
-               interpolate_array_using_TSC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
-            else
-               interpolate_array_using_M4p_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
-            for (k=0; k<sc_cnt; k++) tempout[k][i][j] = outvals[k];
          }
       }
    } else if (order == 4) {
@@ -1972,100 +2053,110 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **u,float **v,
       for (i=0;i<nx;i++) {
          px = (float)i * dx;
          for (j=0;j<ny;j++) {
-
-            py = (float)j * dx;
-            // find vel at px,py (k_1)
-            u0 = u[i][j];
-            v0 = v[i][j];
-
-            // find position 1 explicit Euler step backwards
-            newx = px-dt*0.5*u0;
-            if (xbdry == WALL || xbdry == OPEN) {
-               if (newx > xf-EPSILON) newx = xf-EPSILON;
-               if (newx < 0.0+EPSILON) newx = EPSILON;
-            }
-            newy = py-dt*0.5*v0;
-            if (ybdry == WALL || ybdry == OPEN) {
-               if (newy > yf-EPSILON) newy = yf-EPSILON;
-               if (newy < 0.0+EPSILON) newy = EPSILON;
-            }
-            // find vel at newx,newy (k_2)
-            if (interp == cic)
-               interpolate_vel_using_CIC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
-            else if (interp == tsc)
-               interpolate_vel_using_TSC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
-            else
-               interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
-
-            // find position 2 explicit Euler step backwards
-            newx = px-dt*0.5*u1;
-            if (xbdry == WALL || xbdry == OPEN) {
-               if (newx > xf-EPSILON) newx = xf-EPSILON;
-               if (newx < 0.0+EPSILON) newx = EPSILON;
-            }
-            newy = py-dt*0.5*v1;
-            if (ybdry == WALL || ybdry == OPEN) {
-               if (newy > yf-EPSILON) newy = yf-EPSILON;
-               if (newy < 0.0+EPSILON) newy = EPSILON;
-            }
-            // find vel at newx,newy (k_3)
-            if (interp == cic)
-               interpolate_vel_using_CIC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u2,&v2);
-            else if (interp == tsc)
-               interpolate_vel_using_TSC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u2,&v2);
-            else
-               interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u2,&v2);
-
-            // find position 3 explicit Euler step backwards
-            newx = px-dt*u2;
-            if (xbdry == WALL || xbdry == OPEN) {
-               if (newx > xf-EPSILON) newx = xf-EPSILON;
-               if (newx < 0.0+EPSILON) newx = EPSILON;
-            }
-            newy = py-dt*v2;
-            if (ybdry == WALL || ybdry == OPEN) {
-               if (newy > yf-EPSILON) newy = yf-EPSILON;
-               if (newy < 0.0+EPSILON) newy = EPSILON;
-            }
-            // find vel at newx,newy (k_4)
-            if (interp == cic)
-               interpolate_vel_using_CIC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u3,&v3);
-            else if (interp == tsc)
-               interpolate_vel_using_TSC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u3,&v3);
-            else
-               interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u3,&v3);
-
-            // find position back 1 step using average of four velocities
-            accx = 0.16666667*(u0+u3+2.*(u1+u2));
-            newx = px-dt*accx;
-            if (xbdry == WALL || xbdry == OPEN) {
-               if (newx > xf-EPSILON) newx = xf-EPSILON;
-               if (newx < 0.0+EPSILON) newx = EPSILON;
-            }
-            accy = 0.16666667*(v0+v3+2.*(v1+v2));
-            newy = py-dt*accy;
-            if (ybdry == WALL || ybdry == OPEN) {
-               if (newy > yf-EPSILON) newy = yf-EPSILON;
-               if (newy < 0.0+EPSILON) newy = EPSILON;
+            int do_this_pixel = TRUE;
+            float velmult = 1.;
+            if (mask != NULL) {
+               if (mask[i][j] < 1.e-5) do_this_pixel = FALSE;
+               else velmult = mask[i][j];
             }
 
-            // gather an estimate of the acceleration (u1-u0)/dt?
-            accx = (u0-accx)*oodt;
-            accy = (v0-accy)*oodt;
-            //accmag = pow(accx,2) + pow(accy,2);
-            //accmag = sqrt(accmag);
-            //fprintf(stdout,"%d %d %g\n",i,j,accmag);
-            //fprintf(stdout,"%d %d %g %g\n",i,j,accx,accy);
-            // somehow, accx looks like accel in y, and vice versa
+            if (do_this_pixel) {
+               py = (float)j * dx;
+               // find vel at px,py (k_1)
+               u0 = u[i][j];
+               v0 = v[i][j];
 
-            // finally, return scalar values from there
-            if (interp == cic)
-               interpolate_array_using_CIC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
-            else if (interp == tsc)
-               interpolate_array_using_TSC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
-            else
-               interpolate_array_using_M4p_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
-            for (k=0; k<sc_cnt; k++) tempout[k][i][j] = outvals[k];
+               // find position 1 explicit Euler step backwards
+               newx = px-dt*0.5*u0;
+               if (xbdry == WALL || xbdry == OPEN) {
+                  if (newx > xf-EPSILON) newx = xf-EPSILON;
+                  if (newx < 0.0+EPSILON) newx = EPSILON;
+               }
+               newy = py-dt*0.5*v0;
+               if (ybdry == WALL || ybdry == OPEN) {
+                  if (newy > yf-EPSILON) newy = yf-EPSILON;
+                  if (newy < 0.0+EPSILON) newy = EPSILON;
+               }
+               // find vel at newx,newy (k_2)
+               if (interp == cic)
+                  interpolate_vel_using_CIC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
+               else if (interp == tsc)
+                  interpolate_vel_using_TSC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
+               else
+                  interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
+
+               // find position 2 explicit Euler step backwards
+               newx = px-dt*0.5*u1;
+               if (xbdry == WALL || xbdry == OPEN) {
+                  if (newx > xf-EPSILON) newx = xf-EPSILON;
+                  if (newx < 0.0+EPSILON) newx = EPSILON;
+               }
+               newy = py-dt*0.5*v1;
+               if (ybdry == WALL || ybdry == OPEN) {
+                  if (newy > yf-EPSILON) newy = yf-EPSILON;
+                  if (newy < 0.0+EPSILON) newy = EPSILON;
+               }
+               // find vel at newx,newy (k_3)
+               if (interp == cic)
+                  interpolate_vel_using_CIC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u2,&v2);
+               else if (interp == tsc)
+                  interpolate_vel_using_TSC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u2,&v2);
+               else
+                  interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u2,&v2);
+
+               // find position 3 explicit Euler step backwards
+               newx = px-dt*u2;
+               if (xbdry == WALL || xbdry == OPEN) {
+                  if (newx > xf-EPSILON) newx = xf-EPSILON;
+                  if (newx < 0.0+EPSILON) newx = EPSILON;
+               }
+               newy = py-dt*v2;
+               if (ybdry == WALL || ybdry == OPEN) {
+                  if (newy > yf-EPSILON) newy = yf-EPSILON;
+                  if (newy < 0.0+EPSILON) newy = EPSILON;
+               }
+               // find vel at newx,newy (k_4)
+               if (interp == cic)
+                  interpolate_vel_using_CIC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u3,&v3);
+               else if (interp == tsc)
+                  interpolate_vel_using_TSC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u3,&v3);
+               else
+                  interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u3,&v3);
+
+               // find position back 1 step using average of four velocities
+               accx = 0.16666667*(u0+u3+2.*(u1+u2));
+               newx = px-dt*accx;
+               if (xbdry == WALL || xbdry == OPEN) {
+                  if (newx > xf-EPSILON) newx = xf-EPSILON;
+                  if (newx < 0.0+EPSILON) newx = EPSILON;
+               }
+               accy = 0.16666667*(v0+v3+2.*(v1+v2));
+               newy = py-dt*accy;
+               if (ybdry == WALL || ybdry == OPEN) {
+                  if (newy > yf-EPSILON) newy = yf-EPSILON;
+                  if (newy < 0.0+EPSILON) newy = EPSILON;
+               }
+
+               // gather an estimate of the acceleration (u1-u0)/dt?
+               accx = (u0-accx)*oodt;
+               accy = (v0-accy)*oodt;
+               //accmag = pow(accx,2) + pow(accy,2);
+               //accmag = sqrt(accmag);
+               //fprintf(stdout,"%d %d %g\n",i,j,accmag);
+               //fprintf(stdout,"%d %d %g %g\n",i,j,accx,accy);
+               // somehow, accx looks like accel in y, and vice versa
+
+               // finally, return scalar values from there
+               if (interp == cic)
+                  interpolate_array_using_CIC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
+               else if (interp == tsc)
+                  interpolate_array_using_TSC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
+               else
+                  interpolate_array_using_M4p_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
+               for (k=0; k<sc_cnt; k++) tempout[k][i][j] = outvals[k];
+            } else {
+               for (k=0; k<sc_cnt; k++) tempout[k][i][j] = tempin[k][i][j];
+            }
          }
       }
    } else {
