@@ -360,11 +360,13 @@ void update_mask_with_blocks_2 (float **mask, float **a[MAX_SCALARS],
                a[RR][ix][iy] = cratio*a[RR][ix][iy] + (1.-cratio)*block[i].r;
                a[GG][ix][iy] = cratio*a[GG][ix][iy] + (1.-cratio)*block[i].g;
                a[BB][ix][iy] = cratio*a[BB][ix][iy] + (1.-cratio)*block[i].b;
-               //a[SF][ix][iy] = 0.3*a[RR][ix][iy] + 0.7*a[GG][ix][iy] + 0.1*a[BB][ix][iy] - 0.5;
                a[SF][ix][iy] = 0.3*a[RR][ix][iy] + 0.7*a[GG][ix][iy] + 0.1*a[BB][ix][iy];
-               //mask[ix][iy] = cratio*mask[ix][iy];
-               if (block[i].mask) mask[ix][iy] = 0.;
-               else mask[ix][iy] = 1.;
+               // flip immediately to new mask
+               //if (block[i].mask) mask[ix][iy] = 0.;
+               //else mask[ix][iy] = 1.;
+               // smoothly shift to new mask
+               if (block[i].mask) mask[ix][iy] = cratio*mask[ix][iy];
+               else mask[ix][iy] = cratio*mask[ix][iy] + (1.-cratio);
             }
          }
          nthis++;
