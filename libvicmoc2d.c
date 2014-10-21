@@ -1234,7 +1234,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
             // reset back to full solve
             fparm[4] = muderr;
             iparm[12] = 100;
-         } else if (maxcorr/maxvort < 10.*maskerr) {
+         } else if (maxcorr/maxvort < 2.*maskerr) {
             // always run a specific number of cycles
             fparm[4] = 0.0;
             iparm[12] = 2;
