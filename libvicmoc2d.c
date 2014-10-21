@@ -19,29 +19,27 @@ float step_forward_2d (int,int,int,int,int,int,int,int,float*,int,int,float***,f
 
 int create_baroclinic_vorticity_2d (int,int,int,int,float**,float**,float**,float,float*,float);
 int create_boundary_vorticity_2d (int,int,int,int,float**,float**,float**,float);
-float diffuse_scalar_2d (int,int,int,int,float**,float**,float,int,float**,float);
+float diffuse_scalar_2d (int,int,int,int,int,float**,float**,float,int,float**,float);
 float variable_diffuse_scalar_2d (int,int,int,int,float**,float**,float**,int,float**,float);
 int find_vels_2d (int,int,int,int,int,int,int,float*,float**,float**,float**,const int,float**,const float);
 int find_gradient_of_scalar_2d (int,int,int,int,float**,float**,float,float**,float);
 int find_gradient_of_scalar_2nd_2d (int,int,int,int,float**,float**,float**,float,float**,float);
 int find_curl_of_vel_2d (int,int,int,int,float**,float**,float**);
-int moc_advect_2d (int,int,int,int,float **,float**,float**,float***,float***,float,int,int);
+int moc_advect_2d (int,int,int,int,float**,float**,float**,float***,float***,float,int,int);
 int find_open_boundary_psi (int,int,float**,float,float*,float**);
 float find_biot_savart_u (float,float,int,int,float,float,float**);
 float find_biot_savart_v (float,float,int,int,float,float,float**);
 int find_biot_savart (float,float,int,int,float,float,float**,float*);
 
 // interpolation routines
-float interpolate_using_area_2d (int,int,int,int,float**,float,float);
 float interpolate_array_using_CIC_2d (int,int,int,int,float***,float,float,int,float*);
 int interpolate_vel_using_CIC_2d (int,int,int,int,float**,float**,float,float,float*,float*);
 
 float interpolate_array_using_TSC_2d (int,int,int,int,float***,float,float,int,float*);
 int interpolate_vel_using_TSC_2d (int,int,int,int,float**,float**,float,float,float*,float*);
 
-float interpolate_using_M4p_2d (int,int,int,int,float**,float,float);
-float interpolate_array_using_M4p_2d (int,int,int,int,float***,float,float,int,float*);
-int interpolate_vel_using_M4p_2d (int,int,int,int,float**,float**,float,float,float*,float*);
+float interpolate_array_using_M4p_2d (int,int,int,int,float**,float***,float,float,int,float*);
+int interpolate_vel_using_M4p_2d (int,int,int,int,float**,float**,float**,float,float,float*,float*);
 
 
 /*
@@ -186,7 +184,7 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
                                      a[MD],use_MASK,mask,dt);
         } else {
           // run the uniform viscosity routine
-          coeff = diffuse_scalar_2d (nx,ny,xbdry,ybdry,a[k],t[k],
+          coeff = diffuse_scalar_2d (nx,ny,xbdry,ybdry,k,a[k],t[k],
                                      sc_diffus[k],use_MASK,mask,dt);
         }
       } else {
@@ -314,31 +312,6 @@ int create_baroclinic_vorticity_2d (int nx,int ny,int xbdry,int ybdry,
 
    // nah, just keep it. it's OK. it needs to diffuse, anyway
    return(0);
-
-   // new way: treat boundaries properly!
-   if (ybdry == WALL) {
-      // correct top and bottom by taking the effect away
-      j = ny-1;
-      for (i=0;i<nx;i++) vort[i][j] -= dt*(grad[0][i][j]*g[1] - grad[1][i][j]*g[0]);
-      j = 0;
-      for (i=0;i<nx;i++) vort[i][j] -= dt*(grad[0][i][j]*g[1] - grad[1][i][j]*g[0]);
-   }
-   if (xbdry == WALL) {
-      // correct left and right by taking the effect away
-      i = 0;
-      for (j=0;j<ny;j++) vort[i][j] -= dt*(grad[0][i][j]*g[1] - grad[1][i][j]*g[0]);
-      i = nx-1;
-      for (j=0;j<ny;j++) vort[i][j] -= dt*(grad[0][i][j]*g[1] - grad[1][i][j]*g[0]);
-   }
-   if (xbdry == WALL && ybdry == WALL) {
-      // re-correct by adding it back on (we took it off twice!
-      vort[0][0] += dt*(grad[0][0][0]*g[1] - grad[1][0][0]*g[0]);
-      vort[0][ny-1] += dt*(grad[0][0][ny-1]*g[1] - grad[1][0][ny-1]*g[0]);
-      vort[nx-1][0] += dt*(grad[0][nx-1][0]*g[1] - grad[1][nx-1][0]*g[0]);
-      vort[nx-1][ny-1] += dt*(grad[0][nx-1][ny-1]*g[1] - grad[1][nx-1][ny-1]*g[0]);
-   }
-
-   return(0);
 }
 
 
@@ -447,11 +420,10 @@ int create_boundary_vorticity_2d (int nx,int ny,int xbdry,int ybdry,
  * diffuse scalar field according to laplacian of vorticity, return
  * to a different scalar field
  *
- * where mask is 1.0, do not diffuse, where mask is 0.0, fully diffuse
- *
  * diffus is the scalar diffusivity, like nu for vorticity: 1/Re
  */
-float diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,float **in,float **out,
+float diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,
+      int vartype,float **in,float **out,
       float diffus,int use_MASK,float **mask,float dt) {
 
    int i,j;
@@ -461,11 +433,6 @@ float diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,float **in,float **ou
    float multx,multy;
    float mult,omm;
 
-   // float mult = 0.001;	// 0.25 is maximum allowed
-   // float mult = 0.125;	// 0.25 is maximum allowed
-   // float mult = 0.05;	// the new 2nd deriv allows only 0.125 now
-   //multx = dt*diffus*pow(nxm1/SCALE,2);
-   //multy = dt*diffus*pow(nxm1,2);
    if (nx > ny) {
       multx = dt*diffus*pow(nxm1,2);
       multy = dt*diffus*pow(nxm1,2);
@@ -486,17 +453,32 @@ float diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,float **in,float **ou
 
    // do the middle part of the field, regardless of the BCs
    if (use_MASK) {
-     #pragma omp parallel for private(i,j)
-     for (i=1;i<nxm1;i++) {
-       for (j=1;j<nym1;j++) {
-         // first attempt 2014-10-20
-         //out[i][j] = in[i][j]
-         //          + mask[i+1][j]*mask[i][j]*mask[i-1][j]*multx*(in[i+1][j]+in[i-1][j]-2.*in[i][j])
-         //          + mask[i][j+1]*mask[i][j]*mask[i][j-1]*multy*(in[i][j+1]+in[i][j-1]-2.*in[i][j]);
-         // see notes 2014-10-21
-         out[i][j] = in[i][j]
-                   + mask[i][j]*multx*(mask[i+1][j]*(in[i+1][j]-in[i][j]) + mask[i-1][j]*(in[i-1][j]-in[i][j]))
-                   + mask[i][j]*multy*(mask[i][j+1]*(in[i][j+1]-in[i][j]) + mask[i][j-1]*(in[i][j-1]-in[i][j]));
+     if (vartype == W2) {
+       // this is vorticity, allow it to diffuse from masks
+       #pragma omp parallel for private(i,j)
+       for (i=1;i<nxm1;i++) {
+         for (j=1;j<nym1;j++) {
+           // diffuse vort from masks, but not into masks
+           out[i][j] = in[i][j]
+                     + mask[i][j]*multx*(in[i+1][j]+in[i-1][j]-2.*in[i][j])
+                     + mask[i][j]*multy*(in[i][j+1]+in[i][j-1]-2.*in[i][j]);
+         }
+       }
+     } else {
+       // this is not vorticity, prevent it from diffusing from masks
+       #pragma omp parallel for private(i,j)
+       for (i=1;i<nxm1;i++) {
+         for (j=1;j<nym1;j++) {
+           // avoid diffusing anything from masks
+           // first attempt 2014-10-20
+           //out[i][j] = in[i][j]
+           //          + mask[i+1][j]*mask[i][j]*mask[i-1][j]*multx*(in[i+1][j]+in[i-1][j]-2.*in[i][j])
+           //          + mask[i][j+1]*mask[i][j]*mask[i][j-1]*multy*(in[i][j+1]+in[i][j-1]-2.*in[i][j]);
+           // see notes 2014-10-21
+           out[i][j] = in[i][j]
+                     + mask[i][j]*multx*(mask[i+1][j]*(in[i+1][j]-in[i][j]) + mask[i-1][j]*(in[i-1][j]-in[i][j]))
+                     + mask[i][j]*multy*(mask[i][j+1]*(in[i][j+1]-in[i][j]) + mask[i][j-1]*(in[i][j-1]-in[i][j]));
+         }
        }
      }
    } else {
@@ -1976,7 +1958,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
                else if (interp == tsc)
                   interpolate_array_using_TSC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
                else
-                  interpolate_array_using_M4p_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
+                  interpolate_array_using_M4p_2d(nx,ny,xbdry,ybdry,mask,tempin,newx,newy,sc_cnt,outvals);
                for (k=0; k<sc_cnt; k++) tempout[k][i][j] = outvals[k];
             } else {
                for (k=0; k<sc_cnt; k++) tempout[k][i][j] = tempin[k][i][j];
@@ -2020,7 +2002,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
                else if (interp == tsc)
                   interpolate_vel_using_TSC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
                else
-                  interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
+                  interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,mask,u,v,newx,newy,&u1,&v1);
 
                // find position back 1 step using average of two velocities
                newx = px-dt*0.5*velmult*(u0+u1);
@@ -2042,7 +2024,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
                else if (interp == tsc)
                   interpolate_array_using_TSC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
                else
-                  interpolate_array_using_M4p_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
+                  interpolate_array_using_M4p_2d(nx,ny,xbdry,ybdry,mask,tempin,newx,newy,sc_cnt,outvals);
                for (k=0; k<sc_cnt; k++) tempout[k][i][j] = outvals[k];
             } else {
                for (k=0; k<sc_cnt; k++) tempout[k][i][j] = tempin[k][i][j];
@@ -2085,7 +2067,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
                else if (interp == tsc)
                   interpolate_vel_using_TSC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
                else
-                  interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
+                  interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,mask,u,v,newx,newy,&u1,&v1);
 
                // find position 2 explicit Euler step backwards
                newx = px-dt*0.5*velmult*u1;
@@ -2104,7 +2086,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
                else if (interp == tsc)
                   interpolate_vel_using_TSC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u2,&v2);
                else
-                  interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u2,&v2);
+                  interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,mask,u,v,newx,newy,&u2,&v2);
 
                // find position 3 explicit Euler step backwards
                newx = px-dt*velmult*u2;
@@ -2123,7 +2105,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
                else if (interp == tsc)
                   interpolate_vel_using_TSC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u3,&v3);
                else
-                  interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u3,&v3);
+                  interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,mask,u,v,newx,newy,&u3,&v3);
 
                // find position back 1 step using average of four velocities
                accx = 0.16666667*(u0+u3+2.*(u1+u2));
@@ -2154,7 +2136,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
                else if (interp == tsc)
                   interpolate_array_using_TSC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
                else
-                  interpolate_array_using_M4p_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
+                  interpolate_array_using_M4p_2d(nx,ny,xbdry,ybdry,mask,tempin,newx,newy,sc_cnt,outvals);
                for (k=0; k<sc_cnt; k++) tempout[k][i][j] = outvals[k];
             } else {
                for (k=0; k<sc_cnt; k++) tempout[k][i][j] = tempin[k][i][j];
@@ -2188,108 +2170,6 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
    }
 
    return(0);
-}
-
-
-/*
- * basic 2d interpolation scheme (cloud-in-cell, or area-weighting)
- */
-float interpolate_using_area_2d(int nx,int ny,int xbdry,int ybdry,float **a,float px,float py) {
-
-   // really, this is the M2 scheme, or the cloud-in-cell scheme of
-   //    bilinear interpolation
-
-   int i,j,ii,ji,ir,jr;
-   int si[2];           // start index
-   FLOAT dx;
-   FLOAT wt[2][2];
-   FLOAT xfactor,yfactor;
-   FLOAT mf;
-   FLOAT out = 0.0;
-
-   // compute the lowest corner index of the cells that the scheme needs
-   // these may be negative
-   si[0] = (int)(10+(nx-1)*(px)) - 10;
-   // si[1] = (int)(10+(ny-1)*(py)) - 10;
-   si[1] = (int)(10+(nx-1)*(py)) - 10;
-   // fprintf(stdout,"location is %g %g, start index is %d %d\n",px,py,si[0],si[1]);
-
-   // make the list of M4 weights
-   dx = fabs( (px)*(nx-1) - si[0] );
-   wt[0][0] = 1.0-dx;
-   dx = dx-1.0;
-   wt[0][1] = 1.0+dx;
-
-   // dx = fabs( (py)*(ny-1) - si[1] );
-   dx = fabs( (py)*(nx-1) - si[1] );
-   wt[1][0] = 1.0-dx;
-   dx = dx-1.0;
-   wt[1][1] = 1.0+dx;
-
-   // fprintf(stdout,"  weights are %g %g and %g %g\n",wt[0][0],wt[0][1],wt[1][0],wt[1][1]);
-
-   // ii,ji are the counters, i,j are the cell indexes (possibly negative)
-   //   and ir,jr are the actual cells we take values from
-   for (ii=0; ii<2; ii++) {
-   for (ji=0; ji<2; ji++) {
-
-      i = ii+si[0];
-      j = ji+si[1];
-
-      /* in order to properly reflect vorticity off walls, use xyzfactors */
-      xfactor = 1.0;
-      yfactor = 1.0;
-      // but, when writing images, use additive reflection, i.e. no need for factors
-      // also true when interpolating within scalar-type fields
-
-      /* near the min or max x bounds */
-      if (xbdry == PERIODIC) {
-         ir = (i+(nx-1))%(nx-1);
-      } else {
-         ir = i;
-         if (i==0) {
-            // xfactor = 1.0;
-         } else if (i<0) {
-            ir = -i;
-            // xfactor *= -1.0;
-         } else if (i==(nx-1)) {
-            // xfactor = 0.0;
-         } else if (i>(nx-1)) {
-            ir = 2*(nx-1) - i;
-            // xfactor *= -1.0;
-         }
-      }
-
-      /* near the min or max y bounds */
-      if (ybdry == PERIODIC) {
-         jr = (j+(ny-1))%(ny-1);
-      } else {
-         jr = j;
-         if (j==0) {
-            // yfactor = 1.0;
-         } else if (j<0) {
-            jr = -j;
-            // yfactor *= -1.0;
-         } else if (j==(ny-1)) {
-            // yfactor = 0.0;
-         } else if (j>(ny-1)) {
-            jr = 2*(ny-1) - j;
-            // yfactor *= -1.0;
-         }
-      }
-
-      /* find the wt-factor for this cell's contribution */
-      mf = wt[0][ii]*wt[1][ji];
-
-      /* apply them to the grid node in question */
-      out += a[ir][jr]*mf*xfactor*yfactor;
-
-   }}
-
-   // fprintf(stdout,"      out is %g\n",out);
-
-   /* all's well that ends well */
-   return(out);
 }
 
 
@@ -2497,7 +2377,8 @@ float interpolate_array_using_TSC_2d(int nx,int ny,int xbdry,int ybdry,
  * out is the vector value interpolated from the field
  */
 float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
-   float ***zeta,float px,float py,int numout,float out[MAX_SCALARS]) {
+      float **mask,float ***zeta,
+      float px,float py,int numout,float out[MAX_SCALARS]) {
 
    int i,j,k,ii,ji,ir,jr,nm1;
    int si[2];           // start index
@@ -2505,6 +2386,7 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
    float m4[2][4];
    float xfactor,yfactor;
    float mf;
+   float mfsum = 0.;
 
    for (k=0; k<numout; k++) out[k] = 0.0;
 
@@ -2554,8 +2436,8 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       j = ji+si[1];
 
       /* in order to properly reflect vorticity off walls, use xyzfactors */
-      xfactor = 1.0;
-      yfactor = 1.0;
+      //xfactor = 1.0;
+      //yfactor = 1.0;
       // but, when writing images, use additive reflection, i.e. no need for factors
       // also true when interpolating within scalar-type fields
 
@@ -2588,130 +2470,19 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       }
 
       /* find the m4-factor for this cell's contribution */
-      mf = m4[0][ii]*m4[1][ji]*xfactor*yfactor;
+      mf = m4[0][ii] * m4[1][ji] * mask[ir][jr];
+      mfsum += mf;
 
       /* apply them to the grid node in question */
       for (k=0; k<numout; k++) out[k] += zeta[k][ir][jr]*mf;
 
    }}
 
+   // correct by the actual sum of the weights
+   for (k=0; k<numout; k++) out[k] /= mfsum;
+
    /* all's well that ends well */
    return(0);
-}
-
-
-/*
- * Interpolate velocity FROM the grid using the M4' method, but in 2
- * dimensions only, and with a scalar-valued field
- *
- * loc is the point at which the vector is to be evaluated
- * zeta makes the 2d input field of vectors
- * out is the scalar value interpolated from the field
- */
-float interpolate_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,float **zeta,float px,float py) {
-
-   int i,j,ii,ji,ir,jr,nm1;
-   int si[2];           // start index
-   FLOAT dx;
-   FLOAT m4[2][4];
-   FLOAT xfactor,yfactor;
-   FLOAT mf;
-   FLOAT out = 0.0;
-
-   /* compute the lowest corner index of the cells that the scheme needs */
-   // these may be negative
-   if (nx > ny) {
-      nm1 = nx-1;
-   } else {
-      nm1 = ny-1;
-   }
-   si[0] = (int)(20+(nm1)*(px)) - 21;
-   si[1] = (int)(20+(nm1)*(py)) - 21;
-   // fprintf(stdout,"location is %g %g, start index is %d %d\n",px,py,si[0],si[1]);
-
-   // make the list of M4 weights
-   dx = fabs( (px)*(nm1) - si[0] );
-   m4[0][0] = 0.5*pow(2-dx,2)*(1-dx);
-   dx = dx-1.0;
-   m4[0][1] = 1.0 - 2.5*dx*dx + 1.5*dx*dx*dx;
-   dx = fabs(dx-1.0);
-   m4[0][2] = 1.0 - 2.5*dx*dx + 1.5*dx*dx*dx;
-   dx = dx+1.0;
-   m4[0][3] = 0.5*pow(2-dx,2)*(1-dx);
-
-   dx = fabs( (py)*(nm1) - si[1] );
-   m4[1][0] = 0.5*pow(2-dx,2)*(1-dx);
-   dx = dx-1.0;
-   m4[1][1] = 1.0 - 2.5*dx*dx + 1.5*dx*dx*dx;
-   dx = fabs(dx-1.0);
-   m4[1][2] = 1.0 - 2.5*dx*dx + 1.5*dx*dx*dx;
-   dx = dx+1.0;
-   m4[1][3] = 0.5*pow(2-dx,2)*(1-dx);
-
-   // fprintf(stdout,"  weights are %g %g %g %g and %g %g %g %g\n",m4[0][0],m4[0][1],m4[0][2],m4[0][3],m4[1][0],m4[1][1],m4[1][2],m4[1][3]);
-
-   // ii,ji are the counters, i,j are the cell indexes (possibly negative)
-   //   and ir,jr are the actual cells we take values from
-   for (ii=0; ii<4; ii++) {
-   for (ji=0; ji<4; ji++) {
-
-      i = ii+si[0];
-      j = ji+si[1];
-
-      /* in order to properly reflect vorticity off walls, use xyzfactors */
-      xfactor = 1.0;
-      yfactor = 1.0;
-      // but, when writing images, use additive reflection, i.e. no need for factors
-      // also true when interpolating within scalar-type fields
-
-      /* near the min or max x bounds */
-      if (xbdry == PERIODIC) {
-         ir = (i+(nx-1))%(nx-1);
-      } else {
-         ir = i;
-         if (i==0) {
-            // xfactor = 1.0;
-         } else if (i<0) {
-            ir = -i;
-            // xfactor *= -1.0;
-         } else if (i==(nx-1)) {
-            // xfactor = 0.0;
-         } else if (i>(nx-1)) {
-            ir = 2*(nx-1) - i;
-            // xfactor *= -1.0;
-         }
-      }
-
-      /* near the min or max y bounds */
-      if (ybdry == PERIODIC) {
-         jr = (j+(ny-1))%(ny-1);
-      } else {
-         jr = j;
-         if (j==0) {
-            // yfactor = 1.0;
-         } else if (j<0) {
-            jr = -j;
-            // yfactor *= -1.0;
-         } else if (j==(ny-1)) {
-            // yfactor = 0.0;
-         } else if (j>(ny-1)) {
-            jr = 2*(ny-1) - j;
-            // yfactor *= -1.0;
-         }
-      }
-
-      /* find the m4-factor for this cell's contribution */
-      mf = m4[0][ii]*m4[1][ji];
-
-      /* apply them to the grid node in question */
-      out += zeta[ir][jr]*mf*xfactor*yfactor;
-
-   }}
-
-   // fprintf(stdout,"      out is %g\n",out);
-
-   /* all's well that ends well */
-   return(out);
 }
 
 
@@ -2938,7 +2709,9 @@ int interpolate_vel_using_TSC_2d(int nx,int ny,int xbdry,int ybdry,float **ua,fl
  * zeta makes the 2d input field of vectors
  * out is the vector value interpolated from the field
  */
-int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,float **ua,float **va,float px,float py,float *u,float *v) {
+int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
+      float **mask,float **ua,float **va,
+      float px,float py,float *u,float *v) {
 
    int i,j,ii,ji,ir,jr,nm1;
    int si[2];           // start index
@@ -2947,6 +2720,7 @@ int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,float **ua,fl
    FLOAT xfactor,yfactor;
    FLOAT mf;
    FLOAT out = 0.0;
+   FLOAT mfsum = 0.;
 
    /* compute the lowest corner index of the cells that the scheme needs */
    // these may be negative
@@ -3040,13 +2814,19 @@ int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,float **ua,fl
 
       /* find the m4-factor for this cell's contribution */
       //mf = xfactor*yfactor*m4[0][ii]*m4[1][ji];
-      mf = m4[0][ii]*m4[1][ji];
+      //mf = m4[0][ii]*m4[1][ji];
+      mf = m4[0][ii] * m4[1][ji] * mask[ir][jr];
+      mfsum += mf;
 
       /* apply them to the grid node in question */
       *(u) += ua[ir][jr]*mf;
       *(v) += va[ir][jr]*mf;
 
    }}
+
+   // correct by the actual sum of the weights
+   *(u) /= mfsum;
+   *(v) /= mfsum;
 
    // fprintf(stdout,"      out is %g\n",out);
 
