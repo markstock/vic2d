@@ -106,6 +106,76 @@ void populate_block_array (int nx, int ny) {
             block[icnt].starty = MAX(0,centery-sizey/2);
             block[icnt].endy = MIN(ny,centery+sizey/2);
 
+            // grow by 1 pixel if this leaves any 1-pixel mask walls
+
+            // check bottom row
+            int keeptrying = TRUE;
+            while (keeptrying && (block[icnt].starty > 1)) {
+               int isbad = FALSE;
+               for (int ix=block[icnt].startx; ix<block[icnt].endx; ix++) {
+                  if (masked[ix][block[icnt].starty-1] == TRUE &&
+                      masked[ix][block[icnt].starty-2] == FALSE) {
+                     isbad = TRUE;
+                  }
+               }
+               if (isbad) {
+                  block[icnt].starty--;
+               } else {
+                  keeptrying = FALSE;
+               }
+            }
+
+            // check top row
+            keeptrying = TRUE;
+            while (keeptrying && (block[icnt].endy < ny-1)) {
+               int isbad = FALSE;
+               for (int ix=block[icnt].startx; ix<block[icnt].endx; ix++) {
+                  if (masked[ix][block[icnt].endy] == TRUE &&
+                      masked[ix][block[icnt].endy+1] == FALSE) {
+                     isbad = TRUE;
+                  }
+               }
+               if (isbad) {
+                  block[icnt].endy++;
+               } else {
+                  keeptrying = FALSE;
+               }
+            }
+
+            // check leftmost side
+            keeptrying = TRUE;
+            while (keeptrying && (block[icnt].startx > 1)) {
+               int isbad = FALSE;
+               for (int iy=block[icnt].starty; iy<block[icnt].endy; iy++) {
+                  if (masked[block[icnt].startx-1][iy] == TRUE &&
+                      masked[block[icnt].startx-2][iy] == FALSE) {
+                     isbad = TRUE;
+                  }
+               }
+               if (isbad) {
+                  block[icnt].startx--;
+               } else {
+                  keeptrying = FALSE;
+               }
+            }
+
+            // check rightmost side
+            keeptrying = TRUE;
+            while (keeptrying && (block[icnt].endx < ny-1)) {
+               int isbad = FALSE;
+               for (int iy=block[icnt].starty; iy<block[icnt].endy; iy++) {
+                  if (masked[block[icnt].endx][iy] == TRUE &&
+                      masked[block[icnt].endx+1][iy] == FALSE) {
+                     isbad = TRUE;
+                  }
+               }
+               if (isbad) {
+                  block[icnt].endx++;
+               } else {
+                  keeptrying = FALSE;
+               }
+            }
+
             // test to see if it opens up enough
             int num_opened = 0;
             int num_pixels = 0;
