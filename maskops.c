@@ -61,7 +61,7 @@ void populate_block_array (int nx, int ny) {
    const float sizerand = (float)nx*100./2049.;
 
    // blocks that open up the space (mostly)
-   for (int i=(int)(topencenter-topenwide); i<(int)(topencenter+topenwide); i++) {
+   for (int i=(int)(MAX(0.,topencenter-topenwide)); i<(int)(topencenter+topenwide); i++) {
 
       // how many this second?
       float fthis = MAX (0., topenmag * (0.5*cos( M_PI*((float)i-topencenter)/topenwide ) + 0.5));
