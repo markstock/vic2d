@@ -94,6 +94,7 @@ extern int copy_2d_field (float**,float**,int,int);
 extern void populate_block_array (int, int);
 extern void update_mask_with_blocks_1 (float**, float***, int, int, float);
 extern void update_mask_with_blocks_2 (float**, float***, int, int, float, float);
+extern void overlay_mask (int, int, float**);
 
 // from, well, color stuff
 extern int get_random_color (float***, int, int, float*);

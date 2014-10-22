@@ -644,6 +644,9 @@ int main(int argc,char **argv) {
       }
    }
 
+   // optionally generate repeatedly-overlaid mask
+   (void) overlay_mask (nx, ny, mask);
+
    // Initial velocity solve -------------------------
 
    // if you want to show velocity on the first step, solve for it here
@@ -1064,8 +1067,12 @@ int main(int argc,char **argv) {
          }
       }
 
+
       if (TRUE) {
+         // open or close blocks in the mask
          (void) update_mask_with_blocks_2 (mask, a, nx, ny, simtime, dt);
+         // optionally generate repeatedly-overlaid mask
+         (void) overlay_mask (nx, ny, mask);
       }
 
       if (FALSE && step%50 == 0 && step < 1001) {

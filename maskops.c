@@ -393,3 +393,35 @@ void update_mask_with_blocks_2 (float **mask, float **a[MAX_SCALARS],
 
    return;
 }
+
+//
+// Read, store, and overlay a second mask over the existing mask
+//
+void overlay_mask (int nx, int ny, float** mask) {
+
+   static int first_time = TRUE;
+   static float** overlay = NULL;
+   //char maskfilename[255] = "burn_it_down_edges5_1025.png";
+   char maskfilename[255] = "burn_it_down_edges3_2049.png";
+
+   // if we're not using a mask, just ignore this
+   if (mask == NULL) return;
+
+   // read in the mask file
+   if (first_time) {
+      overlay = allocate_2d_array_f(nx,ny);
+      // read grayscale PNG of exactly nx by ny resolution
+      // 0.0 = black = masked, 1.0 = white = open
+      read_png(maskfilename,nx,ny,FALSE,FALSE,1.0,FALSE,
+         overlay,0.0,1.0,NULL,0.0,1.0,NULL,0.0,1.0);
+      // do not normalize mask
+      // never re-load or reallocate
+      first_time = FALSE;
+   }
+
+   // lay it over the existing mask
+   for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++)
+      mask[ix][iy] = MIN(overlay[ix][iy], mask[ix][iy]);
+
+   return;
+}
