@@ -2479,7 +2479,9 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
    }}
 
    // correct by the actual sum of the weights
-   for (k=0; k<numout; k++) out[k] /= mfsum;
+   if (mfsum > 0.) {
+      for (k=0; k<numout; k++) out[k] /= mfsum;
+   }
 
    /* all's well that ends well */
    return(0);
@@ -2825,8 +2827,10 @@ int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
    }}
 
    // correct by the actual sum of the weights
-   *(u) /= mfsum;
-   *(v) /= mfsum;
+   if (mfsum > 0.) {
+      *(u) /= mfsum;
+      *(v) /= mfsum;
+   }
 
    // fprintf(stdout,"      out is %g\n",out);
 
