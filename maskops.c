@@ -56,6 +56,7 @@ void populate_block_array (int nx, int ny) {
    const float tmaskcenter = 170.;
    const float tmaskwide = 45.;
    const float tmaskmag = 13.5;
+   const int stop_time = 310;
    // dimensions of blocks
    const float sizebase = (float)nx*30./2049.;
    const float sizerand = (float)nx*100./2049.;
@@ -81,12 +82,9 @@ void populate_block_array (int nx, int ny) {
 
          // color
          (void) get_random_color (c,cnx,cny,thisc);
-         block[icnt].r = 1.3*thisc[0];
-         block[icnt].g = 1.3*thisc[1];
-         block[icnt].b = 1.3*thisc[2];
-         //block[icnt].r = 1.;
-         //block[icnt].g = 1.;
-         //block[icnt].b = 1.;
+         block[icnt].r = thisc[0];
+         block[icnt].g = thisc[1];
+         block[icnt].b = thisc[2];
 
          // how much of the field is masked over?
          int num_masked = 0;
@@ -217,7 +215,7 @@ void populate_block_array (int nx, int ny) {
    const int iopened = icnt;
 
    // blocks that close off the space (completely)
-   for (int i=(int)(tmaskcenter-tmaskwide); i<(int)(tmaskcenter+tmaskwide); i++) {
+   for (int i=(int)(tmaskcenter-tmaskwide); i<MIN(stop_time,(int)(tmaskcenter+tmaskwide)); i++) {
 
       // how many this second?
       float fthis = MAX (0., tmaskmag * (0.5*cos( M_PI*((float)i-tmaskcenter)/tmaskwide ) + 0.5));
