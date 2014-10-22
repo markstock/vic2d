@@ -51,9 +51,11 @@ void populate_block_array (int nx, int ny) {
    // time center and half-width of sequence of blocks that will open the domain
    const float topencenter = 55.;
    const float topenwide = 60.;
+   const float topenmag = 9.5;
    // time center and half-width of sequence of blocks that will mask the domain
-   const float tmaskcenter = 180.;
-   const float tmaskwide = 40.;
+   const float tmaskcenter = 170.;
+   const float tmaskwide = 45.;
+   const float tmaskmag = 13.5;
    // dimensions of blocks
    const float sizebase = (float)nx*30./2049.;
    const float sizerand = (float)nx*100./2049.;
@@ -62,7 +64,7 @@ void populate_block_array (int nx, int ny) {
    for (int i=(int)(topencenter-topenwide); i<(int)(topencenter+topenwide); i++) {
 
       // how many this second?
-      float fthis = MAX (0., 9.5 * (0.5*cos( M_PI*((float)i-topencenter)/topenwide ) + 0.5));
+      float fthis = MAX (0., topenmag * (0.5*cos( M_PI*((float)i-topencenter)/topenwide ) + 0.5));
       int nthis = (int)fthis;
       if ( fthis-(float)nthis > rand()/(float)RAND_MAX ) nthis++;
 
@@ -189,7 +191,14 @@ void populate_block_array (int nx, int ny) {
 
             numtries++;
 
-            if (frac_opened > frac_masked || numtries > 1000) keepgoing = FALSE;
+            // when we get near the end, make sure we always open masked pixels
+            if (frac_opened > frac_masked*frac_masked) keepgoing = FALSE;
+
+            // but early on, try to adjoin existing open areas
+            if (num_opened == num_pixels && rand()/(float)RAND_MAX < (float)icnt/30.) keepgoing = TRUE;
+
+            // and don't try too hard
+            if (numtries > 1000) keepgoing = FALSE;
          }
          globnumtries += numtries;
 
@@ -207,10 +216,10 @@ void populate_block_array (int nx, int ny) {
    }
 
    // blocks that close off the space (completely)
-   for (int i=140; i<220; i++) {
+   for (int i=(int)(tmaskcenter-tmaskwide); i<(int)(tmaskcenter+tmaskwide); i++) {
 
       // how many this second?
-      float fthis = MAX (0., 13.5 * (0.5*cos( M_PI*((float)i-180.)/40. ) + 0.5));
+      float fthis = MAX (0., tmaskmag * (0.5*cos( M_PI*((float)i-tmaskcenter)/tmaskwide ) + 0.5));
       int nthis = (int)fthis;
       if ( fthis-(float)nthis > rand()/(float)RAND_MAX ) nthis++;
 
@@ -230,6 +239,7 @@ void populate_block_array (int nx, int ny) {
          block[icnt].b = 0.;
 
          // how much of the field is masked over?
+         const int iopened = icnt;
          int num_masked = 0;
          for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) if (masked[ix][iy]) num_masked++;
          frac_masked = (float)num_masked / (float)(nx*ny);
@@ -262,7 +272,14 @@ void populate_block_array (int nx, int ny) {
 
             numtries++;
 
-            if (frac_closed > (1.-frac_masked) || numtries > 1000) keepgoing = FALSE;
+            // make sure we continue to mask off open areas
+            if (frac_closed > (1.-frac_masked)*(1.-frac_masked)) keepgoing = FALSE;
+
+            // but try to adjoin existing masked areas
+            if (num_closed == num_pixels && rand()/(float)RAND_MAX < (float)(icnt-iopened)/30.) keepgoing = TRUE;
+
+            // and don't try too hard
+            if (numtries > 1000) keepgoing = FALSE;
          }
          globnumtries += numtries;
 
