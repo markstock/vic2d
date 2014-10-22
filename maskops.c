@@ -214,6 +214,7 @@ void populate_block_array (int nx, int ny) {
       }
       fprintf(stderr,"adding %d blocks at time %d, required %d tries, masked frac is %g\n",nthis,i,globnumtries,frac_masked); fflush(stderr);
    }
+   const int iopened = icnt;
 
    // blocks that close off the space (completely)
    for (int i=(int)(tmaskcenter-tmaskwide); i<(int)(tmaskcenter+tmaskwide); i++) {
@@ -239,7 +240,6 @@ void populate_block_array (int nx, int ny) {
          block[icnt].b = 0.;
 
          // how much of the field is masked over?
-         const int iopened = icnt;
          int num_masked = 0;
          for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) if (masked[ix][iy]) num_masked++;
          frac_masked = (float)num_masked / (float)(nx*ny);
