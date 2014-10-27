@@ -645,7 +645,7 @@ int main(int argc,char **argv) {
    }
 
    // optionally generate repeatedly-overlaid mask
-   (void) overlay_mask (nx, ny, mask);
+   //(void) overlay_mask (nx, ny, mask);
 
    // Initial velocity solve -------------------------
 
@@ -688,7 +688,7 @@ int main(int argc,char **argv) {
    }
 
    // initialize an array of blocks to add during the run
-   if (TRUE) {
+   if (FALSE) {
       populate_block_array(nx,ny);
    }
 
@@ -1071,7 +1071,7 @@ int main(int argc,char **argv) {
       }
 
 
-      if (TRUE) {
+      if (FALSE) {
          // open or close blocks in the mask
          (void) update_mask_with_blocks_2 (mask, a, nx, ny, simtime, dt);
          // optionally generate repeatedly-overlaid mask
