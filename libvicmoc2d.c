@@ -1234,7 +1234,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
             // reset back to full solve
             fparm[4] = muderr;
             iparm[12] = 100;
-         } else if (maxcorr/maxvort < 2.*maskerr) {
+         } else if (maxcorr/maxvort < 5.*maskerr) {
             // always run a specific number of cycles
             fparm[4] = 0.0;
             iparm[12] = 2;
@@ -1446,11 +1446,13 @@ int find_biot_savart (float xp,float yp,int nx,int ny,
   for (i=istart;i<iend;i++) {
     xdist = i*dx - xp;
     for (j=jstart;j<jend;j++) {
-      ydist = j*dy - yp;
-      distsq = xdist*xdist+ydist*ydist;
-      if (distsq > 1.e-20) {
-        vel[0] += ydist * vort[i][j] / distsq;
-        vel[1] -= xdist * vort[i][j] / distsq;
+      if (abs(vort[i][j]) > 1.e-20) {
+        ydist = j*dy - yp;
+        distsq = xdist*xdist+ydist*ydist+dx*dy;
+        //if (distsq > 1.e-20) {
+          vel[0] += ydist * vort[i][j] / distsq;
+          vel[1] -= xdist * vort[i][j] / distsq;
+        //}
       }
     }
   }
