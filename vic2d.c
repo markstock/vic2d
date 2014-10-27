@@ -1197,7 +1197,10 @@ float compute_and_write_stats(int silent, int step, float dt, float simtime, flo
    cn = vmax*(nx+1)*dt;
 
    // write the stats here
-   if (!silent) fprintf(stdout,"%d %g %g %g %g %g\n",step,simtime,ke,vmax,cn,cputime);
+   if (!silent) {
+      fprintf(stdout,"%d %g %g %g %g %g\n",step,simtime,ke,vmax,cn,cputime);
+      fflush(stdout);
+   }
    fprintf(outp,"%d %g %g %g %g %g\n",step,simtime,ke,vmax,cn,cputime);
    fflush(outp);
 
