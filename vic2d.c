@@ -1039,14 +1039,15 @@ int main(int argc,char **argv) {
       }
 
       // take one computational step forward in time
-      int numsubsteps = 1 + (int)(vmax*(nx+1)*dt/10.);
+      int numsubsteps = 1;
+      if (use_MASK) numsubsteps = 1 + (int)(vmax*(nx+1)*dt/10.);
       for (int istep=0; istep<numsubsteps; istep++) {
-      effective_re = step_forward_2d (silent,step,isStam,4,
-                        nx,ny,xbdry,ybdry,freestream,
-                        recalc_vel,move_colors,
-                        u,a,t,use_MASK,mask,maskerr,sc_diffus,
-                        gravtype,gravity,(dt/(float)numsubsteps),
-                        use_strong_strat,bn,dens_ratio,acc);
+         effective_re = step_forward_2d (silent,step,isStam,4,
+                           nx,ny,xbdry,ybdry,freestream,
+                           recalc_vel,move_colors,
+                           u,a,t,use_MASK,mask,maskerr,sc_diffus,
+                           gravtype,gravity,(dt/(float)numsubsteps),
+                           use_strong_strat,bn,dens_ratio,acc);
       }
 
       // read in the image again and overlay it!
