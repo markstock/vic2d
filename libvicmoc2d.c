@@ -494,7 +494,8 @@ float diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,
 
    // walls, 2nd order Laplacian
    // then solve for the wall and periodic bdry
-   if (xbdry == WALL || xbdry == OPEN) {
+   // new: do not diffuse on OPEN boundaries, because flow may be coming in
+   if (xbdry == WALL) {
       for (j=1;j<nym1;j++) {
          out[0][j] = in[0][j]
                    + multx*(-in[2][j]+6.*in[1][j]-5.*in[0][j])
@@ -510,8 +511,13 @@ float diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,
                    + multy*(in[0][j+1]+in[0][j-1]-2.*in[0][j]);
          out[nxm1][j] = out[0][j];
       }
+   } else {	// OPEN
+      for (j=1;j<nym1;j++) {
+         out[0][j] = in[0][j];
+         out[nxm1][j] = in[nxm1][j];
+      }
    }
-   if (ybdry == WALL || ybdry == OPEN) {
+   if (ybdry == WALL) {
       for (i=1;i<nxm1;i++) {
          out[i][0] = in[i][0]
                    + multx*(in[i+1][0]+in[i-1][0]-2.*in[i][0])
@@ -527,10 +533,15 @@ float diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,
                    + multy*(in[i][1]+in[i][ny-2]-2.*in[i][0]);
          out[i][nym1] = out[i][0];
       }
+   } else {	// OPEN
+      for (i=1;i<nxm1;i++) {
+         out[i][0] = in[i][0];
+         out[i][nym1] = in[i][nym1];
+      }
    }
 
    // corners, 2nd order Laplacian
-   if ((xbdry == WALL && ybdry == WALL) || (xbdry == OPEN && ybdry == OPEN)) {
+   if (xbdry == WALL && ybdry == WALL) {
       out[0][0] = in[0][0]
                    + multx*(-in[2][0]+6.*in[1][0]-5.*in[0][0])
                    + multy*(-in[0][2]+6.*in[0][1]-5.*in[0][0]);
@@ -570,9 +581,11 @@ float diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,
       out[0][nym1] = out[0][0];
       out[nxm1][0] = out[0][0];
       out[nxm1][nym1] = out[0][0];
-   } else {
-      fprintf(stderr,"ERROR (diffuse_scalar_2d): should not get here\n");
-      exit(0);
+   } else {	// all OPEN
+      out[0][0] = in[0][0];
+      out[0][nym1] = in[0][nym1];
+      out[nxm1][0] = in[nxm1][0];
+      out[nxm1][nym1] = in[nxm1][nym1];
    }
 
    // and, for subsequent steps to act on the right variables, swap
@@ -1947,14 +1960,14 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
                py = (float)j * dx;
                newx = px-dt*velmult*u[i][j];
                newy = py-dt*velmult*v[i][j];
-               if (xbdry == WALL || xbdry == OPEN) {
-                  if (newx > xf-EPSILON) newx = xf-EPSILON;
-                  if (newx < 0.0+EPSILON) newx = EPSILON;
-               }
-               if (ybdry == WALL || ybdry == OPEN) {
-                  if (newy > yf-EPSILON) newy = yf-EPSILON;
-                  if (newy < 0.0+EPSILON) newy = EPSILON;
-               }
+               //if (xbdry == WALL || xbdry == OPEN) {
+               //   if (newx > xf-EPSILON) newx = xf-EPSILON;
+               //   if (newx < 0.0+EPSILON) newx = EPSILON;
+               //}
+               //if (ybdry == WALL || ybdry == OPEN) {
+               //   if (newy > yf-EPSILON) newy = yf-EPSILON;
+               //   if (newy < 0.0+EPSILON) newy = EPSILON;
+               //}
                if (interp == cic)
                   interpolate_array_using_CIC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
                else if (interp == tsc)
@@ -1988,15 +2001,15 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
 
                // find position 1 explicit Euler step backwards
                newx = px-dt*velmult*u0;
-               if (xbdry == WALL || xbdry == OPEN) {
-                  if (newx > xf-EPSILON) newx = xf-EPSILON;
-                  if (newx < 0.0+EPSILON) newx = EPSILON;
-               }
+               //if (xbdry == WALL || xbdry == OPEN) {
+               //   if (newx > xf-EPSILON) newx = xf-EPSILON;
+               //   if (newx < 0.0+EPSILON) newx = EPSILON;
+               //}
                newy = py-dt*velmult*v0;
-               if (ybdry == WALL || ybdry == OPEN) {
-                  if (newy > yf-EPSILON) newy = yf-EPSILON;
-                  if (newy < 0.0+EPSILON) newy = EPSILON;
-               }
+               //if (ybdry == WALL || ybdry == OPEN) {
+               //   if (newy > yf-EPSILON) newy = yf-EPSILON;
+               //   if (newy < 0.0+EPSILON) newy = EPSILON;
+               //}
 
                // find vel at newx,newy
                if (interp == cic)
@@ -2008,15 +2021,15 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
 
                // find position back 1 step using average of two velocities
                newx = px-dt*0.5*velmult*(u0+u1);
-               if (xbdry == WALL || xbdry == OPEN) {
-                  if (newx > xf-EPSILON) newx = xf-EPSILON;
-                  if (newx < 0.0+EPSILON) newx = EPSILON;
-               }
+               //if (xbdry == WALL || xbdry == OPEN) {
+               //   if (newx > xf-EPSILON) newx = xf-EPSILON;
+               //   if (newx < 0.0+EPSILON) newx = EPSILON;
+               //}
                newy = py-dt*0.5*velmult*(v0+v1);
-               if (ybdry == WALL || ybdry == OPEN) {
-                  if (newy > yf-EPSILON) newy = yf-EPSILON;
-                  if (newy < 0.0+EPSILON) newy = EPSILON;
-               }
+               //if (ybdry == WALL || ybdry == OPEN) {
+               //   if (newy > yf-EPSILON) newy = yf-EPSILON;
+               //   if (newy < 0.0+EPSILON) newy = EPSILON;
+               //}
 
                // are we able to calculate the acceleration here?
 
@@ -2054,15 +2067,15 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
 
                // find position 1 explicit Euler step backwards
                newx = px-dt*0.5*velmult*u0;
-               if (xbdry == WALL || xbdry == OPEN) {
-                  if (newx > xf-EPSILON) newx = xf-EPSILON;
-                  if (newx < 0.0+EPSILON) newx = EPSILON;
-               }
+               //if (xbdry == WALL || xbdry == OPEN) {
+               //   if (newx > xf-EPSILON) newx = xf-EPSILON;
+               //   if (newx < 0.0+EPSILON) newx = EPSILON;
+               //}
                newy = py-dt*0.5*velmult*v0;
-               if (ybdry == WALL || ybdry == OPEN) {
-                  if (newy > yf-EPSILON) newy = yf-EPSILON;
-                  if (newy < 0.0+EPSILON) newy = EPSILON;
-               }
+               //if (ybdry == WALL || ybdry == OPEN) {
+               //   if (newy > yf-EPSILON) newy = yf-EPSILON;
+               //   if (newy < 0.0+EPSILON) newy = EPSILON;
+               //}
                // find vel at newx,newy (k_2)
                if (interp == cic)
                   interpolate_vel_using_CIC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
@@ -2073,15 +2086,15 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
 
                // find position 2 explicit Euler step backwards
                newx = px-dt*0.5*velmult*u1;
-               if (xbdry == WALL || xbdry == OPEN) {
-                  if (newx > xf-EPSILON) newx = xf-EPSILON;
-                  if (newx < 0.0+EPSILON) newx = EPSILON;
-               }
+               //if (xbdry == WALL || xbdry == OPEN) {
+               //   if (newx > xf-EPSILON) newx = xf-EPSILON;
+               //   if (newx < 0.0+EPSILON) newx = EPSILON;
+               //}
                newy = py-dt*0.5*velmult*v1;
-               if (ybdry == WALL || ybdry == OPEN) {
-                  if (newy > yf-EPSILON) newy = yf-EPSILON;
-                  if (newy < 0.0+EPSILON) newy = EPSILON;
-               }
+               //if (ybdry == WALL || ybdry == OPEN) {
+               //   if (newy > yf-EPSILON) newy = yf-EPSILON;
+               //   if (newy < 0.0+EPSILON) newy = EPSILON;
+               //}
                // find vel at newx,newy (k_3)
                if (interp == cic)
                   interpolate_vel_using_CIC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u2,&v2);
@@ -2092,15 +2105,15 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
 
                // find position 3 explicit Euler step backwards
                newx = px-dt*velmult*u2;
-               if (xbdry == WALL || xbdry == OPEN) {
-                  if (newx > xf-EPSILON) newx = xf-EPSILON;
-                  if (newx < 0.0+EPSILON) newx = EPSILON;
-               }
+               //if (xbdry == WALL || xbdry == OPEN) {
+               //   if (newx > xf-EPSILON) newx = xf-EPSILON;
+               //   if (newx < 0.0+EPSILON) newx = EPSILON;
+               //}
                newy = py-dt*velmult*v2;
-               if (ybdry == WALL || ybdry == OPEN) {
-                  if (newy > yf-EPSILON) newy = yf-EPSILON;
-                  if (newy < 0.0+EPSILON) newy = EPSILON;
-               }
+               //if (ybdry == WALL || ybdry == OPEN) {
+               //   if (newy > yf-EPSILON) newy = yf-EPSILON;
+               //   if (newy < 0.0+EPSILON) newy = EPSILON;
+               //}
                // find vel at newx,newy (k_4)
                if (interp == cic)
                   interpolate_vel_using_CIC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u3,&v3);
@@ -2112,16 +2125,16 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
                // find position back 1 step using average of four velocities
                accx = 0.16666667*(u0+u3+2.*(u1+u2));
                newx = px-dt*velmult*accx;
-               if (xbdry == WALL || xbdry == OPEN) {
-                  if (newx > xf-EPSILON) newx = xf-EPSILON;
-                  if (newx < 0.0+EPSILON) newx = EPSILON;
-               }
+               //if (xbdry == WALL || xbdry == OPEN) {
+               //   if (newx > xf-EPSILON) newx = xf-EPSILON;
+               //   if (newx < 0.0+EPSILON) newx = EPSILON;
+               //}
                accy = 0.16666667*(v0+v3+2.*(v1+v2));
                newy = py-dt*velmult*accy;
-               if (ybdry == WALL || ybdry == OPEN) {
-                  if (newy > yf-EPSILON) newy = yf-EPSILON;
-                  if (newy < 0.0+EPSILON) newy = EPSILON;
-               }
+               //if (ybdry == WALL || ybdry == OPEN) {
+               //   if (newy > yf-EPSILON) newy = yf-EPSILON;
+               //   if (newy < 0.0+EPSILON) newy = EPSILON;
+               //}
 
                // gather an estimate of the acceleration (u1-u0)/dt?
                accx = velmult*(u0-accx)*oodt;
@@ -2389,6 +2402,8 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
    float xfactor,yfactor;
    float mf;
    float mfsum = 0.;
+   //const int debug = (px < 0.0 && py > 0.1 && py < 0.102);
+   const int debug = FALSE;
 
    for (k=0; k<numout; k++) out[k] = 0.0;
 
@@ -2401,7 +2416,7 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
    }
    si[0] = (int)(20+(nm1)*(px)) - 21;
    si[1] = (int)(20+(nm1)*(py)) - 21;
-   // fprintf(stdout,"location is %g %g, start index is %d %d\n",px,py,si[0],si[1]);
+   if (debug) fprintf(stdout,"location is %g %g, start index is %d %d\n",px,py,si[0],si[1]);
 
    // make the list of M4 weights
    dx = fabs( (px)*(nm1) - si[0] );
@@ -2427,7 +2442,7 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
    dx = dx+1.0;
    m4[1][3] = 0.5*pow(2-dx,2)*(1-dx);
 
-   // fprintf(stdout,"  weights are %g %g %g %g and %g %g %g %g\n",m4[0][0],m4[0][1],m4[0][2],m4[0][3],m4[1][0],m4[1][1],m4[1][2],m4[1][3]);
+   if (debug) fprintf(stdout,"  weights are %g %g %g %g and %g %g %g %g\n",m4[0][0],m4[0][1],m4[0][2],m4[0][3],m4[1][0],m4[1][1],m4[1][2],m4[1][3]);
 
    // ii,ji are the counters, i,j are the cell indexes (possibly negative)
    //   and ir,jr are the actual cells we take values from
@@ -2444,10 +2459,16 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       // also true when interpolating within scalar-type fields
 
       /* near the min or max x bounds */
+      ir = i;
       if (xbdry == PERIODIC) {
          ir = (i+(nx-1))%(nx-1);
-      } else {
-         ir = i;
+      } else if (xbdry == OPEN) {
+         if (i<0) {
+            ir = 0;
+         } else if (i>(nx-1)) {
+            ir = nx-1;
+         }
+      } else {	// WALL
          if (i<0) {
             ir = -i;
             // xfactor *= -1.0;
@@ -2458,10 +2479,16 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       }
 
       /* near the min or max y bounds */
+      jr = j;
       if (ybdry == PERIODIC) {
          jr = (j+(ny-1))%(ny-1);
-      } else {
-         jr = j;
+      } else if (ybdry == OPEN) {
+         if (j<0) {
+            jr = 0;
+         } else if (j>(ny-1)) {
+            jr = ny-1;
+         }
+      } else {	// WALL
          if (j<0) {
             jr = -j;
             // yfactor *= -1.0;
@@ -2475,15 +2502,18 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       mf = m4[0][ii] * m4[1][ji] * mask[ir][jr];
       mfsum += mf;
 
+      if (debug) fprintf(stdout,"    ii,ji %d %d   ir,jr %d %d   weight %g\n",ii,ji,ir,jr,mf);
+
       /* apply them to the grid node in question */
       for (k=0; k<numout; k++) out[k] += zeta[k][ir][jr]*mf;
 
    }}
 
    // correct by the actual sum of the weights
-   if (mfsum > 0.) {
+   if (fabs(mfsum) > 0.) {
       for (k=0; k<numout; k++) out[k] /= mfsum;
    }
+   if (debug) for (k=0; k<numout; k++) fprintf(stdout,"    k %d   val %g\n",k,out[k]);
 
    /* all's well that ends well */
    return(0);
@@ -2781,10 +2811,16 @@ int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       // also true when interpolating within scalar-type fields
 
       /* near the min or max x bounds */
+      ir = i;
       if (xbdry == PERIODIC) {
          ir = (i+(nx-1))%(nx-1);
+      } else if (xbdry == OPEN) {
+         if (i<0) {
+            ir = 0;
+         } else if (i>(nx-1)) {
+            ir = nx-1;
+         }
       } else {
-         ir = i;
          if (i==0) {
             // xfactor = 1.0;
          } else if (i<0) {
@@ -2799,10 +2835,16 @@ int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       }
 
       /* near the min or max y bounds */
+      jr = j;
       if (ybdry == PERIODIC) {
          jr = (j+(ny-1))%(ny-1);
+      } else if (ybdry == OPEN) {
+         if (j<0) {
+            jr = 0;
+         } else if (j>(ny-1)) {
+            jr = ny-1;
+         }
       } else {
-         jr = j;
          if (j==0) {
             // yfactor = 1.0;
          } else if (j<0) {
@@ -2829,7 +2871,7 @@ int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
    }}
 
    // correct by the actual sum of the weights
-   if (mfsum > 0.) {
+   if (fabs(mfsum) > 0.) {
       *(u) /= mfsum;
       *(v) /= mfsum;
    }
