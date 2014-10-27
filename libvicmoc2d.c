@@ -27,9 +27,7 @@ int find_gradient_of_scalar_2nd_2d (int,int,int,int,float**,float**,float**,floa
 int find_curl_of_vel_2d (int,int,int,int,float**,float**,float**);
 int moc_advect_2d (int,int,int,int,float**,float**,float**,float***,float***,float,int,int);
 int find_open_boundary_psi (int,int,float**,float,float*,float**);
-float find_biot_savart_u (float,float,int,int,float,float,float**);
-float find_biot_savart_v (float,float,int,int,float,float,float**);
-int find_biot_savart (float,float,int,int,float,float,float**,float*);
+int find_biot_savart (int,float,float,int,int,float,float,float**,float*);
 
 // interpolation routines
 float interpolate_array_using_CIC_2d (int,int,int,int,float***,float,float,int,float*);
@@ -1319,15 +1317,13 @@ int find_open_boundary_psi (int nx,int ny,float **vort,
    else vel = allocate_1d_array_f((long int)ny);
 
    // initialize the static variables
-   find_biot_savart (0.,0.,nx,ny,-1.0,-1.0,vort,thisvel);
+   find_biot_savart (TRUE,0.,0.,nx,ny,dx,dy,vort,thisvel);
 
    // first, march across bottom row (j=0, y=0)
    #pragma omp parallel for private(i,thisvel)
    for (i=0;i<nx;i++) {
-     find_biot_savart (i*dx,0.,nx,ny,dx,dy,vort,thisvel);
+     find_biot_savart (FALSE,i*dx,0.,nx,ny,dx,dy,vort,thisvel);
      vel[i] = freestream[1] + thisvel[1];
-     //vel[i] = freestream[1] + find_biot_savart_v(i*dx,0.,nx,ny,dx,dy,vort);
-     //fprintf(stderr,"fbs %g, fbsv %g, n %d\n",thisvel[1],vel[i]-freestream[1],j);
    }
    //exit(0);
    psi[0][0] = 0.0;
@@ -1339,9 +1335,8 @@ int find_open_boundary_psi (int nx,int ny,float **vort,
    // then march up left side
    #pragma omp parallel for private(j,thisvel)
    for (j=0;j<ny;j++) {
-     find_biot_savart (0.,j*dy,nx,ny,dx,dy,vort,thisvel);
+     find_biot_savart (FALSE,0.,j*dy,nx,ny,dx,dy,vort,thisvel);
      vel[j] = freestream[0] + thisvel[0];
-     //vel[j] = freestream[0] + find_biot_savart_u(0.,j*dy,nx,ny,dx,dy,vort);
    }
    for (j=1;j<ny;j++) {
      psi[0][j] = psi[0][j-1] + 0.5*(vel[j]+vel[j-1])*dy;
@@ -1351,9 +1346,8 @@ int find_open_boundary_psi (int nx,int ny,float **vort,
    // then march up right side
    #pragma omp parallel for private(j,thisvel)
    for (j=0;j<ny;j++) {
-     find_biot_savart (1.,j*dy,nx,ny,dx,dy,vort,thisvel);
+     find_biot_savart (FALSE,1.,j*dy,nx,ny,dx,dy,vort,thisvel);
      vel[j] = freestream[0] + thisvel[0];
-     //vel[j] = freestream[0] + find_biot_savart_u(1.,j*dy,nx,ny,dx,dy,vort);
    }
    for (j=1;j<ny;j++) {
      psi[nx-1][j] = psi[nx-1][j-1] + 0.5*(vel[j]+vel[j-1])*dy;
@@ -1363,9 +1357,8 @@ int find_open_boundary_psi (int nx,int ny,float **vort,
    // finally, march across top row (j=ny-1, y=yf)
    #pragma omp parallel for private(i,thisvel)
    for (i=0;i<nx;i++) {
-     find_biot_savart (i*dx,yf,nx,ny,dx,dy,vort,thisvel);
+     find_biot_savart (FALSE,i*dx,yf,nx,ny,dx,dy,vort,thisvel);
      vel[i] = freestream[1] + thisvel[1];
-     //vel[i] = freestream[1] + find_biot_savart_v(i*dx,yf,nx,ny,dx,dy,vort);
    }
    for (i=1;i<nx;i++) {
      psi[i][ny-1] = psi[i-1][ny-1] - 0.5*(vel[i]+vel[i-1])*dx;
@@ -1377,51 +1370,11 @@ int find_open_boundary_psi (int nx,int ny,float **vort,
    return(0);
 }
 
-float find_biot_savart_u (float xp,float yp,int nx,int ny,
-                        float dx,float dy,float **vort) {
-  int i,j;
-  float xdist,ydist,distsq;
-  float uvel = 0.;
-
-  for (i=0;i<nx;i++) {
-    xdist = i*dx - xp;
-    for (j=0;j<ny;j++) {
-      ydist = j*dy - yp;
-      distsq = xdist*xdist+ydist*ydist;
-      if (distsq > 1.e-20) {
-        uvel += ydist * vort[i][j] / distsq;
-      }
-    }
-  }
-  uvel *= dx*dy/(2.*M_PI);
-
-  return uvel;
-}
-
-float find_biot_savart_v (float xp,float yp,int nx,int ny,
-                        float dx,float dy,float **vort) {
-  int i,j;
-  float xdist,ydist,distsq;
-  float vvel = 0.;
-
-  for (i=0;i<nx;i++) {
-    xdist = i*dx - xp;
-    for (j=0;j<ny;j++) {
-      ydist = j*dy - yp;
-      distsq = xdist*xdist+ydist*ydist;
-      if (distsq > 1.e-20) {
-        vvel -= xdist * vort[i][j] / distsq;
-      }
-    }
-  }
-  vvel *= dx*dy/(2.*M_PI);
-
-  return vvel;
-}
-
-int find_biot_savart (float xp,float yp,int nx,int ny,
-                      float dx,float dy,float **vort,
-                      float *vel) {
+int find_biot_savart (const int initialize,
+                      const float xp,const float yp,
+                      const int nx,const int ny,
+                      const float dx,const float dy,
+                      float **vort,float *vel) {
   int i,j;
   static int istart = 100000;
   static int iend = -1;
@@ -1430,7 +1383,7 @@ int find_biot_savart (float xp,float yp,int nx,int ny,
   float xdist,ydist,distsq;
 
   // initialize some arrays
-  if (dx < 0. || dy < 0.) {
+  if (initialize) {
 
     istart = 100000;
     iend = -1;
@@ -1450,6 +1403,8 @@ int find_biot_savart (float xp,float yp,int nx,int ny,
       }
     }
 
+    // for O(NlogN) version: generate the hierarchical array
+
     //fprintf(stderr,"%d %d  %d %d\n",istart,iend,jstart,jend);
   }
 
@@ -1462,10 +1417,8 @@ int find_biot_savart (float xp,float yp,int nx,int ny,
       if (abs(vort[i][j]) > 1.e-20) {
         ydist = j*dy - yp;
         distsq = xdist*xdist+ydist*ydist+dx*dy;
-        //if (distsq > 1.e-20) {
-          vel[0] += ydist * vort[i][j] / distsq;
-          vel[1] -= xdist * vort[i][j] / distsq;
-        //}
+        vel[0] += ydist * vort[i][j] / distsq;
+        vel[1] -= xdist * vort[i][j] / distsq;
       }
     }
   }
