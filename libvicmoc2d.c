@@ -25,7 +25,7 @@ int find_vels_2d (int,int,int,int,int,int,int,float*,float**,float**,float**,con
 int find_gradient_of_scalar_2d (int,int,int,int,float**,float**,float,float**,float);
 int find_gradient_of_scalar_2nd_2d (int,int,int,int,float**,float**,float**,float,float**,float);
 int find_curl_of_vel_2d (int,int,int,int,float**,float**,float**);
-int moc_advect_2d (int,int,int,int,float**,float**,float**,float***,float***,float,int,int);
+int moc_advect_2d (int,int,int,int,float**,float**,float**,float*,float***,float***,float,int,int);
 int find_open_boundary_psi (int,int,float**,float,float*,float**);
 int find_biot_savart (int,float,float,int,int,float,float,float**,float*);
 
@@ -211,7 +211,7 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
 
   // project forward to find the new fields (both)
   if (!silent) fprintf(stderr,"  now in moc_advect_2d\n"); fflush(stderr);
-  moc_advect_2d (nx,ny,xbdry,ybdry,mask,u[XV],u[YV],t,a,dt,mocOrder,move_colors);
+  moc_advect_2d (nx,ny,xbdry,ybdry,mask,u[XV],u[YV],freestream,t,a,dt,mocOrder,move_colors);
 
   // split on method for advection step
   if (isStam) {
@@ -1846,10 +1846,12 @@ int find_curl_of_vel_2d(int nx,int ny,int xbdry,int ybdry,
 
 
 /*
- * moc_advect_2d is the implicit scheme for updating the vorticity values
+ * moc_advect_2d is the implicit scheme for updating all field values
  */
-int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,float **v,
-   float ***in,float ***out,float dt,int order,int moveColors) {
+int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
+      float** mask,float** u,float** v,float* fs,
+      float*** in,float*** out,
+      float dt,int order,int moveColors) {
 
    enum interpMeth {
       cic, tsc, m4p, cic2, cic3 } interp = m4p;
@@ -1870,20 +1872,12 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
    for (i=0; i<MAX_SCALARS; i++) {
       tempin[i] = NULL;
       tempout[i] = NULL;
-      //fprintf(stderr,"%d  %ld  %ld\n",i,in[i],out[i]);
-      //fflush(stderr);
       if (in[i] != NULL) {
          tempin[sc_cnt] = in[i];
          tempout[sc_cnt] = out[i];
-         //fprintf(stderr,"   %ld  %ld\n",tempin[sc_cnt],tempout[sc_cnt]);
-         //fflush(stderr);
          sc_cnt++;
       }
    }
-   //for (i=0; i<MAX_SCALARS; i++) {
-   //   fprintf(stderr,"%ld  %ld\n",in[i],tempin[i]);
-   //}
-   //fflush(stderr);
 
    // fprintf(stderr,"in moc_advect_2d\n"); fflush(stderr);
    if (nx > ny) {
@@ -1909,6 +1903,11 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
                if (mask[i][j] < 1.e-5) do_this_pixel = FALSE;
                else velmult = mask[i][j];
             }
+            if (i==0 && fs[0] > 0.0) do_this_pixel = FALSE;
+            if (i==nx-1 && fs[0] < 0.0) do_this_pixel = FALSE;
+            if (j==0 && fs[1] > 0.0) do_this_pixel = FALSE;
+            if (j==ny-1 && fs[1] < 0.0) do_this_pixel = FALSE;
+
             if (do_this_pixel) {
                py = (float)j * dx;
                newx = px-dt*velmult*u[i][j];
@@ -1945,6 +1944,10 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
                if (mask[i][j] < 1.e-5) do_this_pixel = FALSE;
                else velmult = mask[i][j];
             }
+            if (i==0 && fs[0] > 0.0) do_this_pixel = FALSE;
+            if (i==nx-1 && fs[0] < 0.0) do_this_pixel = FALSE;
+            if (j==0 && fs[1] > 0.0) do_this_pixel = FALSE;
+            if (j==ny-1 && fs[1] < 0.0) do_this_pixel = FALSE;
 
             if (do_this_pixel) {
                py = (float)j * dx;
@@ -2011,6 +2014,10 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,float **mask,float **u,floa
                if (mask[i][j] < 1.e-5) do_this_pixel = FALSE;
                else velmult = mask[i][j];
             }
+            if (i==0 && fs[0] > 0.0) do_this_pixel = FALSE;
+            if (i==nx-1 && fs[0] < 0.0) do_this_pixel = FALSE;
+            if (j==0 && fs[1] > 0.0) do_this_pixel = FALSE;
+            if (j==ny-1 && fs[1] < 0.0) do_this_pixel = FALSE;
 
             if (do_this_pixel) {
                py = (float)j * dx;
