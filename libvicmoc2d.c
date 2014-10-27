@@ -2459,7 +2459,8 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       }
 
       /* find the m4-factor for this cell's contribution */
-      mf = m4[0][ii] * m4[1][ji] * mask[ir][jr];
+      mf = m4[0][ii] * m4[1][ji];
+      if (mask != NULL) mf *= mask[ir][jr];
       mfsum += mf;
 
       if (debug) fprintf(stdout,"    ii,ji %d %d   ir,jr %d %d   weight %g\n",ii,ji,ir,jr,mf);
@@ -2819,9 +2820,8 @@ int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       }
 
       /* find the m4-factor for this cell's contribution */
-      //mf = xfactor*yfactor*m4[0][ii]*m4[1][ji];
-      //mf = m4[0][ii]*m4[1][ji];
-      mf = m4[0][ii] * m4[1][ji] * mask[ir][jr];
+      mf = m4[0][ii] * m4[1][ji];
+      if (mask != NULL) mf *= mask[ir][jr];
       mfsum += mf;
 
       /* apply them to the grid node in question */
