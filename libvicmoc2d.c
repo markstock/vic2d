@@ -28,6 +28,7 @@ int find_curl_of_vel_2d (int,int,int,int,float**,float**,float**);
 int moc_advect_2d (int,int,int,int,float**,float**,float**,float*,float***,float***,float,int,int);
 int find_open_boundary_psi (int,int,float**,float,float*,float**);
 int find_biot_savart (int,float,float,int,int,float,float,float**,float*);
+void recursive_biot_savart (const float, const float, const int, const int, const int, const float, const float, float***, float*);
 
 // interpolation routines
 float interpolate_array_using_CIC_2d (int,int,int,int,float***,float,float,int,float*);
@@ -1375,12 +1376,16 @@ int find_biot_savart (const int initialize,
                       const int nx,const int ny,
                       const float dx,const float dy,
                       float **vort,float *vel) {
-  int i,j;
+
+  const int treecode = FALSE;
   static int istart = 100000;
   static int iend = -1;
   static int jstart = 100000;
   static int jend = -1;
   float xdist,ydist,distsq;
+  static int nlevels = -1;
+  static float** va[20];
+  static int firsttime = TRUE;
 
   // initialize some arrays
   if (initialize) {
@@ -1392,8 +1397,8 @@ int find_biot_savart (const int initialize,
     
     // which columns have non-zero circulation?
     // which rows have non-zero circulation?
-    for (i=0;i<nx;i++) {
-      for (j=0;j<ny;j++) {
+    for (int i=0;i<nx;i++) {
+      for (int j=0;j<ny;j++) {
         if (abs(vort[i][j]) > 1.e-20) {
           if (i<istart) istart=i;
           if (i+1>iend) iend=i+1;
@@ -1404,21 +1409,58 @@ int find_biot_savart (const int initialize,
     }
 
     // for O(NlogN) version: generate the hierarchical array
+    if (treecode) {
+      int ilevel = 0;
+      va[ilevel] = vort;
+      int oldnx = nx;
+      int oldny = ny;
+      while (oldnx > 4 && oldny > 4 && ilevel < 20) {
+        ilevel++;
+        int newnx = (oldnx+1)/2;
+        int newny = (oldny+1)/2;
+        if (firsttime) va[ilevel] = allocate_2d_array_f(newnx, newny);
+        for (int i=0; i<newnx; i++) for (int j=0; j<newny; j++) va[ilevel][i][j] = 0.;
+        for (int i=0; i<oldnx; i++) {
+          for (int j=0; j<oldny; j++) {
+            va[ilevel][i/2][j/2] += va[ilevel-1][i][j];
+          }
+        }
+        iend = newnx;
+        jend = newny;
+        oldnx = newnx;
+        oldny = newny;
+      }
+      nlevels = ilevel;
+    }
 
+    // never alloc again
+    if (firsttime) firsttime = FALSE;
     //fprintf(stderr,"%d %d  %d %d\n",istart,iend,jstart,jend);
   }
 
   // now, only iterate over the necessary rows/columns
   vel[0] = 0.;
   vel[1] = 0.;
-  for (i=istart;i<iend;i++) {
-    xdist = i*dx - xp;
-    for (j=jstart;j<jend;j++) {
-      if (abs(vort[i][j]) > 1.e-20) {
-        ydist = j*dy - yp;
-        distsq = xdist*xdist+ydist*ydist+dx*dy;
-        vel[0] += ydist * vort[i][j] / distsq;
-        vel[1] -= xdist * vort[i][j] / distsq;
+  if (treecode) {
+    // iterate over coarsest grid first
+    for (int i=0;i<iend;i++) {
+      for (int j=0;j<jend;j++) {
+        recursive_biot_savart(xp,yp,i,j,nlevels,
+           dx*pow(2,nlevels),dy*pow(2,nlevels),
+           va,vel);
+      }
+    }
+
+  } else {  // direct method
+    for (int i=istart;i<iend;i++) {
+      xdist = i*dx - xp;
+      for (int j=jstart;j<jend;j++) {
+        if (abs(vort[i][j]) > 1.e-20) {
+          ydist = j*dy - yp;
+          distsq = xdist*xdist+ydist*ydist+dx*dy;
+          vel[0] += ydist * vort[i][j] / distsq;
+          vel[1] -= xdist * vort[i][j] / distsq;
+        }
       }
     }
   }
@@ -1428,6 +1470,40 @@ int find_biot_savart (const int initialize,
   return ((iend-istart-1)*(jend-jstart-1));
 }
 
+
+/*
+ * recursive Biot-Savart law, for hierarchical treecode
+ *
+ * needs work: fix distances to account for offset box centers
+ *             prevent recursing into oob i,j
+ */
+void recursive_biot_savart (const float xp, const float yp,
+      const int i, const int j, const int level,
+      const float dx, const float dy,
+      float*** va, float* vel) {
+
+   // don't even bother if vorticity is weak
+   if (abs(va[level][i][j]) < 1.e-20) return;
+
+   // check box-opening criterion
+   const float xdist = i*dx - xp;
+   const float ydist = j*dy - yp;
+   float distsq = xdist*xdist+ydist*ydist;
+   if (level == 0 || distsq > 3.*dx) {
+      // compute influence at this level
+      vel[0] += ydist * va[level][i][j] / distsq;
+      vel[1] -= xdist * va[level][i][j] / distsq;
+
+   } else {
+      // recurse to finer level
+      recursive_biot_savart(xp,yp,2*i,2*j,level-1,dx/2.,dy/2.,va,vel);
+      recursive_biot_savart(xp,yp,2*i,2*j+1,level-1,dx/2.,dy/2.,va,vel);
+      recursive_biot_savart(xp,yp,2*i+1,2*j,level-1,dx/2.,dy/2.,va,vel);
+      recursive_biot_savart(xp,yp,2*i+1,2*j+1,level-1,dx/2.,dy/2.,va,vel);
+   }
+
+   return;
+}
 
 /*
  * differentiate the a scalar to find the velocity
