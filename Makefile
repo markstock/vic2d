@@ -33,8 +33,11 @@ ifeq ($(UNAME), Linux)
   LDFLAGS=
 endif
 ifeq ($(UNAME), Darwin)
-  LDFLAGS=-L/Developer/SDKs/MacOSX10.5.sdk/usr/X11/lib
-  CFLAGS=-I/Developer/SDKs/MacOSX10.5.sdk/usr/X11/include
+  #LDFLAGS+=-L/opt/X11/lib
+  LDFLAGS+=-L/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk/usr/X11/lib
+  LDFLAGS+=-L/usr/local/gfortran/lib
+  #CFLAGS+=-I /opt/X11/include
+  CFLAGS+=-I /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk/usr/X11/include
 endif
 LDFLAGS+=-lm -lgfortran -lpng
 
