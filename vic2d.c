@@ -533,6 +533,11 @@ int main(int argc,char **argv) {
          }
       }
    }
+   if (use_vort_img) {
+      // read grayscale PNG of exactly nx by ny resolution
+      read_png(vortfilename,nx,ny,FALSE,FALSE,1.0,FALSE,
+         a[W2],-1.0,2.0,NULL,-1.0,2.0,NULL,-1.0,2.0);
+   }
    if (randvortscale > 0.0) {
       // create a random field of vorticity
       //scale = 20.;
@@ -542,11 +547,6 @@ int main(int argc,char **argv) {
             a[W2][ix][iy] += scale*(rand()/(float)RAND_MAX - 0.5);
          }
       }
-   }
-   if (use_vort_img) {
-      // read grayscale PNG of exactly nx by ny resolution
-      read_png(vortfilename,nx,ny,FALSE,FALSE,1.0,FALSE,
-         a[W2],-1.0,2.0,NULL,-1.0,2.0,NULL,-1.0,2.0);
    }
 
 
