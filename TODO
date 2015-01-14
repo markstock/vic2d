@@ -1,5 +1,16 @@
 vic2d - TODO
 
+Note that for a 2D simulation with color and density, we need 19 full-sized fields.
+  Is there any way to reduce that number?
+
+When loading in a color file, convert immediately to HSV and perform all
+  advection on HSV coords. Only when dumping back out to a PNG should the
+  values be converted back to RGB. How do we interpolate hue? It's periodic.
+
+Add option to M4' interpolation to disallow new values that exceed the 
+  min/max of the 16 or 64 source values. This may prevent blow-up, but at
+  the cost of artificial dissipation.
+
 Add poisson process code to this
   Look in vort3d for marquee
 
