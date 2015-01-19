@@ -902,10 +902,10 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
          // do x first
          //fprintf(stdout," nx is %d\n",nx);
          iparm[9] = ny;
-         for (i=2; i<11; i++) {
+         for (i=2; i<101; i++) {
            for (j=1; j<20; j++) {
              if (i*(pow(2,j))+1 == ny) {
-               //fprintf(stdout," nx (%d) is 1 + %d * 2^ %d\n",nx,i,j);
+               fprintf(stdout," ny (%d) is 1 + %d * 2^%d\n",ny,i,j);
                iparm[5] = i;
                iparm[7] = j+1;
                j = 100;
@@ -929,10 +929,10 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
 
          // do y next
          iparm[10] = nx;
-         for (i=2; i<11; i++) {
+         for (i=2; i<101; i++) {
            for (j=1; j<20; j++) {
              if (i*(pow(2,j))+1 == nx) {
-               //fprintf(stdout," ny (%d) is 1 + %d * 2^ %d\n",ny,i,j);
+               fprintf(stdout," nx (%d) is 1 + %d * 2^%d\n",nx,i,j);
                iparm[6] = i;
                iparm[8] = j+1;
                j = 100;
