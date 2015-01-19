@@ -1009,7 +1009,11 @@ int main(int argc,char **argv) {
          for (i=0; i<VMAXAVG; i++) vmax += ccnvmax[i];
          vmax /= (float)VMAXAVG;
          // recalculate dt
-         dt = (courantconst/vmax)/(nx+1);
+         float newdt = (courantconst/vmax)/(nx+1);
+         // do not let dt change too much!
+         if (newdt > 2.0*dt) dt *= 2.0;
+         else if (newdt < 0.5*dt) dt *= 0.5;
+         else dt = newdt;
          if (!silent) fprintf(stderr,"  changing dt to %g\n",dt);
       }
 
