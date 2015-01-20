@@ -913,7 +913,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
              }
            }
          }
-         if (i == 11) {
+         if (i == 101) {
            fprintf(stderr,"Try an ny that is divisible by an integer from");
            fprintf(stderr," 2 to 10\n");
            fprintf(stderr," ny = %d\n",ny);
@@ -940,7 +940,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
              }
            }
          }
-         if (i == 11) {
+         if (i == 101) {
            fprintf(stderr,"Try an nx that is divisible by an integer from");
            fprintf(stderr," 2 to 10\n");
            fprintf(stderr," nx = %d\n",nx);
@@ -2543,6 +2543,9 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
 
       /* apply them to the grid node in question */
       for (k=0; k<numout; k++) out[k] += zeta[k][ir][jr]*mf;
+
+      // we need to find the min and max values of the input arrays so that we can
+      // limit the output value to stay within those bounds!!!
 
    }}
 

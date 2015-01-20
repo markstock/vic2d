@@ -1,5 +1,10 @@
 vic2d - TODO
 
+Add an option to advect the color at a fraction of the local velocity,
+  or give each "pixel" a momentum/ballistic coefficient, and have the
+  local velocity create a "force" on the pixel.
+  This may generate more wispy, advective-appearing images.
+
 Note that for a 2D simulation with color and density, we need 19 full-sized fields.
   Is there any way to reduce that number?
 
@@ -9,7 +14,7 @@ When loading in a color file, convert immediately to HSV and perform all
 
 Add option to M4' interpolation to disallow new values that exceed the 
   min/max of the 16 or 64 source values. This may prevent blow-up, but at
-  the cost of artificial dissipation.
+  the cost of artificial dissipation. DO THIS!
 
 Add poisson process code to this
   Look in vort3d for marquee
