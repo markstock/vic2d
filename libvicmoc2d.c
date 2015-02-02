@@ -53,7 +53,7 @@ int add_sharp_circular_blob (int nx,int ny,int xbdry,int ybdry,float **addto,flo
       px = (float)ix/(float)(nx-1);
       for (iy=0; iy<ny; iy++) {
          py = (float)iy/(float)(nx-1);
-         if (sqrt(pow(SCALE*(px-xpos),2)+pow(py-ypos,2)) < rad) addto[ix][iy] += val;
+         if (sqrt(pow((px-xpos),2)+pow(py-ypos,2)) < rad) addto[ix][iy] += val;
       }
    }
 
@@ -75,7 +75,7 @@ int add_smooth_circular_blob(int nx,int ny,int xbdry,int ybdry,float **addto,flo
       px = (float)ix/(float)(nx-1);
       for (iy=0; iy<ny; iy++) {
          py = (float)iy/(float)(nx-1);
-         dist = sqrt(pow(SCALE*(px-xpos),2)+pow(py-ypos,2));
+         dist = sqrt(pow((px-xpos),2)+pow(py-ypos,2));
          if (dist < rad_inner) {
             addto[ix][iy] += val;
          } else if (dist < rad) {
@@ -373,8 +373,6 @@ int create_boundary_vorticity_2d (int nx,int ny,int xbdry,int ybdry,
    //hyi = -dt*0.5*(float)(nxm1);
    // DUH! When I redefine vorticity (as I need to do to force the wall
    //  velocity to zero) I don't need to multiply by dt! Dummy.
-   //hxi = 0.5*(float)(nxm1)/SCALE;
-   //hyi = -0.5*(float)(nxm1);
    if (nx > ny) {
       hxi = 0.5*(float)(nxm1);
       hyi = -0.5*(float)(nxm1);
@@ -382,8 +380,6 @@ int create_boundary_vorticity_2d (int nx,int ny,int xbdry,int ybdry,
       hxi = 0.5*(float)(nym1);
       hyi = -0.5*(float)(nym1);
    }
-   //hxi = dt*0.5*(float)(nxm1)/SCALE;
-   //hyi = dt*-0.5*(float)(nxm1);
    if (xbdry == WALL) {
       for (j=0; j<ny; j++) {
          // vort[0][j] = (-1.*v[2][j]+4.*v[1][j]-3.*v[0][j])*hxi;
@@ -846,7 +842,6 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    }
 
    // set domain dimensions
-   // how does SCALE work into this?
    xs = 0.0;
    ys = 0.0;
    if (nx > ny) {
@@ -1307,7 +1302,6 @@ int find_open_boundary_psi (int nx,int ny,float **vort,
    float xs = 0.0;
    float ys = 0.0;
    float xf = 1.0;
-   //float yf = SCALE;
    float dx = 1./(nx-1);
    float dy = yf/(ny-1);
    float thisvel[2];
@@ -1522,8 +1516,7 @@ int find_gradient_of_scalar_2d (int nx,int ny,int xbdry,int ybdry,float **psi,fl
    FLOAT incx,jncy;
    FLOAT hxi,hyi,cx,cy;
    int ini,jnj,ii,jj;
-   hxi = 0.5*umult*(nxm1)/SCALE;		// negative because vel is neg gradient
-   // hyi = 0.5*(nym1);
+   hxi = 0.5*umult*(nxm1);		// negative because vel is neg gradient
    hyi = 0.5*vmult*(nxm1);
 
    // now, account for periodic BCs by setting some indexes
@@ -1807,7 +1800,7 @@ int find_curl_of_vel_2d(int nx,int ny,int xbdry,int ybdry,
    FLOAT hxi,hyi;
 
    // old way
-   hxi = 0.5*(nxm1)/SCALE;
+   hxi = 0.5*(nxm1);
    hyi = 0.5*(nxm1);		// and *nxm1 because xsize=1
    // new way
    if (nx > ny) {

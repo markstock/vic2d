@@ -16,11 +16,8 @@
 
 #define M_PI 3.14159265358979323846
 
-// this can and should be changed to allow running non-square sims:
-// no: eventually this will support non-square *pixels*, but for now it's broken
-//#define SCALE 1.7777778
-#define SCALE 1.0
-//#define SCALE 0.0857
+// How many digits in output file names
+#define DGTS 6
 
 // these can be changed
 // for ordering of the arrays in "a", they will change depending on what is being tracked
