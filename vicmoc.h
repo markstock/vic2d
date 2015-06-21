@@ -16,9 +16,6 @@
 
 #define M_PI 3.14159265358979323846
 
-// How many digits in output file names
-#define DGTS 6
-
 // these can be changed
 // for ordering of the arrays in "a", they will change depending on what is being tracked
 #define XV 0		// x-velocity
@@ -52,6 +49,15 @@
 #define PERIODIC 2
 
 #define VMAXAVG 5
+
+// available interpolation methods
+typedef enum interpMeth {
+   cic,		// 1st order cloud-in-cell (bi- or tri-linear interpolation), support width=2
+   tsc,		// 2nd order triangle-shaped cloud, support width=3
+   m4p,		// 4th order M4', support width=4
+   cic2,
+   cic3
+} INTERP;
 
 // in libvicmoc.c
 extern int find_vels_2d (int,int,int,int,int,int,int,float*,float**,float**,float**,const int,float**,const float);
