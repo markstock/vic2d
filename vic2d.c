@@ -930,7 +930,7 @@ int main(int argc,char **argv) {
       {
          //#pragma omp section
          if (print_vort) {
-            sprintf(outfileroot,"vort_%0DGTSd",step);
+            sprintf(outfileroot,"vort_%06",step);
             //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-1.0,2.0,
             //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-10.0,20.0,
             //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-250.0,500.0,
@@ -943,7 +943,7 @@ int main(int argc,char **argv) {
          }
          //#pragma omp section
          if (print_mask && use_MASK) {
-            sprintf(outfileroot,"mask_%0DGTSd",step);
+            sprintf(outfileroot,"mask_%06",step);
             write_png (outfileroot,nx,ny,FALSE,FALSE,
                        mask,0.0,1.0,
                        NULL,0.0,1.0,
@@ -951,7 +951,7 @@ int main(int argc,char **argv) {
          }
          //#pragma omp section
          if (print_temp) {
-            sprintf(outfileroot,"temp_%0DGTSd",step);
+            sprintf(outfileroot,"temp_%06",step);
             write_png (outfileroot,nx,ny,FALSE,FALSE,
                        a[SF],0.0,1.0,
                        NULL,0.0,1.0,
@@ -959,7 +959,7 @@ int main(int argc,char **argv) {
          }
          //#pragma omp section
          if (use_COLOR) {
-            sprintf(outfileroot,"out_%0DGTSd",step);
+            sprintf(outfileroot,"out_%06",step);
             write_png (outfileroot,nx,ny,TRUE,use_16bpp,
                        a[RR],0.0,1.0,
                        a[GG],0.0,1.0,
@@ -967,7 +967,7 @@ int main(int argc,char **argv) {
          }
          //#pragma omp section
          if (print_vel) {
-            sprintf(outfileroot,"vel_%0DGTSd",step);
+            sprintf(outfileroot,"vel_%06",step);
             write_png (outfileroot,nx,ny,TRUE,use_16bpp,
                        u[XV],-velscale,2.*velscale,
                        u[YV],-velscale,2.*velscale,
@@ -975,7 +975,7 @@ int main(int argc,char **argv) {
          }
          //#pragma omp section
          if (print_mu) {
-            sprintf(outfileroot,"mu_%0DGTSd",step);
+            sprintf(outfileroot,"mu_%06",step);
             write_png (outfileroot,nx,ny,FALSE,use_16bpp,
                        a[MD],mdlow,mdhigh-mdlow,
                        NULL,0.0,1.0,
