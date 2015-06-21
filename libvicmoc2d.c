@@ -904,7 +904,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
                iparm[5] = i;
                iparm[7] = j+1;
                j = 100;
-               i = 100;
+               i = 200;
              }
            }
          }
@@ -931,7 +931,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
                iparm[6] = i;
                iparm[8] = j+1;
                j = 100;
-               i = 100;
+               i = 200;
              }
            }
          }
