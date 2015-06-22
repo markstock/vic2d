@@ -1966,23 +1966,23 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
    for (i=0;i<nx;i++) {
       px = (float)i * dx;
       for (j=0;j<ny;j++) {
+         py = (float)j * dx;
+
          int do_this_pixel = TRUE;
          float velmult = 1.;
          if (mask != NULL) {
+            // if we're fully inside of the mask, there's no need to advect
             if (mask[i][j] < 1.e-5) do_this_pixel = FALSE;
             else velmult = mask[i][j];
          }
+
+         // if this cell is on an inflow boundary, do not try to interpolate
          if (i==0 && fs[0] > 0.0) do_this_pixel = FALSE;
          if (i==nx-1 && fs[0] < 0.0) do_this_pixel = FALSE;
          if (j==0 && fs[1] > 0.0) do_this_pixel = FALSE;
          if (j==ny-1 && fs[1] < 0.0) do_this_pixel = FALSE;
 
          if (do_this_pixel) {
-            py = (float)j * dx;
-            // find vel at px,py (k_1)
-            u0 = u[i][j];
-            v0 = v[i][j];
-
             // change interpolation order or advection order?
             advectOrder = order;
             velInterp = defaultInterp;
@@ -1997,10 +1997,39 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
             //if (j<14) arrayInterp = cic;
             //if (j>ny-15) arrayInterp = cic;
 
+            // should we subsample?
+            int snx = 1;
+            int sny = 1;
+            if (FALSE) {
+               snx = 2;
+               sny = 2;
+            }
+            for (k=0; k<sc_cnt; k++) tempout[k][i][j] = 0.0;
+
+            // split over the pixel's subsamples (defaults to 1x1)
+            for (int si=0;si<snx;si++) {
+               float spx = px + (float)(1 + 2*si - snx) * dx / (float)(2*snx);
+               for (int sj=0;sj<sny;sj++) {
+                  float spy = py + (float)(1 + 2*sj - sny) * dx / (float)(2*sny);
+
+            // find vel at px,py (k_1)
+            if (snx == 1 && sny == 1) {
+               u0 = u[i][j];
+               v0 = v[i][j];
+            } else {
+               // find vel at spx,spy
+               if (velInterp == cic)
+                  interpolate_vel_using_CIC_2d(nx,ny,xbdry,ybdry,u,v,spx,spy,&u0,&v0);
+               else if (velInterp == tsc)
+                  interpolate_vel_using_TSC_2d(nx,ny,xbdry,ybdry,u,v,spx,spy,&u0,&v0);
+               else
+                  interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,mask,u,v,spx,spy,&u0,&v0);
+            }
+
             if (advectOrder == 1) {
                // use a 1-step method
-               newx = px-dt*velmult*u0;
-               newy = py-dt*velmult*v0;
+               newx = spx-dt*velmult*u0;
+               newy = spy-dt*velmult*v0;
                //if (xbdry == WALL || xbdry == OPEN) {
                //   if (newx > xf-EPSILON) newx = xf-EPSILON;
                //   if (newx < 0.0+EPSILON) newx = EPSILON;
@@ -2015,18 +2044,18 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
                   interpolate_array_using_TSC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
                else
                   interpolate_array_using_M4p_2d(nx,ny,xbdry,ybdry,mask,tempin,newx,newy,sc_cnt,outvals);
-               for (k=0; k<sc_cnt; k++) tempout[k][i][j] = outvals[k];
+               for (k=0; k<sc_cnt; k++) tempout[k][i][j] += outvals[k];
 
             } else if (advectOrder == 2) {
                // use a two-step method
 
                // find position 1 explicit Euler step backwards
-               newx = px-dt*velmult*u0;
+               newx = spx-dt*velmult*u0;
                //if (xbdry == WALL || xbdry == OPEN) {
                //   if (newx > xf-EPSILON) newx = xf-EPSILON;
                //   if (newx < 0.0+EPSILON) newx = EPSILON;
                //}
-               newy = py-dt*velmult*v0;
+               newy = spy-dt*velmult*v0;
                //if (ybdry == WALL || ybdry == OPEN) {
                //   if (newy > yf-EPSILON) newy = yf-EPSILON;
                //   if (newy < 0.0+EPSILON) newy = EPSILON;
@@ -2041,12 +2070,12 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
                   interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,mask,u,v,newx,newy,&u1,&v1);
 
                // find position back 1 step using average of two velocities
-               newx = px-dt*0.5*velmult*(u0+u1);
+               newx = spx-dt*0.5*velmult*(u0+u1);
                //if (xbdry == WALL || xbdry == OPEN) {
                //   if (newx > xf-EPSILON) newx = xf-EPSILON;
                //   if (newx < 0.0+EPSILON) newx = EPSILON;
                //}
-               newy = py-dt*0.5*velmult*(v0+v1);
+               newy = spy-dt*0.5*velmult*(v0+v1);
                //if (ybdry == WALL || ybdry == OPEN) {
                //   if (newy > yf-EPSILON) newy = yf-EPSILON;
                //   if (newy < 0.0+EPSILON) newy = EPSILON;
@@ -2061,18 +2090,18 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
                   interpolate_array_using_TSC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
                else
                   interpolate_array_using_M4p_2d(nx,ny,xbdry,ybdry,mask,tempin,newx,newy,sc_cnt,outvals);
-               for (k=0; k<sc_cnt; k++) tempout[k][i][j] = outvals[k];
+               for (k=0; k<sc_cnt; k++) tempout[k][i][j] += outvals[k];
 
             } else if (advectOrder == 4) {
                // use a four-step method, RK4
 
                // find position 1 explicit Euler step backwards
-               newx = px-dt*0.5*velmult*u0;
+               newx = spx-dt*0.5*velmult*u0;
                //if (xbdry == WALL || xbdry == OPEN) {
                //   if (newx > xf-EPSILON) newx = xf-EPSILON;
                //   if (newx < 0.0+EPSILON) newx = EPSILON;
                //}
-               newy = py-dt*0.5*velmult*v0;
+               newy = spy-dt*0.5*velmult*v0;
                //if (ybdry == WALL || ybdry == OPEN) {
                //   if (newy > yf-EPSILON) newy = yf-EPSILON;
                //   if (newy < 0.0+EPSILON) newy = EPSILON;
@@ -2086,12 +2115,12 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
                   interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,mask,u,v,newx,newy,&u1,&v1);
 
                // find position 2 explicit Euler step backwards
-               newx = px-dt*0.5*velmult*u1;
+               newx = spx-dt*0.5*velmult*u1;
                //if (xbdry == WALL || xbdry == OPEN) {
                //   if (newx > xf-EPSILON) newx = xf-EPSILON;
                //   if (newx < 0.0+EPSILON) newx = EPSILON;
                //}
-               newy = py-dt*0.5*velmult*v1;
+               newy = spy-dt*0.5*velmult*v1;
                //if (ybdry == WALL || ybdry == OPEN) {
                //   if (newy > yf-EPSILON) newy = yf-EPSILON;
                //   if (newy < 0.0+EPSILON) newy = EPSILON;
@@ -2105,12 +2134,12 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
                   interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,mask,u,v,newx,newy,&u2,&v2);
 
                // find position 3 explicit Euler step backwards
-               newx = px-dt*velmult*u2;
+               newx = spx-dt*velmult*u2;
                //if (xbdry == WALL || xbdry == OPEN) {
                //   if (newx > xf-EPSILON) newx = xf-EPSILON;
                //   if (newx < 0.0+EPSILON) newx = EPSILON;
                //}
-               newy = py-dt*velmult*v2;
+               newy = spy-dt*velmult*v2;
                //if (ybdry == WALL || ybdry == OPEN) {
                //   if (newy > yf-EPSILON) newy = yf-EPSILON;
                //   if (newy < 0.0+EPSILON) newy = EPSILON;
@@ -2125,13 +2154,13 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
 
                // find position back 1 step using average of four velocities
                accx = 0.16666667*(u0+u3+2.*(u1+u2));
-               newx = px-dt*velmult*accx;
+               newx = spx-dt*velmult*accx;
                //if (xbdry == WALL || xbdry == OPEN) {
                //   if (newx > xf-EPSILON) newx = xf-EPSILON;
                //   if (newx < 0.0+EPSILON) newx = EPSILON;
                //}
                accy = 0.16666667*(v0+v3+2.*(v1+v2));
-               newy = py-dt*velmult*accy;
+               newy = spy-dt*velmult*accy;
                //if (ybdry == WALL || ybdry == OPEN) {
                //   if (newy > yf-EPSILON) newy = yf-EPSILON;
                //   if (newy < 0.0+EPSILON) newy = EPSILON;
@@ -2153,7 +2182,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
                   interpolate_array_using_TSC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
                else
                   interpolate_array_using_M4p_2d(nx,ny,xbdry,ybdry,mask,tempin,newx,newy,sc_cnt,outvals);
-               for (k=0; k<sc_cnt; k++) tempout[k][i][j] = outvals[k];
+               for (k=0; k<sc_cnt; k++) tempout[k][i][j] += outvals[k];
 
             } else {  // order is not 1, 2 or 4
                fprintf(stderr,"Method-of-characteristics advection order %d unsupported.\n",advectOrder);
@@ -2161,6 +2190,12 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
                fprintf(stderr," Quitting.\n");
                exit(0);
             }
+
+               } // for sj=0..sny
+            } // for si=0..snx
+
+            // scale the final values
+            for (k=0; k<sc_cnt; k++) tempout[k][i][j] *= 1.0/(float)(snx*sny);
 
          } else {  // !do_this_pixel
             for (k=0; k<sc_cnt; k++) tempout[k][i][j] = tempin[k][i][j];
