@@ -1934,6 +1934,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
    float outvals[MAX_SCALARS];
    float **tempin[MAX_SCALARS];
    float **tempout[MAX_SCALARS];
+   long int numFlops = 6 + nx*(622*(long int)ny+1);
 
    oodt = 1.0/dt;
 
@@ -1949,6 +1950,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
          sc_cnt++;
       }
    }
+   numFlops += 34*sc_cnt*(long int)nx*(long int)ny;
 
    // fprintf(stderr,"in moc_advect_2d\n"); fflush(stderr);
    if (nx > ny) {
@@ -1966,7 +1968,9 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
    for (i=0;i<nx;i++) {
       px = (float)i * dx;
       for (j=0;j<ny;j++) {
+         // 622 + 34*sc_cnt flops per pixel (no subsampling, 4th order advection and interpolation
          py = (float)j * dx;
+
 
          int do_this_pixel = TRUE;
          float velmult = 1.;
@@ -2000,9 +2004,9 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
             // should we subsample?
             int snx = 1;
             int sny = 1;
-            if (FALSE) {
-               snx = 2;
-               sny = 2;
+            if (TRUE) {
+               snx = 4;
+               sny = 4;
             }
             for (k=0; k<sc_cnt; k++) tempout[k][i][j] = 0.0;
 
@@ -2094,7 +2098,9 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
 
             } else if (advectOrder == 4) {
                // use a four-step method, RK4
+               // 611 + 34*sc_cnt flops
 
+               // 8 flops
                // find position 1 explicit Euler step backwards
                newx = spx-dt*0.5*velmult*u0;
                //if (xbdry == WALL || xbdry == OPEN) {
@@ -2106,6 +2112,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
                //   if (newy > yf-EPSILON) newy = yf-EPSILON;
                //   if (newy < 0.0+EPSILON) newy = EPSILON;
                //}
+               // 158 flops
                // find vel at newx,newy (k_2)
                if (velInterp == cic)
                   interpolate_vel_using_CIC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u1,&v1);
@@ -2114,6 +2121,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
                else
                   interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,mask,u,v,newx,newy,&u1,&v1);
 
+               // 8 flops
                // find position 2 explicit Euler step backwards
                newx = spx-dt*0.5*velmult*u1;
                //if (xbdry == WALL || xbdry == OPEN) {
@@ -2125,6 +2133,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
                //   if (newy > yf-EPSILON) newy = yf-EPSILON;
                //   if (newy < 0.0+EPSILON) newy = EPSILON;
                //}
+               // 158 flops
                // find vel at newx,newy (k_3)
                if (velInterp == cic)
                   interpolate_vel_using_CIC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u2,&v2);
@@ -2133,6 +2142,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
                else
                   interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,mask,u,v,newx,newy,&u2,&v2);
 
+               // 6 flops
                // find position 3 explicit Euler step backwards
                newx = spx-dt*velmult*u2;
                //if (xbdry == WALL || xbdry == OPEN) {
@@ -2145,6 +2155,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
                //   if (newy < 0.0+EPSILON) newy = EPSILON;
                //}
                // find vel at newx,newy (k_4)
+               // 158 flops
                if (velInterp == cic)
                   interpolate_vel_using_CIC_2d(nx,ny,xbdry,ybdry,u,v,newx,newy,&u3,&v3);
                else if (velInterp == tsc)
@@ -2152,6 +2163,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
                else
                   interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,mask,u,v,newx,newy,&u3,&v3);
 
+               // 22 flops in this chunk
                // find position back 1 step using average of four velocities
                accx = 0.16666667*(u0+u3+2.*(u1+u2));
                newx = spx-dt*velmult*accx;
@@ -2176,12 +2188,15 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
                // somehow, accx looks like accel in y, and vice versa
 
                // finally, return scalar values from there
+               // 93 + 33*sc_cnt flops
                if (arrayInterp == cic)
                   interpolate_array_using_CIC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
                else if (arrayInterp == tsc)
                   interpolate_array_using_TSC_2d(nx,ny,xbdry,ybdry,tempin,newx,newy,sc_cnt,outvals);
                else
                   interpolate_array_using_M4p_2d(nx,ny,xbdry,ybdry,mask,tempin,newx,newy,sc_cnt,outvals);
+
+               // sc_cnt flops
                for (k=0; k<sc_cnt; k++) tempout[k][i][j] += outvals[k];
 
             } else {  // order is not 1, 2 or 4
@@ -2428,6 +2443,8 @@ float interpolate_array_using_TSC_2d(int nx,int ny,int xbdry,int ybdry,
  * loc is the point at which the vector is to be evaluated
  * zeta makes the 2d input field of vectors
  * out is the vector value interpolated from the field
+ *
+ * 93 + 33*numout flops
  */
 float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       float **mask,float ***zeta,
@@ -2452,11 +2469,12 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
    } else {
       nm1 = ny-1;
    }
+   // 4 flops here
    si[0] = (int)(20+(nm1)*(px)) - 21;
    si[1] = (int)(20+(nm1)*(py)) - 21;
    if (debug) fprintf(stdout,"location is %g %g, start index is %d %d\n",px,py,si[0],si[1]);
 
-   // make the list of M4 weights
+   // make the list of M4 weights (28 flops *2)
    dx = fabs( (px)*(nm1) - si[0] );
    m4[0][0] = 0.5*pow(2-dx,2)*(1-dx);
    dx = dx-1.0;
@@ -2482,6 +2500,7 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
 
    if (debug) fprintf(stdout,"  weights are %g %g %g %g and %g %g %g %g\n",m4[0][0],m4[0][1],m4[0][2],m4[0][3],m4[1][0],m4[1][1],m4[1][2],m4[1][3]);
 
+   // 2*(numout+1)*16 flops
    // ii,ji are the counters, i,j are the cell indexes (possibly negative)
    //   and ir,jr are the actual cells we take values from
    for (ii=0; ii<4; ii++) {
@@ -2551,6 +2570,7 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
 
    }}
 
+   // numout+1 flops
    // correct by the actual sum of the weights
    if (fabs(mfsum) > 0.) {
       for (k=0; k<numout; k++) out[k] /= mfsum;
@@ -2784,6 +2804,8 @@ int interpolate_vel_using_TSC_2d(int nx,int ny,int xbdry,int ybdry,float **ua,fl
  * loc is the point at which the vector is to be evaluated
  * zeta makes the 2d input field of vectors
  * out is the vector value interpolated from the field
+ *
+ * 158 flops
  */
 int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       float **mask,float **ua,float **va,
@@ -2805,12 +2827,13 @@ int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
    } else {
       nm1 = ny-1;
    }
+   // 4 flops here
    si[0] = (int)(20+(nm1)*(px)) - 21;
    si[1] = (int)(20+(nm1)*(py)) - 21;
    // fprintf(stdout,"location is %g %g, start index is %d %d\n",px,py,si[0],si[1]);
 
    // make the list of M4 weights
-   // first in the x direction
+   // first in the x direction (27 flops)
    dx = fabs( (px)*(nm1) - si[0] );
    m4[0][0] = 0.5*pow(2.0-dx,2)*(1.0-dx);
    dx = dx-1.0;
@@ -2822,7 +2845,7 @@ int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
    dx = dx+1.0;
    m4[0][3] = 0.5*pow(2.0-dx,2)*(1.0-dx);
 
-   // then in the y direction
+   // then in the y direction (27 flops)
    dx = fabs( (py)*(nm1) - si[1] );
    m4[1][0] = 0.5*pow(2.0-dx,2)*(1.0-dx);
    dx = dx-1.0;
@@ -2836,6 +2859,7 @@ int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
 
    // fprintf(stdout,"  weights are %g %g %g %g and %g %g %g %g\n",m4[0][0],m4[0][1],m4[0][2],m4[0][3],m4[1][0],m4[1][1],m4[1][2],m4[1][3]);
 
+   // 6*16=96 flops
    // ii,ji are the counters, i,j are the cell indexes (possibly negative)
    //   and ir,jr are the actual cells we take values from
    *(u) = 0.0;
@@ -2911,6 +2935,7 @@ int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
 
    }}
 
+   // 4 flops
    // correct by the actual sum of the weights
    if (fabs(mfsum) > 0.) {
       *(u) /= mfsum;
