@@ -2004,7 +2004,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
             // should we subsample?
             int snx = 1;
             int sny = 1;
-            if (TRUE) {
+            if (FALSE) {
                snx = 4;
                sny = 4;
             }
