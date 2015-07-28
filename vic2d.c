@@ -287,6 +287,7 @@ int main(int argc,char **argv) {
          use_MASK = TRUE;
 
       } else if (strncmp(argv[i], "-ores", 3) == 0) {
+         // NOT IMPLEMENTED
          outscale = atoi(argv[++i]);
       } else if (strncmp(argv[i], "-dt", 3) == 0) {
          dt = atof(argv[++i]);
@@ -314,6 +315,8 @@ int main(int argc,char **argv) {
          writeOutput = FALSE;
       } else if (strncmp(argv[i], "-q", 2) == 0) {
          silent = TRUE;
+      } else if (strncmp(argv[i], "-8", 2) == 0) {
+         use_16bpp = FALSE;
       } else if (strncmp(argv[i], "-16", 3) == 0) {
          use_16bpp = TRUE;
       } else {
