@@ -742,7 +742,6 @@ int read_png (char *infile, int nx, int ny,
        } else if (overlay && darkenonly) {
          for (j=ny-1; j>=0; j--) {
            for (i=0; i<nx; i++) {
-             
              red[i][j] -= overlay_frac*(redmin+redrange*(1.-img[ny-1-j][3*i]/255.));
              grn[i][j] -= overlay_frac*(grnmin+grnrange*(1.-img[ny-1-j][3*i+1]/255.));
              blu[i][j] -= overlay_frac*(blumin+blurange*(1.-img[ny-1-j][3*i+2]/255.));
