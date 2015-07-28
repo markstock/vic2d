@@ -532,7 +532,7 @@ int read_png (char *infile, int nx, int ny,
    int three_channel;
    int i,j,printval; //,bit_depth,color_type,interlace_type;
    float newminrange,newmaxrange;
-   float overlay_divisor = 1.0 + overlay_frac;
+   float overlay_divisor;
    FILE *fp;
    unsigned char header[8];
    png_uint_32 height,width;
@@ -540,6 +540,16 @@ int read_png (char *infile, int nx, int ny,
    png_structp png_ptr;
    png_infop info_ptr;
    png_byte **img;
+
+
+   // set up overlay divisor
+   if (overlay == TRUE) {
+      // set divisor to blend original and incoming
+      overlay_divisor = 1.0 + overlay_frac;
+   } else if (overlay == 2) {
+      // set divisor to add original and incoming
+      overlay_divisor = 1.0;
+   }
 
    // check the file
    fp = fopen(infile,"rb");
