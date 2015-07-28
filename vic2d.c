@@ -40,6 +40,7 @@ int main(int argc,char **argv) {
    int use_DF = FALSE;
    int use_COLOR = FALSE;
    int reread_color = FALSE;
+   int reread_vort = FALSE;
    int darkenonly = TRUE;
    int freeze_flow = FALSE;
    int freeze_at = -1;
@@ -174,6 +175,8 @@ int main(int argc,char **argv) {
       } else if (strncmp(argv[i], "-vf", 3) == 0) {
          strcpy (vortfilename,argv[++i]);
          use_vort_img = TRUE;
+      } else if (strncmp(argv[i], "-vr", 3) == 0) {
+         reread_vort = TRUE;
       } else if (strncmp(argv[i], "-vscale", 3) == 0) {
          vortscale = atof(argv[++i]);
       } else if (strncmp(argv[i], "-vdf", 4) == 0) {
@@ -195,7 +198,7 @@ int main(int argc,char **argv) {
          freeze_flow = TRUE;
          if (argc > i+1) {
             if (isdigit((int)argv[i+1][0]) || isdigit((int)argv[i+1][1])) {
-               // first number after elevation is frame at which to freeze
+               // first number after keyword is frame at which to freeze
                freeze_at = atoi(argv[++i]);
             }
          }
@@ -535,8 +538,12 @@ int main(int argc,char **argv) {
    }
    if (use_vort_img) {
       // read grayscale PNG of exactly nx by ny resolution
-      read_png(vortfilename,nx,ny,FALSE,FALSE,1.0,FALSE,
-         a[W2],-1.0,2.0,NULL,-1.0,2.0,NULL,-1.0,2.0);
+      // the funny min bounds are to allow value of 127 to become 0.0
+      read_png(vortfilename,nx,ny,FALSE,
+               FALSE,1.0,FALSE,
+               a[W2],-254.*vortscale/255.,2.0*vortscale,
+               NULL, -254.*vortscale/255.,2.0*vortscale,
+               NULL, -254.*vortscale/255.,2.0*vortscale);
    }
    if (randvortscale > 0.0) {
       // create a random field of vorticity
@@ -1061,9 +1068,9 @@ int main(int argc,char **argv) {
          if (use_color_img && reread_color) {
             //read_png(colorfilename,nx,ny,TRUE,TRUE,0.01,TRUE,
             //   a[RR],0.0,1.0,a[GG],0.0,1.0,a[BB],0.0,1.0);
-            read_png(colorfilename,nx,ny,TRUE,TRUE,
-               overlay_fraction,darkenonly,
-               a[RR],0.0,1.0,a[GG],0.0,1.0,a[BB],0.0,1.0);
+            read_png(colorfilename,nx,ny,TRUE,
+                     TRUE,overlay_fraction,darkenonly,
+                     a[RR],0.0,1.0,a[GG],0.0,1.0,a[BB],0.0,1.0);
             // use the brightness component to indicate density!
             //for (ix=0; ix<nx; ix++) {
             //   for (iy=0; iy<ny; iy++) {
@@ -1075,6 +1082,17 @@ int main(int argc,char **argv) {
          }
       }
 
+      // read in the vorticity image and overlay it
+      if (recalc_vel && reread_vort && use_vort_img) {
+         // read grayscale PNG of exactly nx by ny resolution
+         // the 2 is to force the new data to be simply added to the old
+         // the funny min bounds are to allow value of 127 to become 0.0
+         read_png(vortfilename,nx,ny,FALSE,
+                  2,1.0,FALSE,
+                  a[W2],-254.*vortscale/255.,2.0*vortscale,
+                  NULL, -254.*vortscale/255.,2.0*vortscale,
+                  NULL, -254.*vortscale/255.,2.0*vortscale);
+      }
 
       if (FALSE) {
          // open or close blocks in the mask
