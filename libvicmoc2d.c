@@ -17,7 +17,7 @@ int add_smooth_spherical_blob (int,int,int,int,int,int,float***,float,float,floa
 // simulation routines
 float step_forward_2d (int,int,int,int,int,int,int,int,float*,int,int,float***,float***,float***,int,float**,float,float*,int,float*,float,int,float,float,float***);
 
-int create_baroclinic_vorticity_2d (int,int,int,int,float**,float**,float**,float,float*,float);
+int create_baroclinic_vorticity_2d (int,int,int,int,float**,float**,float**,float,int,float*,float);
 int create_boundary_vorticity_2d (int,int,int,int,float**,float**,float**,float);
 float diffuse_scalar_2d (int,int,int,int,int,float**,float**,float,int,float**,float);
 float variable_diffuse_scalar_2d (int,int,int,int,float**,float**,float**,int,float**,float);
@@ -162,7 +162,7 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
 
     // create new vorticity based on density differences (gradient of scalar)
     if (a[SF] != NULL)
-      create_baroclinic_vorticity_2d (nx,ny,xbdry,ybdry,a[SF],mask,a[W2],dt,grav,bn);
+      create_baroclinic_vorticity_2d (nx,ny,xbdry,ybdry,a[SF],mask,a[W2],dt,gravtype,grav,bn);
 
     // create new vorticity due to viscous boundaries, etc,
     // sets 'a' vorticity at boundaries
@@ -279,12 +279,13 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
  * create vorticity at areas of scalar gradient
  */
 int create_baroclinic_vorticity_2d (int nx,int ny,int xbdry,int ybdry,
-      float **scalar,float **mask,float **vort,float dt,float *g,float bn) {
+      float **scalar,float **mask,float **vort,float dt,int gravtype,float *g,float bn) {
 
    int i,j;
    //float g[2] = {0.0,-1.0};
    static float **grad[2];
    static int set_grad = FALSE;
+   const float fac = dt*bn;
 
    // fprintf(stderr,"in create_baroclinic_vorticity_2d\n"); fflush(stderr);
 
@@ -302,10 +303,34 @@ int create_baroclinic_vorticity_2d (int nx,int ny,int xbdry,int ybdry,
    find_gradient_of_scalar_2nd_2d (nx,ny,xbdry,ybdry,scalar,mask,grad[0],bn,grad[1],bn);
 
    // then, cross with the gravity vector
-   #pragma omp parallel for private(i,j)
-   for (i=0;i<nx;i++) {
-      for (j=0;j<ny;j++) {
-         vort[i][j] += dt*(grad[0][i][j]*g[1] - grad[1][i][j]*g[0]);
+
+   if (gravtype == 0) {
+      // normal (uniform) gravity
+      #pragma omp parallel for private(i,j)
+      for (i=0;i<nx;i++) {
+         for (j=0;j<ny;j++) {
+            vort[i][j] += fac*(grad[0][i][j]*g[1] - grad[1][i][j]*g[0]);
+         }
+      }
+
+   } else {
+      // gravity points toward the given screen position (normalized)
+      float xmult = 1.0;
+      float ymult = (ny-1)/(float)(nx-1);
+      if (ny > nx) {
+         xmult = (nx-1)/(float)(ny-1);
+         ymult = 1.0;
+      }
+      //fprintf(stdout,"  creating baroclinic vort: %g %g %g\n",xmult,ymult,fac);
+
+      #pragma omp parallel for private(i,j)
+      for (i=0;i<nx;i++) {
+         // find vector from pixel to gravity center point
+         float dx = xmult * (g[0] - (float)(i)/(float)(nx-1));
+         for (j=0;j<ny;j++) {
+            float dy = ymult * (g[1] - (float)(j)/(float)(ny-1));
+            vort[i][j] += fac*(grad[0][i][j]*dy - grad[1][i][j]*dx);
+         }
       }
    }
 
