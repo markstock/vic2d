@@ -3,11 +3,7 @@
 # build options
 #DEBUG=1
 OPENMP=1
-
-# build targets
-all: vic2d
-#all: vic3d
-#all: vic2d vic3d
+#MINGW=1
 
 # no user-serviceable parts below
 
@@ -16,13 +12,14 @@ CC=gcc
 LINKER=gcc
 FC=gfortran
 CFLAGS=
-
+LDFLAGS=
+EXE=vic2d
 
 ifdef DEBUG
   CFLAGS+=-g -p -ggdb -fbounds-check
 else
   CFLAGS+=-O2 -funroll-loops -ffast-math -fomit-frame-pointer
-  CFLAGS+=-mtune=native
+  #CFLAGS+=-mtune=native
 endif
 ifdef OPENMP
   CFLAGS+=-fopenmp
@@ -39,7 +36,19 @@ ifeq ($(UNAME), Darwin)
   #CFLAGS+=-I /opt/X11/include
   CFLAGS+=-I /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk/usr/X11/include
 endif
-LDFLAGS+=-lm -lgfortran -lpng
+ifdef MINGW
+  CC=x86_64-w64-mingw32-gcc
+  LINKER=x86_64-w64-mingw32-gcc
+  FC=x86_64-w64-mingw32-gfortran
+  EXE=vic2d.exe
+  LDFLAGS+=-static
+endif
+LDFLAGS+=-lm -lgfortran -lpng -lz
+
+# build targets
+all: $(EXE)
+#all: vic3d
+#all: vic2d vic3d
 
 gr2.o : gr2.f Makefile
 	$(FC) $(CFLAGS) $(MACH) -c $<
@@ -65,7 +74,7 @@ libvicmoc2d.a: $(LIB2D) vicmoc.h Makefile
 libvicmoc3d.a: $(LIB3D) vicmoc.h Makefile
 	ar -rcs libvicmoc3d.a $(LIB3D)
 
-vic2d: libvicmoc2d.a inout.o vic2d.o vicmoc.h Makefile
+$(EXE): libvicmoc2d.a inout.o vic2d.o vicmoc.h Makefile
 	$(LINKER) -o $@ $(CFLAGS) $(MACH) inout.o vic2d.o libvicmoc2d.a $(LDFLAGS)
 
 vic3d: libvicmoc3d.a inout.o vic3d.o vicmoc.h Makefile
@@ -73,3 +82,4 @@ vic3d: libvicmoc3d.a inout.o vic3d.o vicmoc.h Makefile
 
 clean :
 	rm -f *.o *.a gmon* a.out
+
