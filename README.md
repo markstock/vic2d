@@ -16,6 +16,8 @@ To get a list of options, run
 
 Note that all diffusivities are coefficients, so for Reynolds number 10000, you should use `-vd 0.0001` for momentum diffusivity.
 
+For some sample command lines and output, including links to YouTube videos, check out the [old vic2d page](http://markjstock.org/vic2d/).
+
 ## Theory
 
 This code uses a semi-Lagrangian vortex method, which means that pressure doesn't enter in the equations: the formulation is in velocity-vorticity coordinates. The velocity-vorticity inversion is accomplished with MUDPACK, a multigrid solution method. Interpolation to and from the grid is done with a 4th order kernel. Advection uses a semi-Lagrangian method, in which the vorticity at each grid point is drawn from a 4th order backward-looking interpolation.
