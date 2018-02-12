@@ -24,7 +24,7 @@ For some sample command lines and output, including links to YouTube videos, che
 
 ## Theory
 
-This code uses a vortex method solver, which means that pressure doesn't enter in the equations: the formulation is in velocity-vorticity coordinates. The velocity-vorticity inversion is accomplished with MUDPACK, a multigrid solution method. Interpolation to and from the grid is done with a 4th order kernel. Advection uses a semi-Lagrangian method, in which the vorticity at each grid point is drawn from a 4th order backward-looking interpolation.
+This code uses a vortex method solver, which means that pressure doesn't enter in the equations: the formulation is in velocity-vorticity coordinates. The velocity-vorticity inversion is accomplished with MUDPACK, a multigrid solution method. Interpolation to and from the grid is done with a 4th order kernel (M4'). Advection uses a semi-Lagrangian method, in which the vorticity at each grid point is drawn from a 4th order (Runge-Kutta) backward-looking projection. All of these methods contribute to the code's remarkable lack of numerical diffusion - you can run problems with Reynolds numbers in the hundreds of millions - though the drawback is that the simulation is not unconditionally stable.
 
 The idea for a semi-Lagrangian vortex methods comes from a 1969 paper on atmospheric physics that I, unfortunately, cannot find any more.
 
