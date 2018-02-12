@@ -4,8 +4,10 @@ A command-line two-dimensional fluid simulator using a novel semi-Lagrangian adv
 
 ## Building vic2d
 
-This should be easy, at least on Linux. This should be do it.
+This should be easy, at least on Linux. This should be all that you need:
 
+    git clone https://github.com/markstock/vic2d.git
+    cd vic2d
     make
 
 ## Running vic2d
@@ -14,13 +16,15 @@ To get a list of options, run
 
     vic2d -h
 
-Note that all diffusivities are coefficients, so for Reynolds number 10000, you should use `-vd 0.0001` for momentum diffusivity.
+Note that all diffusivities are coefficients, so for Reynolds number 10000, you should set momentum diffusivity with `-vd 0.0001`
+
+Also note that the actual resolution of the output images will be one higher than that given on the command-line. So `-x 1024 -y 1024` will generate square PNG images with 1025 pixels on a side. And any input images for such a run should have 1025 pixels on a side. I know, this is not intuitive. I created it this way because for the multigrid solver to function efficiently, you should try to run at resolutions that are small multiples of large factors of 2, so 2560 (5 * 128) is much better than 2544 (159 * 16), and those numbers are easier to remember.
 
 For some sample command lines and output, including links to YouTube videos, check out the [old vic2d page](http://markjstock.org/vic2d/).
 
 ## Theory
 
-This code uses a semi-Lagrangian vortex method, which means that pressure doesn't enter in the equations: the formulation is in velocity-vorticity coordinates. The velocity-vorticity inversion is accomplished with MUDPACK, a multigrid solution method. Interpolation to and from the grid is done with a 4th order kernel. Advection uses a semi-Lagrangian method, in which the vorticity at each grid point is drawn from a 4th order backward-looking interpolation.
+This code uses a vortex method solver, which means that pressure doesn't enter in the equations: the formulation is in velocity-vorticity coordinates. The velocity-vorticity inversion is accomplished with MUDPACK, a multigrid solution method. Interpolation to and from the grid is done with a 4th order kernel. Advection uses a semi-Lagrangian method, in which the vorticity at each grid point is drawn from a 4th order backward-looking interpolation.
 
 The idea for a semi-Lagrangian vortex methods comes from a 1969 paper on atmospheric physics that I, unfortunately, cannot find any more.
 
