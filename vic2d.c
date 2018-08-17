@@ -1,7 +1,7 @@
 /*
  * vic2d
  *
- * Copyright 2004-10 Mark J. Stock mstock@umich.edu
+ * Copyright 2004-18 Mark J. Stock mstock@umich.edu
  *
  * a 2D vortex method which uses the method of characteristics for the
  * convection step, and a single explicit step for diffusion and vorticity
@@ -22,6 +22,7 @@ int Usage(char[80],int);
 
 int main(int argc,char **argv) {
 
+   static int first_time = TRUE;
    int isStam;
    int i,j;
    int nx,ny;
@@ -92,6 +93,7 @@ int main(int argc,char **argv) {
    float **heat;			// constant heat source map
    float **c[3];			// color image storage
    float **acc[2];			// Lagrangian acceleration
+   float **shear;			// shear magnitude
 
    // bookkeeping
    unsigned long int tics,last_tics;
@@ -1124,6 +1126,30 @@ int main(int argc,char **argv) {
          }
       }
 
+      if (FALSE) {
+         // allocate space
+         if (first_time) {
+            shear = allocate_2d_array_f(nx,ny);
+         }
+
+         // adjust color value based on shear present in flow
+         (void) find_shear_magnitude (nx, ny, xbdry, ybdry, u[XV],1.0, u[YV],1.0, shear);
+
+         float minshear = 9.9e+9;
+         float maxshear = -9.9e+9;
+         for (ix=0; ix<nx; ix++) {
+            for (iy=0; iy<ny; iy++) {
+               if (shear[ix][iy] < minshear) minshear = shear[ix][iy];
+               if (shear[ix][iy] > maxshear) maxshear = shear[ix][iy];
+               float shearscale = 1.0 - 0.002*(fabs(shear[ix][iy]) - 1.0);
+               a[RR][ix][iy] *= shearscale;
+               a[GG][ix][iy] *= shearscale;
+               a[BB][ix][iy] *= shearscale;
+            }
+         }
+         printf("  shear range: %g to %g\n", minshear, maxshear);
+      }
+
       // overlay the heat map
       if (use_heat_img) {
          for (ix=0; ix<nx; ix++) {
@@ -1149,6 +1175,8 @@ int main(int argc,char **argv) {
       if (writeOutput) {
          vmax = compute_and_write_stats(silent,step,dt,simtime,cputime,nx,ny,xbdry,ybdry,u);
       }
+
+      if (first_time) first_time = FALSE;
 
       // ----------------------------
       step++;

@@ -68,6 +68,7 @@ extern int add_smooth_spherical_blob(int,int,int,int,int,int,float***,float,floa
 extern int add_singular_blob_3d(int,int,int,int,int,int,float***,float,float,float,float,float);
 extern int add_cube_3d(int,int,int,int,int,int,float***,float,float,float,float,float);
 extern int add_vortex_ring_3d(int,int,int,int,int,int,float***,float***,float***,float,float,float,float,float,float,float,float,float);
+extern int find_shear_magnitude (int, int, int, int, float**, float, float**, float, float **);
 extern int write_output(char*,int,int,float**,float,float,int);
 extern int write_png (char*, int, int, int, int, float**, float, float, float**, float, float, float**, float, float);
 extern int read_png (char*, int, int, int, int, float, int, float**, float, float, float**, float, float, float**, float, float);

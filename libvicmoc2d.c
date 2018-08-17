@@ -24,6 +24,7 @@ float variable_diffuse_scalar_2d (int,int,int,int,float**,float**,float**,int,fl
 int find_vels_2d (int,int,int,int,int,int,int,float*,float**,float**,float**,const int,float**,const float);
 int find_gradient_of_scalar_2d (int,int,int,int,float**,float**,float,float**,float);
 int find_gradient_of_scalar_2nd_2d (int,int,int,int,float**,float**,float**,float,float**,float);
+int find_shear_magnitude (int, int, int, int, float**, float, float**, float, float **);
 int find_curl_of_vel_2d (int,int,int,int,float**,float**,float**);
 int moc_advect_2d (int,int,int,int,float**,float**,float**,float*,float***,float***,float,int,int);
 int find_open_boundary_psi (int,int,float**,float,float*,float**);
@@ -1807,6 +1808,132 @@ int find_gradient_of_scalar_2nd_2d (int nx,int ny,int xbdry,int ybdry,float **ps
       }
       }
 
+   }
+
+   return(0);
+}
+
+
+/*
+ * differentiate the the velocity field to find the shear
+ *
+ * 2nd order everywhere, ignore mask
+ */
+int find_shear_magnitude (int nx, int ny, int xbdry, int ybdry,
+                          float **u, float umult, float **v, float vmult,
+                          float **shear) {
+
+   int i,j;
+   int nxm1 = nx-1;
+   int nym1 = ny-1;
+   FLOAT hxi,hyi;
+
+   // new school, max domain is 0..1
+   if (nx > ny) {
+      hxi = 0.5*umult*(nxm1);
+      hyi = 0.5*vmult*(nxm1);
+   } else {
+      hxi = 0.5*umult*(nym1);
+      hyi = 0.5*vmult*(nym1);
+   }
+
+   // do the middle first
+   #pragma omp parallel for private(i,j)
+   for (i=1; i<nxm1; i++) {
+   for (j=1; j<nym1; j++) {
+      // du / dy + dv / dx
+      shear[i][j] = (u[i][j+1]-u[i][j-1])*hyi + (v[i+1][j]-v[i-1][j])*hxi;
+   }
+   }
+
+   // now, do left and right sides
+   if (xbdry == WALL || xbdry == OPEN) {
+      i = 0;
+      for (j=1; j<nym1; j++) {
+         shear[i][j] = (-1.*v[i+2][j]+4.*v[i+1][j]-3.*v[i][j])*hxi;
+         shear[i][j] += (u[i][j+1]-u[i][j-1])*hyi;
+      }
+      i = nxm1;
+      for (j=1; j<nym1; j++) {
+         shear[i][j] = (v[i-2][j]-4.*v[i-1][j]+3.*v[i][j])*hxi;
+         shear[i][j] += (u[i][j+1]-u[i][j-1])*hyi;
+      }
+   } else if (xbdry == PERIODIC) {
+      i = 0;
+      for (j=1; j<nym1; j++) {
+         shear[i][j] = (v[i+1][j]-v[nxm1-1][j])*hxi;
+         shear[i][j] += (u[i][j+1]-u[i][j-1])*hyi;
+         shear[nxm1][j] = shear[i][j];
+      }
+   }
+ 
+   // now, do top and bottom sides
+   if (ybdry == WALL || ybdry == OPEN) {
+      j = 0;
+      for (i=1; i<nxm1; i++) {
+         shear[i][j] = (v[i+1][j]-v[i-1][j])*hxi;
+         shear[i][j] += (-1.*u[i][j+2]+4.*u[i][j+1]-3.*u[i][j])*hyi;
+      }
+      j = nym1;
+      for (i=1; i<nxm1; i++) {
+         shear[i][j] = (v[i+1][j]-v[i-1][j])*hxi;
+         shear[i][j] += (u[i][j-2]-4.*u[i][j-1]+3.*u[i][j])*hyi;
+      }
+   } else if (ybdry == PERIODIC) {
+      j = 0;
+      for (i=1; i<nxm1; i++) {
+         shear[i][j] = (v[i+1][j]-v[i-1][j])*hxi;
+         shear[i][j] += (u[i][j+1]-u[i][nym1-1])*hyi;
+         shear[i][nym1] = shear[i][j];
+      }
+   }
+
+   // finally, do the corners
+   if ((xbdry == WALL && ybdry == WALL) || (xbdry == OPEN && ybdry == OPEN)) {
+      i = 0; j = 0;
+      shear[i][j] = (-1.*v[i+2][j]+4.*v[i+1][j]-3.*v[i][j])*hxi;
+      shear[i][j] += (-1.*u[i][j+2]+4.*u[i][j+1]-3.*u[i][j])*hyi;
+      i = 0; j = nym1;
+      shear[i][j] = (-1.*v[i+2][j]+4.*v[i+1][j]-3.*v[i][j])*hxi;
+      shear[i][j] += (u[i][j-2]-4.*u[i][j-1]+3.*u[i][j])*hyi;
+      i = nxm1; j = nym1;
+      shear[i][j] = (v[i-2][j]-4.*v[i-1][j]+3.*v[i][j])*hxi;
+      shear[i][j] += (u[i][j-2]-4.*u[i][j-1]+3.*u[i][j])*hyi;
+      i = nxm1; j = 0;
+      shear[i][j] = (v[i-2][j]-4.*v[i-1][j]+3.*v[i][j])*hxi;
+      shear[i][j] += (-1.*u[i][j+2]+4.*u[i][j+1]-3.*u[i][j])*hyi;
+   } else if (xbdry == PERIODIC && ybdry == WALL) {
+      i = 0; j = 0;
+      shear[i][j] = (v[i+1][j]-v[nxm1-1][j])*hxi;
+      shear[i][j] += (-1.*u[i][j+2]+4.*u[i][j+1]-3.*u[i][j])*hyi;
+      i = 0; j = nym1;
+      shear[i][j] = (v[i+1][j]-v[nxm1-1][j])*hxi;
+      shear[i][j] += (u[i][j-2]-4.*u[i][j-1]+3.*u[i][j])*hyi;
+      i = nxm1; j = nym1;
+      shear[i][j] = shear[0][j];
+      i = nxm1; j = 0;
+      shear[i][j] = shear[0][j];
+   } else if (xbdry == WALL && ybdry == PERIODIC) {
+      i = 0; j = 0;
+      shear[i][j] = (-1.*v[i+2][j]+4.*v[i+1][j]-3.*v[i][j])*hxi;
+      shear[i][j] += (u[i][j+1]-u[i][nym1-1])*hyi;
+      i = nxm1; j = 0;
+      shear[i][j] = (v[i-2][j]-4.*v[i-1][j]+3.*v[i][j])*hxi;
+      shear[i][j] += (u[i][j+1]-u[i][nym1-1])*hyi;
+      i = 0; j = nym1;
+      shear[i][j] = shear[i][0];
+      i = nxm1; j = nym1;
+      shear[i][j] = shear[i][0];
+   } else {
+      i = 0; j = 0;
+      shear[i][j] = (v[i+1][j]-v[nxm1-1][j])*hxi;
+      shear[i][j] += (u[i][j+1]-u[i][nym1-1])*hyi;
+      i = nxm1; j = 0;
+      shear[i][j] = shear[0][0];
+      i = 0; j = nym1;
+      shear[i][j] = shear[0][0];
+      i = nxm1; j = nym1;
+      shear[i][j] = shear[0][0];
    }
 
    return(0);
