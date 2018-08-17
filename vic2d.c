@@ -1143,7 +1143,6 @@ int main(int argc,char **argv) {
             for (iy=0; iy<ny; iy++) {
                if (shear[ix][iy] < minshear) minshear = shear[ix][iy];
                if (shear[ix][iy] > maxshear) maxshear = shear[ix][iy];
-               meanshear += fabs(shear[ix][iy]);
 
                // adjust color
                //float shearscale = 1.0 - 0.002*(fabs(shear[ix][iy]) - 1.0);
@@ -1157,7 +1156,6 @@ int main(int argc,char **argv) {
                if (mask[ix][iy] < 0.0) mask[ix][iy] = 0.0;
             }
          }
-
          printf("  shear range: %g to %g, mean abs is %g\n", minshear, maxshear, meanshear/(float)(nx*ny));
 
          if (TRUE) {
@@ -1166,6 +1164,62 @@ int main(int argc,char **argv) {
                        shear,-100.0,200.0,
                        NULL,0.0,1.0,
                        NULL,0.0,1.0);
+         }
+      }
+
+      // use vorticity and mask to modify mask
+      if (FALSE) {
+         // if vorticity is less than this, deposit "mask"
+         const float depos_thresh = 100.0;
+         // if vorticity is greater than this, erode "mask"
+         const float erode_thresh = 200.0;
+
+         float maxvort, thisvort, minmask, maxmask, thismask;
+         int ixx, iyy;
+         for (ix=1; ix<nx-1; ix++) {
+            for (iy=1; iy<ny-1; iy++) {
+               // find min/max of neighbors
+               minmask = 1.0;
+               maxmask = 0.0;
+               for (ixx=ix-1; ixx<ix+2; ixx++) {
+                  for (iyy=iy-1; iyy<iy+2; iyy++) {
+                     thismask = mask[ixx][iyy];
+                     if (thismask < minmask) minmask = thismask;
+                     if (thismask > maxmask) maxmask = thismask;
+                  }
+               }
+               maxvort = 0.0;
+               for (ixx=ix-1; ixx<ix+2; ixx++) {
+                  for (iyy=iy-1; iyy<iy+2; iyy++) {
+                     thisvort = fabs(a[W2][ixx][iyy]);
+                     if (thisvort > maxvort) maxvort = thisvort;
+                  }
+               }
+               // note: mask = 0 means that there is solid stuff there, 1.0 means that it is wide open
+               // now test vs. thresholds
+               if (maxvort < depos_thresh) {
+                  // to deposit, there needs to be something nearby
+                  if (minmask < 0.1) {
+                     // deposit mask
+                     mask[ix][iy] -= 1.e-3 * (depos_thresh-maxvort);
+                     // and the new mask value can't be lower than the nearby minimum
+                     if (mask[ix][iy] < minmask) mask[ix][iy] = minmask;
+                  }
+               }
+               if (maxvort > erode_thresh) {
+                  // to erode, there needs to be some fluid nearby (very likely)
+                  if (maxmask > 0.9) {
+                     // erode mask
+                     mask[ix][iy] += 1.e-3 * (maxvort - erode_thresh);
+                     // and the new mask value can't be higher than the nearby maximum
+                     if (mask[ix][iy] > maxmask) mask[ix][iy] = maxmask;
+                  }
+               }
+
+               // maintain mask bounds
+               if (mask[ix][iy] > 1.0) mask[ix][iy] = 1.0;
+               if (mask[ix][iy] < 0.0) mask[ix][iy] = 0.0;
+            }
          }
       }
 
