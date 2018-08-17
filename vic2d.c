@@ -1126,7 +1126,7 @@ int main(int argc,char **argv) {
          }
       }
 
-      if (FALSE) {
+      if (FALSE && use_MASK) {
          // allocate space
          if (first_time) {
             shear = allocate_2d_array_f(nx,ny);
@@ -1168,7 +1168,7 @@ int main(int argc,char **argv) {
       }
 
       // use vorticity and mask to modify mask
-      if (FALSE) {
+      if (FALSE && use_MASK) {
          // if vorticity is less than this, deposit "mask"
          const float depos_thresh = 100.0;
          // if vorticity is greater than this, erode "mask"
@@ -1211,6 +1211,63 @@ int main(int argc,char **argv) {
                   if (maxmask > 0.9) {
                      // erode mask
                      mask[ix][iy] += 1.e-3 * (maxvort - erode_thresh);
+                     // and the new mask value can't be higher than the nearby maximum
+                     if (mask[ix][iy] > maxmask) mask[ix][iy] = maxmask;
+                  }
+               }
+
+               // maintain mask bounds
+               if (mask[ix][iy] > 1.0) mask[ix][iy] = 1.0;
+               if (mask[ix][iy] < 0.0) mask[ix][iy] = 0.0;
+            }
+         }
+      }
+
+      // use velocity and mask to modify mask
+      if (FALSE && use_MASK) {
+         // if velocity magnitude is less than this, deposit "mask"
+         const float depos_thresh = 0.4;
+         // if velocity magnitude is greater than this, erode "mask"
+         const float erode_thresh = 1.2;
+
+         float maxvel, thisvel, minmask, maxmask, thismask;
+         int ixx, iyy;
+
+         for (ix=1; ix<nx-1; ix++) {
+            for (iy=1; iy<ny-1; iy++) {
+               // find min/max of neighbors
+               minmask = 1.0;
+               maxmask = 0.0;
+               for (ixx=ix-1; ixx<ix+2; ixx++) {
+                  for (iyy=iy-1; iyy<iy+2; iyy++) {
+                     thismask = mask[ixx][iyy];
+                     if (thismask < minmask) minmask = thismask;
+                     if (thismask > maxmask) maxmask = thismask;
+                  }
+               }
+               maxvel = 0.0;
+               for (ixx=ix-1; ixx<ix+2; ixx++) {
+                  for (iyy=iy-1; iyy<iy+2; iyy++) {
+                     thisvel = sqrt(pow(u[XV][ixx][iyy],2) + pow(u[YV][ixx][iyy],2));
+                     if (thisvel > maxvel) maxvel = thisvel;
+                  }
+               }
+               // note: mask = 0 means that there is solid stuff there, 1.0 means that it is wide open
+               // now test vs. thresholds
+               if (maxvel < depos_thresh) {
+                  // to deposit, there needs to be something nearby
+                  if (minmask < 0.1) {
+                     // deposit mask
+                     mask[ix][iy] -= 3.e-2 * (depos_thresh - maxvel);
+                     // and the new mask value can't be lower than the nearby minimum
+                     if (mask[ix][iy] < minmask) mask[ix][iy] = minmask;
+                  }
+               }
+               if (maxvel > erode_thresh) {
+                  // to erode, there needs to be some fluid nearby (very likely)
+                  if (maxmask > 0.9) {
+                     // erode mask
+                     mask[ix][iy] += 3.e-2 * (maxvel - erode_thresh);
                      // and the new mask value can't be higher than the nearby maximum
                      if (mask[ix][iy] > maxmask) mask[ix][iy] = maxmask;
                   }
