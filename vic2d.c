@@ -1137,17 +1137,36 @@ int main(int argc,char **argv) {
 
          float minshear = 9.9e+9;
          float maxshear = -9.9e+9;
+         float meanshear = 0.0;
+
          for (ix=0; ix<nx; ix++) {
             for (iy=0; iy<ny; iy++) {
                if (shear[ix][iy] < minshear) minshear = shear[ix][iy];
                if (shear[ix][iy] > maxshear) maxshear = shear[ix][iy];
-               float shearscale = 1.0 - 0.002*(fabs(shear[ix][iy]) - 1.0);
-               a[RR][ix][iy] *= shearscale;
-               a[GG][ix][iy] *= shearscale;
-               a[BB][ix][iy] *= shearscale;
+               meanshear += fabs(shear[ix][iy]);
+
+               // adjust color
+               //float shearscale = 1.0 - 0.002*(fabs(shear[ix][iy]) - 1.0);
+               //a[RR][ix][iy] *= shearscale;
+               //a[GG][ix][iy] *= shearscale;
+               //a[BB][ix][iy] *= shearscale;
+
+               // or adjust mask
+               mask[ix][iy] += 1.e-5 * fabs(shear[ix][iy]);
+               if (mask[ix][iy] > 1.0) mask[ix][iy] = 1.0;
+               if (mask[ix][iy] < 0.0) mask[ix][iy] = 0.0;
             }
          }
-         printf("  shear range: %g to %g\n", minshear, maxshear);
+
+         printf("  shear range: %g to %g, mean abs is %g\n", minshear, maxshear, meanshear/(float)(nx*ny));
+
+         if (TRUE) {
+            sprintf(outfileroot,"shear_%06d",step);
+            write_png (outfileroot,nx,ny,FALSE,FALSE,
+                       shear,-100.0,200.0,
+                       NULL,0.0,1.0,
+                       NULL,0.0,1.0);
+         }
       }
 
       // overlay the heat map
