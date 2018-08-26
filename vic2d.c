@@ -1226,9 +1226,9 @@ int main(int argc,char **argv) {
       // use velocity and mask to modify mask
       if (FALSE && use_MASK) {
          // if velocity magnitude is less than this, deposit "mask"
-         const float depos_thresh = 0.4;
+         const float depos_thresh = 0.2;
          // if velocity magnitude is greater than this, erode "mask"
-         const float erode_thresh = 1.2;
+         const float erode_thresh = 0.2;
 
          float maxvel, thisvel, minmask, maxmask, thismask;
          int ixx, iyy;
@@ -1256,21 +1256,21 @@ int main(int argc,char **argv) {
                // now test vs. thresholds
                if (maxvel < depos_thresh) {
                   // to deposit, there needs to be something nearby
-                  if (minmask < 0.1) {
+                  //if (minmask < 0.1) {
                      // deposit mask
-                     mask[ix][iy] -= 3.e-2 * (depos_thresh - maxvel);
+                     mask[ix][iy] -= 10.0*dt * (depos_thresh - maxvel);
                      // and the new mask value can't be lower than the nearby minimum
                      if (mask[ix][iy] < minmask) mask[ix][iy] = minmask;
-                  }
+                  //}
                }
                if (maxvel > erode_thresh) {
                   // to erode, there needs to be some fluid nearby (very likely)
-                  if (maxmask > 0.9) {
+                  //if (maxmask > 0.9) {
                      // erode mask
-                     mask[ix][iy] += 3.e-2 * (maxvel - erode_thresh);
+                     mask[ix][iy] += 10.0*dt * (maxvel - erode_thresh);
                      // and the new mask value can't be higher than the nearby maximum
                      if (mask[ix][iy] > maxmask) mask[ix][iy] = maxmask;
-                  }
+                  //}
                }
 
                // maintain mask bounds
