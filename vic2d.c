@@ -766,6 +766,15 @@ int main(int argc,char **argv) {
                              124./256.,155./256.,193./256., 1000,
                              nx,ny,a[RR],a[GG],a[BB]);
       }
+      if (FALSE) {
+         // scale input vorticity by pixel brightness
+         for (ix=0; ix<nx; ix++) {
+            for (iy=0; iy<ny; iy++) {
+               float brite = 0.3*a[RR][ix][iy] + 0.6*a[GG][ix][iy] + 0.1*a[BB][ix][iy];
+               a[W2][ix][iy] *= 1.0-brite;
+            }
+         }
+      }
    }
 
    // Set scalar/temperature ----------------------------------
