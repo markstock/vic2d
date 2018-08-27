@@ -14,6 +14,7 @@ FC=gfortran
 CFLAGS=
 LDFLAGS=
 EXE=vic2d
+MACH=-march=native
 
 ifdef DEBUG
   CFLAGS+=-g -p -ggdb -fbounds-check
@@ -27,7 +28,7 @@ endif
 CFLAGS+=-std=c99
 
 ifeq ($(UNAME), Linux)
-  LDFLAGS=
+  LDFLAGS+=
 endif
 ifeq ($(UNAME), Darwin)
   #LDFLAGS+=-L/opt/X11/lib
@@ -43,7 +44,7 @@ ifdef MINGW
   EXE=vic2d.exe
   LDFLAGS+=-static
 endif
-LDFLAGS+=-lm -lgfortran -lpng -lz
+LDFLAGS+=-lgfortran -lpng -lm -lz
 
 # build targets
 all: $(EXE)
