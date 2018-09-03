@@ -64,6 +64,7 @@ int main(int argc,char **argv) {
    float cd,cdlow,cdhigh;		// dimensional color diffusivity
    float bn;				// Boussinesq coefficient
    float dens_ratio;			// ratio of max to min density
+   float heat_coeff;			// coefficient on the heat term
    float dt;
    float courant,courantconst;		// non-dim time step size
    float *freestream;
@@ -133,6 +134,7 @@ int main(int argc,char **argv) {
    cd = 1.e-3;
    cdlow = -1.;
    cdhigh = -1.;
+   heat_coeff = 1.;
    outscale = 1;
    writeevery = 1;
    maxstep = 99999;
@@ -222,6 +224,9 @@ int main(int argc,char **argv) {
       } else if (strncmp(argv[i], "-qf", 3) == 0) {
          strcpy (heatfilename,argv[++i]);
          use_heat_img = TRUE;
+         use_TEMP = TRUE;
+      } else if (strncmp(argv[i], "-qc", 3) == 0) {
+         heat_coeff = atof(argv[++i]);
          use_TEMP = TRUE;
       } else if (strncmp(argv[i], "-tdf", 4) == 0) {
          strcpy (tdfilename,argv[++i]);
@@ -793,18 +798,19 @@ int main(int argc,char **argv) {
          // read grayscale PNG of exactly nx by ny resolution
          //read_png(tempfilename,nx,ny,FALSE,TRUE,1.0,FALSE,
          read_png(tempfilename,nx,ny,FALSE,FALSE,1.0,FALSE,
-            a[SF],0.0,1.0,NULL,0.0,1.0,NULL,0.0,1.0);
+            a[SF],-1.0,2.0,NULL,0.0,1.0,NULL,0.0,1.0);
       }
 
       if (use_heat_img) {
          // read grayscale PNG of exactly nx by ny resolution
          read_png(heatfilename,nx,ny,FALSE,FALSE,1.0,FALSE,
-            heat,0.0,1.0,NULL,0.0,1.0,NULL,0.0,1.0);
+            heat,-1.0,2.0,NULL,0.0,1.0,NULL,0.0,1.0);
 
          for (ix=0; ix<nx; ix++) {
             for (iy=0; iy<ny; iy++) {
                a[SF][ix][iy] += heat[ix][iy];
                if (a[SF][ix][iy] > 1.0) a[SF][ix][iy] = 1.0;
+               if (a[SF][ix][iy] < -1.0) a[SF][ix][iy] = -1.0;
             }
          }
       }
@@ -974,7 +980,7 @@ int main(int argc,char **argv) {
          if (print_temp) {
             sprintf(outfileroot,"temp_%06d",step);
             write_png (outfileroot,nx,ny,FALSE,FALSE,
-                       a[SF],0.0,1.0,
+                       a[SF],-1.0,2.0,
                        NULL,0.0,1.0,
                        NULL,0.0,1.0);
          }
@@ -1293,8 +1299,9 @@ int main(int argc,char **argv) {
       if (use_heat_img) {
          for (ix=0; ix<nx; ix++) {
             for (iy=0; iy<ny; iy++) {
-               a[SF][ix][iy] += heat[ix][iy];
+               a[SF][ix][iy] += dt * heat_coeff * heat[ix][iy];
                if (a[SF][ix][iy] > 1.0) a[SF][ix][iy] = 1.0;
+               if (a[SF][ix][iy] < -1.0) a[SF][ix][iy] = -1.0;
             }
          }
       }
@@ -1527,6 +1534,8 @@ int Usage(char progname[80],int status) {
    "                                                                           ",
    "                                                                           ",
    "   -qf [name]  read PNG file and use as heat source field                  ",
+   "                                                                           ",
+   "   -qc [float] set the scaling on the heat source term                     ",
    "                                                                           ",
    "                                                                           ",
    "   -c          track and print color scalars (out_00000.png)               ",
