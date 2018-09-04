@@ -50,6 +50,8 @@ int main(int argc,char **argv) {
    int use_MASK = FALSE;
    int use_image = FALSE;
    int use_strong_strat = FALSE;
+   int overlay_color_lr = FALSE;
+   int overlay_color_tb = FALSE;
 
    int writeOutput = TRUE;
    int print_vort = FALSE;
@@ -86,6 +88,7 @@ int main(int argc,char **argv) {
    float simtime = 0.;
    float thisc[3];
    float maskerr;
+   float **color_left, **color_right, **color_top, **color_bottom;
 
    float **u[2];			// velocities
    float **a[MAX_SCALARS];		// other scalars
@@ -396,6 +399,12 @@ int main(int argc,char **argv) {
       // now blue
       sc_diffus[BB] = cd;
       a[BB] = allocate_2d_array_f(nx,ny);
+
+      // save boundary colors
+      color_left = allocate_2d_array_f(3,ny);
+      color_right = allocate_2d_array_f(3,ny);
+      color_top = allocate_2d_array_f(3,nx);
+      color_bottom = allocate_2d_array_f(3,nx);
    }
 
    // variable viscosities
@@ -779,6 +788,24 @@ int main(int argc,char **argv) {
                a[W2][ix][iy] *= 1.0-brite;
             }
          }
+      }
+
+      // save the edge colors
+      for (ix=0; ix<nx; ix++) {
+         color_bottom[0][ix] = a[RR][ix][0];
+         color_bottom[1][ix] = a[GG][ix][0];
+         color_bottom[2][ix] = a[BB][ix][0];
+         color_top[0][ix] = a[RR][ix][ny-1];
+         color_top[1][ix] = a[GG][ix][ny-1];
+         color_top[2][ix] = a[BB][ix][ny-1];
+      }
+      for (iy=0; iy<ny; iy++) {
+         color_left[0][iy] = a[RR][0][iy];
+         color_left[1][iy] = a[GG][0][iy];
+         color_left[2][iy] = a[BB][0][iy];
+         color_right[0][iy] = a[RR][nx-1][iy];
+         color_right[1][iy] = a[GG][nx-1][iy];
+         color_right[2][iy] = a[BB][nx-1][iy];
       }
    }
 
@@ -1302,6 +1329,36 @@ int main(int argc,char **argv) {
                a[SF][ix][iy] += dt * heat_coeff * heat[ix][iy];
                if (a[SF][ix][iy] > 1.0) a[SF][ix][iy] = 1.0;
                if (a[SF][ix][iy] < -1.0) a[SF][ix][iy] = -1.0;
+            }
+         }
+      }
+
+      // overlay the edge color input
+      if (use_COLOR && overlay_color_tb) {
+         int nthick = 6;
+         for (iy=0; iy<nthick; iy++) {
+            float tfac = 1.0 / (float)(iy+1);
+            for (ix=0; ix<nx; ix++) {
+               a[RR][ix][iy] = tfac*color_bottom[0][ix] + (1.0-tfac)*a[RR][ix][iy];
+               a[GG][ix][iy] = tfac*color_bottom[1][ix] + (1.0-tfac)*a[GG][ix][iy];
+               a[BB][ix][iy] = tfac*color_bottom[2][ix] + (1.0-tfac)*a[BB][ix][iy];
+               a[RR][ix][ny-1-iy] = tfac*color_top[0][ix] + (1.0-tfac)*a[RR][ix][ny-1-iy];
+               a[GG][ix][ny-1-iy] = tfac*color_top[1][ix] + (1.0-tfac)*a[GG][ix][ny-1-iy];
+               a[BB][ix][ny-1-iy] = tfac*color_top[2][ix] + (1.0-tfac)*a[BB][ix][ny-1-iy];
+            }
+         }
+      }
+      if (use_COLOR && overlay_color_lr) {
+         int nthick = 6;
+         for (ix=0; ix<nthick; ix++) {
+            float tfac = 1.0 / (float)(ix+1);
+            for (iy=0; iy<ny; iy++) {
+               a[RR][ix][iy] = tfac*color_left[0][iy] + (1.0-tfac)*a[RR][ix][iy];
+               a[GG][ix][iy] = tfac*color_left[1][iy] + (1.0-tfac)*a[GG][ix][iy];
+               a[BB][ix][iy] = tfac*color_left[2][iy] + (1.0-tfac)*a[BB][ix][iy];
+               a[RR][nx-1-ix][iy] = tfac*color_right[0][iy] + (1.0-tfac)*a[RR][nx-1-ix][iy];
+               a[GG][nx-1-ix][iy] = tfac*color_right[1][iy] + (1.0-tfac)*a[GG][nx-1-ix][iy];
+               a[BB][nx-1-ix][iy] = tfac*color_right[2][iy] + (1.0-tfac)*a[BB][nx-1-ix][iy];
             }
          }
       }
