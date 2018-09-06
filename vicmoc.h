@@ -60,7 +60,7 @@ typedef enum interpMeth {
 } INTERP;
 
 // in libvicmoc.c
-extern int find_vels_2d (int,int,int,int,int,int,int,float*,float**,float**,float**,const int,float**,const float);
+extern int find_vels_2d (int,int,int,int,int,int,int,float*,float*,float**,float**,float**,const int,float**,const float);
 extern int add_sharp_circular_blob(int,int,int,int,float**,float,float,float,float);
 extern int add_smooth_circular_blob(int,int,int,int,float**,float,float,float,float);
 extern int add_smooth_circular_blob_3d(int,int,int,int,int,int,int,float***,float,float,float,float);
@@ -75,7 +75,7 @@ extern int read_png (char*, int, int, int, int, float, int, float**, float, floa
 extern int write_output_3d(char*,int,int,int,float***,float,float,int,int);
 extern int write_output_particles_rad(char*,int,float**,float**,float*);
 extern int explicit_particle_move_3d(int,int,int,int,int,int,float****,float,float,int,float**,float**);
-extern float step_forward_2d(int,int,int,int,int,int,int,int,float*,int,int,float***,float***,float***,const int,float**,const float,float*,int,float*,float,int,float,float,float***);
+extern float step_forward_2d(int,int,int,int,int,int,int,int,float*,float*,int,int,float***,float***,float***,const int,float**,const float,float*,int,float*,float,int,float,float,float***);
 extern float step_forward_3d(int,int,int,int,int,int,int,int,float****,float****,float****,int,int*,float*,float,float);
 extern int make_solenoidal_3d(int,int,int,int,int,int,float***,float***,float***);
 extern float find_energy_3d(int,int,int,int,int,int,float***,float***,float***);
@@ -99,6 +99,11 @@ extern void populate_block_array (int, int);
 extern void update_mask_with_blocks_1 (float**, float***, int, int, float);
 extern void update_mask_with_blocks_2 (float**, float***, int, int, float, float);
 extern void overlay_mask (int, int, float**);
+
+// from mud2sp_extern.c
+extern void funcbndyc (int*, float*, float*, float*);
+extern void funccfx (float*, float*, float*, float*);
+extern void funccfy (float*, float*, float*, float*);
 
 // from, well, color stuff
 extern int get_random_color (float***, int, int, float*);
@@ -124,8 +129,8 @@ extern
 
 // in mud2sp_full.f
 extern
-  void mud2sp_(int *iparm, float *fparm, float *work, char *cfx, char* cfy,
-               char *bndyc, float *rhs, float *phi, int *mgopt, int *ierror);
+  void mud2sp_(int *iparm, float *fparm, float *work, void *cfx, void *cfy,
+               void *bndyc, float *rhs, float *phi, int *mgopt, int *ierror);
 
 // in gr2.f
 extern

@@ -70,6 +70,7 @@ int main(int argc,char **argv) {
    float dt;
    float courant,courantconst;		// non-dim time step size
    float *freestream;
+   float *wallvel;
    int recalc_vel;
    int move_colors;
    int gravtype;
@@ -150,6 +151,11 @@ int main(int argc,char **argv) {
    freestream = allocate_1d_array_f(2);
    freestream[0] = 0.0;
    freestream[1] = 0.0;
+   wallvel = allocate_1d_array_f(4);
+   wallvel[0] = 0.0;	// left
+   wallvel[1] = 0.0;	// right
+   wallvel[2] = 0.0;	// bottom
+   wallvel[3] = 0.0;	// top
    recalc_vel = TRUE;
    move_colors = TRUE;
    gravtype = 0;
@@ -575,6 +581,10 @@ int main(int argc,char **argv) {
       }
    }
 
+   // Set wall velocity BCs --------------------------
+   // do not use this, it doesn't work
+   //int iwall = -1;
+   //funcbndyc (&iwall, (float*)NULL, (float*)NULL, &wallvel[0]);
 
    // Set flow mask ----------------------------------
 
@@ -676,7 +686,7 @@ int main(int argc,char **argv) {
    // Initial velocity solve -------------------------
 
    // if you want to show velocity on the first step, solve for it here
-   find_vels_2d (silent,step,isStam,nx,ny,xbdry,ybdry,freestream,u[XV],u[YV],a[W2],use_MASK,mask,maskerr);
+   find_vels_2d (silent,step,isStam,nx,ny,xbdry,ybdry,freestream,wallvel,u[XV],u[YV],a[W2],use_MASK,mask,maskerr);
 
    // find vmax (might need this)
    vmax = 0.;
@@ -1101,7 +1111,7 @@ int main(int argc,char **argv) {
       if (use_MASK) numsubsteps = 1 + (int)(vmax*(nx+1)*dt/10.);
       for (int istep=0; istep<numsubsteps; istep++) {
          effective_re = step_forward_2d (silent,step,isStam,4,
-                           nx,ny,xbdry,ybdry,freestream,
+                           nx,ny,xbdry,ybdry,freestream,wallvel,
                            recalc_vel,move_colors,
                            u,a,t,use_MASK,mask,maskerr,sc_diffus,
                            gravtype,gravity,(dt/(float)numsubsteps),

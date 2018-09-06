@@ -15,13 +15,13 @@ int add_smooth_circular_blob (int,int,int,int,float**,float,float,float,float);
 int add_smooth_spherical_blob (int,int,int,int,int,int,float***,float,float,float,float,float);
 
 // simulation routines
-float step_forward_2d (int,int,int,int,int,int,int,int,float*,int,int,float***,float***,float***,int,float**,float,float*,int,float*,float,int,float,float,float***);
+float step_forward_2d (int,int,int,int,int,int,int,int,float*,float*,int,int,float***,float***,float***,int,float**,float,float*,int,float*,float,int,float,float,float***);
 
 int create_baroclinic_vorticity_2d (int,int,int,int,float**,float**,float**,float,int,float*,float);
 int create_boundary_vorticity_2d (int,int,int,int,float**,float**,float**,float);
 float diffuse_scalar_2d (int,int,int,int,int,float**,float**,float,int,float**,float);
 float variable_diffuse_scalar_2d (int,int,int,int,float**,float**,float**,int,float**,float);
-int find_vels_2d (int,int,int,int,int,int,int,float*,float**,float**,float**,const int,float**,const float);
+int find_vels_2d (int,int,int,int,int,int,int,float*,float*,float**,float**,float**,const int,float**,const float);
 int find_gradient_of_scalar_2d (int,int,int,int,float**,float**,float,float**,float);
 int find_gradient_of_scalar_2nd_2d (int,int,int,int,float**,float**,float**,float,float**,float);
 int find_shear_magnitude (int, int, int, int, float**, float, float**, float, float **);
@@ -126,7 +126,7 @@ int add_smooth_spherical_blob(int nx,int ny,int nz,int xbdry,int ybdry,int zbdry
  */
 float step_forward_2d (int silent, int step, int isStam, int mocOrder,
     int nx, int ny, int xbdry, int ybdry,
-    float *freestream, int recalc_vel, int move_colors,
+    float *freestream, float *wallvel, int recalc_vel, int move_colors,
     float ***u, float ***a, float ***t,
     const int use_MASK, float **mask, const float maskerr,
     float sc_diffus[MAX_SCALARS],
@@ -265,7 +265,7 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
   // find the velocity field from the vorticity field
   if (recalc_vel) {
     if (!silent) fprintf(stderr,"  now in find_vels_2d\n"); fflush(stderr);
-    find_vels_2d (silent,step,isStam,nx,ny,xbdry,ybdry,freestream,u[XV],u[YV],a[W2],use_MASK,mask,maskerr);
+    find_vels_2d (silent,step,isStam,nx,ny,xbdry,ybdry,freestream,wallvel,u[XV],u[YV],a[W2],use_MASK,mask,maskerr);
   }
 
   // calculate effective Reynolds number
@@ -408,10 +408,13 @@ int create_boundary_vorticity_2d (int nx,int ny,int xbdry,int ybdry,
    }
    if (xbdry == WALL) {
       for (j=0; j<ny; j++) {
-         // vort[0][j] = (-1.*v[2][j]+4.*v[1][j]-3.*v[0][j])*hxi;
-         // vort[nxm1][j] = (v[nxm3][j]-4.*v[nxm2][j]+3.*v[nxm1][j])*hxi;
-         vort[0][j] = (-1.*v[2][j]+4.*v[1][j])*hxi;
-         vort[nxm1][j] = (v[nxm3][j]-4.*v[nxm2][j])*hxi;
+         // this allows for slip/driven walls
+         vort[0][j] = (-1.*v[2][j]+4.*v[1][j]-3.*v[0][j])*hxi;
+         vort[nxm1][j] = (v[nxm3][j]-4.*v[nxm2][j]+3.*v[nxm1][j])*hxi;
+         // this assumes walls are zero vel!
+         //vort[0][j] = (-1.*v[2][j]+4.*v[1][j])*hxi;
+         //vort[nxm1][j] = (v[nxm3][j]-4.*v[nxm2][j])*hxi;
+         // not sure what these are for
          // vort[0][j] += (-1.*v[2][j]+4.*v[1][j])*hxi;
          // vort[nxm1][j] += (v[nxm3][j]-4.*v[nxm2][j])*hxi;
          // vort[0][j] += (-1.*v[2][j]+4.*v[1][j]-3.*v[0][j])*hxi;
@@ -420,10 +423,13 @@ int create_boundary_vorticity_2d (int nx,int ny,int xbdry,int ybdry,
    }
    if (ybdry == WALL) {
       for (i=0; i<nx; i++) {
-         // vort[i][0] = (-1.*u[i][2]+4.*u[i][1]-3.*u[i][0])*hyi;
-         // vort[i][nym1] = (u[i][nym3]-4.*u[i][nym2]+3.*u[i][nym1])*hyi;
-         vort[i][0] = (-1.*u[i][2]+4.*u[i][1])*hyi;
-         vort[i][nym1] = (u[i][nym3]-4.*u[i][nym2])*hyi;
+         // this allows for slip/driven walls
+         vort[i][0] = (-1.*u[i][2]+4.*u[i][1]-3.*u[i][0])*hyi;
+         vort[i][nym1] = (u[i][nym3]-4.*u[i][nym2]+3.*u[i][nym1])*hyi;
+         // this assumes walls are zero vel!
+         //vort[i][0] = (-1.*u[i][2]+4.*u[i][1])*hyi;
+         //vort[i][nym1] = (u[i][nym3]-4.*u[i][nym2])*hyi;
+         // not sure what these are for
          // vort[i][0] += (-1.*u[i][2]+4.*u[i][1])*hyi;
          // vort[i][nym1] += (u[i][nym3]-4.*u[i][nym2])*hyi;
          // vort[i][0] += (-1.*u[i][2]+4.*u[i][1]-3.*u[i][0])*hyi;
@@ -799,13 +805,12 @@ float variable_diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,
  * if driven cavity problem, force the lid to vel=1
  */
 int find_vels_2d (int silent, int step,const int isStam,const int nx,const int ny,
-      const int xbdry,const int ybdry,float *freestream,
+      const int xbdry,const int ybdry,float *freestream,float *wallvel,
       float **u,float **v,float **vort,
       const int use_MASK,float **mask,const float maskerr) {
 
    int use_multigrid = TRUE;	// use MUDPACK solver mud2sp.f
    //int use_multigrid = FALSE;	// use FISHPAK solver gr2.c
-   int driven_cavity = FALSE;
    int i,j;
    // these are for hwscrt, FISHPAK
    int nxm1 = nx-1;
@@ -822,9 +827,6 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    // these are for mud2sp, MUDPACK
    static int iparm[17];
    static float fparm[6];
-   static char bndyc[10];
-   static char cofx[10];
-   static char cofy[10];
    static float **rhs;
    static int mgopt[4];
    static int must_initialize = TRUE;
@@ -919,6 +921,9 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
            iparm[4] = 1;
          }
 
+         // HACK - top-lid-driven-cavity - this does not work! psi is weird
+         //iparm[2] = 2;
+
          // find the proper integer dimensions
          // do x first
          //fprintf(stdout," nx is %d\n",nx);
@@ -1000,15 +1005,11 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
          // I have no clue how to actually get them to work
          // For now, I have just replaced the calls in mud2sp_full.f with val=1.
          //   (look for "NOTE" or "cfx")
-         (void) strcpy(cofx,"cofx");
-         (void) strcpy(cofy,"cofy");
-         // bndyc only used for mixed BCs - test Dirichlet BC first
-         (void) strcpy(bndyc,"bndyc");
 
          // this flags the routine to discretize the problem and check input
          if (!silent) fprintf(stdout,"Running initialization mud2sp\n");
-         mud2sp_(iparm, fparm, work, cofx, cofy,
-                 bndyc, rhs[0], psi[0], mgopt, &ierr);
+         mud2sp_(iparm, fparm, work, &funccfx, &funccfy,
+                 &funcbndyc, rhs[0], psi[0], mgopt, &ierr);
 
          // catch an error in the setup or input
          if (ierr != 0) {
@@ -1029,7 +1030,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
          // don't do this again
          must_initialize = FALSE;
 
-         // rest the intl parameter
+         // reset the intl parameter
          iparm[0] = 1;
 
       } else {	// not must_initialize
@@ -1084,8 +1085,8 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
       }
 
       if (!silent) fprintf(stderr,"    running mud2sp\n"); fflush(stderr);
-      mud2sp_(iparm, fparm, work, cofx, cofy,
-              bndyc, rhs[0], psi[0], mgopt, &ierr);
+      mud2sp_(iparm, fparm, work, &funccfx, &funccfy,
+              &funcbndyc, rhs[0], psi[0], mgopt, &ierr);
       if (!silent) fprintf(stdout,"    mud2sp solved in %d cycles\n",iparm[16]);
 
       // debug print the resulting streamfunctions
@@ -1298,12 +1299,24 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
       }
 
       //fprintf(stderr,"  iteration step %d\n",istep);
-   }
+   } // end if use_MASK
 
-   // try forcing the driven cavity this way!
-   if (driven_cavity) {
+   // use wall velocities to set driven cavity simulations
+   if (xbdry == WALL) {
+      for (i=0;i<ny;i++) {
+         // left wall
+         v[0][i] = wallvel[0];
+         // right wall
+         v[nxm1][i] = wallvel[1];
+      }
+   }
+   if (ybdry == WALL) {
+      printf("  setting u[i][%d] to %g\n",nym1,wallvel[2]);
       for (i=0;i<nx;i++) {
-         u[i][nym1] = 1.0;
+         // bottom wall
+         u[i][0] = wallvel[2];
+         // top wall
+         u[i][nym1] = wallvel[3];
       }
    }
 
