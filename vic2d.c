@@ -580,7 +580,6 @@ int main(int argc,char **argv) {
    }
    if (randvortscale > 0.0) {
       // create a random field of vorticity
-      //scale = 20.;
       scale = randvortscale;
       for (ix=0; ix<nx; ix++) {
          for (iy=0; iy<ny; iy++) {
