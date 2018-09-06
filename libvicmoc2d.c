@@ -1311,7 +1311,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
       }
    }
    if (ybdry == WALL) {
-      printf("  setting u[i][%d] to %g\n",nym1,wallvel[2]);
+      //printf("  setting u[i][%d] to %g\n",nym1,wallvel[2]);
       for (i=0;i<nx;i++) {
          // bottom wall
          u[i][0] = wallvel[2];
