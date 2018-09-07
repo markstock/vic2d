@@ -404,7 +404,7 @@ int write_png (char *outfileroot, int nx, int ny,
        // am I looping these coordinates in the right memory order?
        for (j=ny-1; j>=0; j--) {
          for (i=0; i<nx; i++) {
-           printval = (int)(0.5 + 65535*(red[i][j]-redmin)/redrange);
+           printval = (int)(0.5 + 65534*(red[i][j]-redmin)/redrange);
            if (printval<0) printval = 0;
            else if (printval>65535) printval = 65535;
            img[ny-1-j][2*i] = (png_byte)(printval/256);
@@ -417,7 +417,7 @@ int write_png (char *outfileroot, int nx, int ny,
        // am I looping these coordinates in the right memory order?
        for (j=ny-1; j>=0; j--) {
          for (i=0; i<nx; i++) {
-           printval = (int)(0.5 + 256*(red[i][j]-redmin)/redrange);
+           printval = (int)(0.5 + 254*(red[i][j]-redmin)/redrange);
            if (printval<0) printval = 0;
            else if (printval>255) printval = 255;
            img[ny-1-j][i] = (png_byte)printval;
@@ -776,13 +776,13 @@ int read_png (char *infile, int nx, int ny,
        if (overlay) {
          for (j=ny-1; j>=0; j--) {
            for (i=0; i<nx; i++) {
-             red[i][j] = (red[i][j] + overlay_frac*(redmin+redrange*(img[ny-1-j][2*i]*256+img[ny-1-j][2*i+1])/65535.)) / overlay_divisor;
+             red[i][j] = (red[i][j] + overlay_frac*(redmin+redrange*(img[ny-1-j][2*i]*256+img[ny-1-j][2*i+1])/65534.)) / overlay_divisor;
            }
          }
        } else {
          for (j=ny-1; j>=0; j--) {
            for (i=0; i<nx; i++) {
-             red[i][j] = redmin+redrange*(img[ny-1-j][2*i]*256+img[ny-1-j][2*i+1])/65535.;
+             red[i][j] = redmin+redrange*(img[ny-1-j][2*i]*256+img[ny-1-j][2*i+1])/65534.;
            }
          }
        }
@@ -792,13 +792,13 @@ int read_png (char *infile, int nx, int ny,
        if (overlay) {
          for (j=ny-1; j>=0; j--) {
            for (i=0; i<nx; i++) {
-             red[i][j] = (red[i][j] + overlay_frac*(redmin+redrange*img[ny-1-j][i]/255.)) / overlay_divisor;
+             red[i][j] = (red[i][j] + overlay_frac*(redmin+redrange*img[ny-1-j][i]/254.)) / overlay_divisor;
            }
          }
        } else {
          for (j=ny-1; j>=0; j--) {
            for (i=0; i<nx; i++) {
-             red[i][j] = redmin+redrange*img[ny-1-j][i]/255.;
+             red[i][j] = redmin+redrange*img[ny-1-j][i]/254.;
            }
          }
        }

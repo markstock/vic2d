@@ -571,19 +571,18 @@ int main(int argc,char **argv) {
    }
    if (use_vort_img) {
       // read grayscale PNG of exactly nx by ny resolution
-      // the funny min bounds are to allow value of 127 to become 0.0
+      // inside read_png we set 127 or 32767 to be 0.0
       read_png(vortfilename,nx,ny,FALSE,
                FALSE,1.0,FALSE,
-               a[W2],-254.*vortscale/255.,2.0*vortscale,
-               NULL, -254.*vortscale/255.,2.0*vortscale,
-               NULL, -254.*vortscale/255.,2.0*vortscale);
+               a[W2],-vortscale,2.0*vortscale,
+               NULL, -vortscale,2.0*vortscale,
+               NULL, -vortscale,2.0*vortscale);
    }
    if (randvortscale > 0.0) {
       // create a random field of vorticity
-      scale = randvortscale;
       for (ix=0; ix<nx; ix++) {
          for (iy=0; iy<ny; iy++) {
-            a[W2][ix][iy] += scale*(rand()/(float)RAND_MAX - 0.5);
+            a[W2][ix][iy] += 2.0*randvortscale*(rand()/(float)RAND_MAX - 0.5);
          }
       }
    }
@@ -802,7 +801,8 @@ int main(int argc,char **argv) {
          for (ix=0; ix<nx; ix++) {
             for (iy=0; iy<ny; iy++) {
                float brite = 0.3*a[RR][ix][iy] + 0.6*a[GG][ix][iy] + 0.1*a[BB][ix][iy];
-               a[W2][ix][iy] *= 1.0-brite;
+               //a[W2][ix][iy] *= 1.0-brite;
+               a[W2][ix][iy] *= MAX(0.0, brite-0.1);
             }
          }
       }
@@ -1002,11 +1002,6 @@ int main(int argc,char **argv) {
          //#pragma omp section
          if (print_vort) {
             sprintf(outfileroot,"vort_%06d",step);
-            //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-1.0,2.0,
-            //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-10.0,20.0,
-            //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-250.0,500.0,
-            //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-100.0,200.0,
-            //write_png (outfileroot,nx,ny,FALSE,FALSE,a[W2],-10.0,20.0,
             write_png (outfileroot,nx,ny,FALSE,use_16bpp,
                        a[W2],-vortscale,2.*vortscale,
                        NULL,0.0,1.0,
