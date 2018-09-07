@@ -1015,8 +1015,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
          if (ierr != 0) {
             fprintf(stderr,"ERROR (mud2sp_): ierr = %d\n",ierr);
             if (ierr == 9) fprintf(stderr,"  iparm[14] (%d) too small, must be > %d\n",iparm[14],iparm[15]);
-            fprintf(stderr,"Quitting.\n");
-            exit(0);
+            if (ierr != -3) { fprintf(stderr,"Quitting.\n"); exit(0); }
          }
 
          // read workspace requirements!
@@ -1098,7 +1097,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
       //}
 
       // catch a runtime error
-      if (ierr != 0) {
+      if (ierr != 0 && ierr != -3) {
          fprintf(stderr,"ERROR (mud2sp_): ierr = %d\n",ierr);
          fprintf(stderr,"Quitting.\n");
          exit(0);
