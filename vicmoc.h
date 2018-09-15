@@ -71,6 +71,7 @@ extern int add_vortex_ring_3d(int,int,int,int,int,int,float***,float***,float***
 extern int find_shear_magnitude (int, int, int, int, float**, float, float**, float, float **);
 extern int write_output(char*,int,int,float**,float,float,int);
 extern int write_png (char*, int, int, int, int, float**, float, float, float**, float, float, float**, float, float);
+extern int read_png_res (char*, int*, int*);
 extern int read_png (char*, int, int, int, int, float, int, float**, float, float, float**, float, float, float**, float, float);
 extern int write_output_3d(char*,int,int,int,float***,float,float,int,int);
 extern int write_output_particles_rad(char*,int,float**,float**,float*);

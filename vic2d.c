@@ -26,7 +26,7 @@ int main(int argc,char **argv) {
    int isStam;
    int i,j;
    int nx,ny;
-   int cnx,cny;
+   int cnx,cny,cmn;
    int xbdry,ybdry;
    int ix,iy;
    int step = -1;
@@ -97,6 +97,7 @@ int main(int argc,char **argv) {
    float **mask;			// flow mask
    float **heat;			// constant heat source map
    float **c[3];			// color image storage
+   float *cm[3];			// linear color map storage
    float **acc[2];			// Lagrangian acceleration
    float **shear;			// shear magnitude
 
@@ -116,6 +117,7 @@ int main(int argc,char **argv) {
    char divfilename[160];
    int use_mask_img = FALSE;
    char maskfilename[160];
+   int use_color_map = FALSE;
    char colorsrcfilename[160];
    char mdfilename[160];
    char tdfilename[160];
@@ -290,6 +292,9 @@ int main(int argc,char **argv) {
          }
       } else if (strncmp(argv[i], "-cd", 3) == 0) {
          cd = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-cm", 3) == 0) {
+         strcpy (colorsrcfilename,argv[++i]);
+         use_color_map = TRUE;
       } else if (strncmp(argv[i], "-c", 2) == 0) {
          use_COLOR = TRUE;
 
@@ -710,25 +715,6 @@ int main(int argc,char **argv) {
 
    // set color ---------------------------------------
 
-   // load in an image containing colors to grab
-   if (FALSE) {
-
-      // the color image from which to grab colors
-      sprintf(colorsrcfilename,"color_source.png");
-      cnx = 300;
-      cny = 169;
-
-      // allocate space and read image
-      c[0] = allocate_2d_array_f(cnx,cny);
-      c[1] = allocate_2d_array_f(cnx,cny);
-      c[2] = allocate_2d_array_f(cnx,cny);
-      read_png (colorsrcfilename,cnx,cny,TRUE,FALSE,1.0,FALSE,
-               c[0],0.0,1.0,c[1],0.0,1.0,c[2],0.0,1.0);
-
-      // later on, grab colors with
-      //(void) get_random_color (c,cnx,cny,thisc);
-   }
-
    // initialize an array of blocks to add during the run
    if (FALSE) {
       populate_block_array(nx,ny);
@@ -984,6 +970,57 @@ int main(int argc,char **argv) {
       }
    }
 
+   // Set color map -------------------------------------------
+
+   // load in an image containing colors to grab
+   if (use_color_map) {
+
+      // interrogate the header for resolution
+      read_png_res (colorsrcfilename,&cny,&cnx);
+
+      // allocate space and read image
+      c[0] = allocate_2d_array_f(cnx,cny);
+      c[1] = allocate_2d_array_f(cnx,cny);
+      c[2] = allocate_2d_array_f(cnx,cny);
+      read_png (colorsrcfilename,cnx,cny,TRUE,FALSE,1.0,FALSE,
+                c[0],0.0,1.0,c[1],0.0,1.0,c[2],0.0,1.0);
+
+      // later on, grab colors with
+      //(void) get_random_color (c,cnx,cny,thisc);
+
+      // set the linear color map (not a 2D image) along the longest side
+      cmn = 0;
+      if (cnx > cny) {
+         cm[0] = allocate_1d_array_f(cnx);
+         cm[1] = allocate_1d_array_f(cnx);
+         cm[2] = allocate_1d_array_f(cnx);
+         for (ix=0; ix<cnx; ix++) {
+            cm[0][ix] = c[0][ix][0];
+            cm[1][ix] = c[1][ix][0];
+            cm[2][ix] = c[2][ix][0];
+         }
+         cmn = cnx;
+      } else {
+         cm[0] = allocate_1d_array_f(cny);
+         cm[1] = allocate_1d_array_f(cny);
+         cm[2] = allocate_1d_array_f(cny);
+         for (iy=0; iy<cny; iy++) {
+            cm[0][iy] = c[0][0][iy];
+            cm[1][iy] = c[1][0][iy];
+            cm[2][iy] = c[2][0][iy];
+         }
+         cmn = cny;
+      }
+
+      // now remove and re-allocate space for the output color image
+      (void) free_2d_array_f(c[0]);
+      (void) free_2d_array_f(c[1]);
+      (void) free_2d_array_f(c[2]);
+      c[0] = allocate_2d_array_f(nx,ny);
+      c[1] = allocate_2d_array_f(nx,ny);
+      c[2] = allocate_2d_array_f(nx,ny);
+   }
+
    // -----------------------------------------------
    // Iterate through time
 
@@ -1018,10 +1055,34 @@ int main(int argc,char **argv) {
          //#pragma omp section
          if (print_temp) {
             sprintf(outfileroot,"temp_%06d",step);
-            write_png (outfileroot,nx,ny,FALSE,FALSE,
-                       a[SF],-1.0,2.0,
-                       NULL,0.0,1.0,
-                       NULL,0.0,1.0);
+            if (use_color_map) {
+               float tempramp = 60.0;
+               // map temp to colors
+               for (ix=0; ix<nx; ix++) {
+                  for (iy=0; iy<ny; iy++) {
+                     float fval = 0.5 * (a[SF][ix][iy] + 1.0);
+                     if (fval < 0.0) fval = 0.0;
+                     if (fval > 1.0) fval = 1.0;
+                     fval = 0.5 + fval*(float)(cmn-1);
+                     int ival = floor(fval);
+                     float frem = fval - (float)ival;
+                     float mult = 1.0 - (1.0-abs(a[SF][ix][iy])) * (1.0-MIN(1.0, simtime/60.0));
+                     c[0][ix][iy] = mult * ((1.0-frem)*cm[0][ival] + frem*cm[0][ival+1]);
+                     c[1][ix][iy] = mult * ((1.0-frem)*cm[1][ival] + frem*cm[1][ival+1]);
+                     c[2][ix][iy] = mult * ((1.0-frem)*cm[2][ival] + frem*cm[2][ival+1]);
+                  }
+               }
+               // and write the image
+               write_png (outfileroot,nx,ny,TRUE,use_16bpp,
+                          c[0],0.0,1.0,
+                          c[1],0.0,1.0,
+                          c[2],0.0,1.0);
+            } else {
+               write_png (outfileroot,nx,ny,FALSE,FALSE,
+                          a[SF],-1.0,2.0,
+                          NULL,0.0,1.0,
+                          NULL,0.0,1.0);
+            }
          }
          //#pragma omp section
          if (use_COLOR) {

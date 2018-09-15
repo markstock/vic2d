@@ -11,6 +11,7 @@
 
 int write_output(char*,int,int,float**,float,float,int);
 int write_png (char*, int, int, int, int, float**, float, float, float**, float, float, float**, float, float);
+int read_png_res (char *infile, int *hgt, int *wdt);
 int read_png (char*, int, int, int, int, float, int, float**, float, float, float**, float, float, float**, float, float);
 int write_3d_vtk(char*,int,int,int,float***,float***,float***);
 int write_output_3d(char*,int,int,int,float***,float,float,int,int);
@@ -512,6 +513,91 @@ int write_png (char *outfileroot, int nx, int ny,
    // free the data array
    //free_2d_array_pb(img);
    //free_2d_array_pb(imgrgb);
+
+   return(0);
+}
+
+
+/*
+ * read a PNG header and return width and height
+ */
+int read_png_res (char *infile, int *hgt, int *wdt) {
+
+   FILE *fp;
+   unsigned char header[8];
+   png_uint_32 height,width;
+   int bit_depth,color_type,interlace_type;
+   png_structp png_ptr;
+   png_infop info_ptr;
+
+
+   // check the file
+   fp = fopen(infile,"rb");
+   if (fp==NULL) {
+      fprintf(stderr,"Could not open input file %s\n",infile);
+      fflush(stderr);
+      exit(0);
+   }
+
+   // check to see that it's a PNG
+   fread (&header, 1, 8, fp);
+   if (png_sig_cmp(header, 0, 8)) {
+      fprintf(stderr,"File %s is not a PNG\n",infile);
+      fflush(stderr);
+      exit(0);
+   }
+
+   /* Create and initialize the png_struct with the desired error handler
+    * functions.  If you want to use the default stderr and longjump method,
+    * you can supply NULL for the last three parameters.  We also supply the
+    * the compiler header file version, so that we know if the application
+    * was compiled with a compatible version of the library.  REQUIRED
+    */
+   png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
+      NULL, NULL, NULL);
+
+   /* Allocate/initialize the memory for image information.  REQUIRED. */
+   info_ptr = png_create_info_struct(png_ptr);
+   if (info_ptr == NULL) {
+      fclose(fp);
+      png_destroy_read_struct(&png_ptr, png_infopp_NULL, png_infopp_NULL);
+      exit(0);
+   }
+
+   /* Set error handling if you are using the setjmp/longjmp method (this is
+    * the normal method of doing things with libpng).  REQUIRED unless you
+    * set up your own error handlers in the png_create_read_struct() earlier.  */
+   if (setjmp(png_jmpbuf(png_ptr))) {
+      /* Free all of the memory associated with the png_ptr and info_ptr */
+      png_destroy_read_struct(&png_ptr, &info_ptr, png_infopp_NULL);
+      fclose(fp);
+      /* If we get here, we had a problem reading the file */
+      exit(0);
+   }
+
+   /* One of the following I/O initialization methods is REQUIRED */
+   /* Set up the input control if you are using standard C streams */
+   png_init_io(png_ptr, fp);
+
+   /* If we have already read some of the signature */
+   png_set_sig_bytes(png_ptr, 8);
+
+   /* The call to png_read_info() gives us all of the information from the
+    * PNG file before the first IDAT (image data chunk).  REQUIRED */
+   png_read_info(png_ptr, info_ptr);
+
+   png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type,
+       &interlace_type, int_p_NULL, int_p_NULL);
+
+   // set the sizes so that we can understand them
+   (*hgt) = height;
+   (*wdt) = width;
+
+   /* clean up after the read, and free any memory allocated - REQUIRED */
+   png_destroy_read_struct(&png_ptr, &info_ptr, png_infopp_NULL);
+
+   /* close the file */
+   fclose(fp);
 
    return(0);
 }
