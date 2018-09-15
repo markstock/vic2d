@@ -4,12 +4,14 @@
  * Copyright 2004-10 Mark J. Stock mstock@umich.edu
  */
 
-#include "utility.h"
-#include "vicmoc.h"
+#include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+#include "utility.h"
+#include "vicmoc.h"
 
 // setup routines
 int add_sharp_circular_blob (int,int,int,int,float**,float,float,float,float);

@@ -4,13 +4,7 @@
  * Copyright 2004 Mark J. Stock mstock@umich.edu
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#ifdef __LINUX__
-#include <malloc.h>
-#endif
-#include <time.h>
+//#include <stdlib.h>
 
 #define M_PI 3.14159265358979323846
 

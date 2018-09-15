@@ -9,11 +9,15 @@
  *
  */
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+#include <math.h>
+#include <time.h>
 #ifdef _OPENMP
 #include <omp.h>
 #endif
-#include <ctype.h>
-#include <math.h>
 #include "utility.h"
 #include "maskops.h"
 #include "vicmoc.h"
