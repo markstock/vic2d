@@ -4,6 +4,7 @@
  * Copyright 2004-10 Mark J. Stock mstock@umich.edu
  */
 
+#include "utility.h"
 #include "vicmoc.h"
 #ifdef _OPENMP
 #include <omp.h>
@@ -1316,6 +1317,8 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
          u[i][0] = wallvel[2];
          // top wall
          u[i][nym1] = wallvel[3];
+         // HACK - scale it along the wall
+         //u[i][nym1] = (float)i*wallvel[3]/(float)(nx-1);
       }
    }
 

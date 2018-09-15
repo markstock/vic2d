@@ -4,6 +4,7 @@
  * Copyright 2004-7 Mark J. Stock mstock@umich.edu
  */
 
+#include "utility.h"
 #include "vicmoc.h"
 #define png_infopp_NULL (png_infopp)NULL
 #define int_p_NULL (int*)NULL

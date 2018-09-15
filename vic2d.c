@@ -9,6 +9,7 @@
  *
  */
 
+#include "utility.h"
 #include "vicmoc.h"
 #ifdef _OPENMP
 #include <omp.h>

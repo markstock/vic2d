@@ -82,19 +82,6 @@ extern int make_solenoidal_3d(int,int,int,int,int,int,float***,float***,float***
 extern float find_energy_3d(int,int,int,int,int,int,float***,float***,float***);
 extern float find_vmax(float***, float***, float***,int,int,int);
 
-extern float* allocate_1d_array_f(long int);
-extern int free_1d_array_f(float*);
-extern float** allocate_2d_array_f(int,int);
-extern int free_2d_array_f(float**);
-extern float*** allocate_3d_array_f(int,int,int);
-extern int free_3d_array_f(float***);
-extern float** flatten_to_2d (float***, int, int, int, int);
-extern int** allocate_2d_array_i(int,int);
-extern int free_2d_array_i(int**);
-
-// from utility.c
-extern int copy_2d_field (float**,float**,int,int);
-
 // from maskops.c
 extern void populate_block_array (int, int);
 extern void update_mask_with_blocks_1 (float**, float***, int, int, float);

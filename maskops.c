@@ -1,3 +1,4 @@
+#include "utility.h"
 #include "vicmoc.h"
 
 typedef struct block_record {
