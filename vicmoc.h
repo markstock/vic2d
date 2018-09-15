@@ -4,7 +4,7 @@
  * Copyright 2004 Mark J. Stock mstock@umich.edu
  */
 
-//#include <stdlib.h>
+#pragma once
 
 #define M_PI 3.14159265358979323846
 
@@ -61,13 +61,6 @@ extern int add_singular_blob_3d(int,int,int,int,int,int,float***,float,float,flo
 extern int add_cube_3d(int,int,int,int,int,int,float***,float,float,float,float,float);
 extern int add_vortex_ring_3d(int,int,int,int,int,int,float***,float***,float***,float,float,float,float,float,float,float,float,float);
 extern int find_shear_magnitude (int, int, int, int, float**, float, float**, float, float **);
-
-extern int write_output(char*,int,int,float**,float,float,int);
-extern int write_png (char*, int, int, int, int, float**, float, float, float**, float, float, float**, float, float);
-extern int read_png_res (char*, int*, int*);
-extern int read_png (char*, int, int, int, int, float, int, float**, float, float, float**, float, float, float**, float, float);
-extern int write_output_3d(char*,int,int,int,float***,float,float,int,int);
-extern int write_output_particles_rad(char*,int,float**,float**,float*);
 
 extern int explicit_particle_move_3d(int,int,int,int,int,int,float****,float,float,int,float**,float**);
 extern float step_forward_2d(int,int,int,int,int,int,int,int,float*,float*,int,int,float***,float***,float***,const int,float**,const float,float*,int,float*,float,int,float,float,float***);

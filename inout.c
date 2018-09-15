@@ -4,19 +4,15 @@
  * Copyright 2004-7 Mark J. Stock mstock@umich.edu
  */
 
+#include <stdlib.h>
+#include "inout.h"
 #include "utility.h"
 #include "vicmoc.h"
 #define png_infopp_NULL (png_infopp)NULL
 #define int_p_NULL (int*)NULL
 #include "png.h"
 
-int write_output(char*,int,int,float**,float,float,int);
-int write_png (char*, int, int, int, int, float**, float, float, float**, float, float, float**, float, float);
-int read_png_res (char *infile, int *hgt, int *wdt);
-int read_png (char*, int, int, int, int, float, int, float**, float, float, float**, float, float, float**, float, float);
-int write_3d_vtk(char*,int,int,int,float***,float***,float***);
-int write_output_3d(char*,int,int,int,float***,float,float,int,int);
-int write_output_particles_rad(char*,int,float**,float**,float*);
+// local functions
 png_byte** allocate_2d_array_pb (int,int,int);
 png_byte** allocate_2d_rgb_array_pb (int,int,int);
 int free_2d_array_pb (png_byte**);
