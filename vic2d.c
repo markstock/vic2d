@@ -9,12 +9,14 @@
  *
  */
 
-#include "utility.h"
-#include "vicmoc.h"
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 #include <ctype.h>
+#include <math.h>
+#include "utility.h"
+#include "maskops.h"
+#include "vicmoc.h"
 
 float compute_and_write_stats(int, int, float, float, float, int, int, int, int, float***);
 void paint_splat (float,float,float,float,float,float,float,float,float,int,int,int,float**,float**,float**);

@@ -6,6 +6,7 @@
 
 #include "utility.h"
 #include "vicmoc.h"
+#include <math.h>
 #ifdef _OPENMP
 #include <omp.h>
 #endif

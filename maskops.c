@@ -1,17 +1,15 @@
+/*
+ * VIC-MOC - maskops.c - operations on dynamics masks
+ *
+ * Copyright 2014 Mark J. Stock mstock@umich.edu
+ */
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
+#include "maskops.h"
 #include "utility.h"
 #include "vicmoc.h"
-
-typedef struct block_record {
-   float tstart;
-   float tlen;
-   int startx,endx,starty,endy;
-   float r,g,b;
-   int mask;
-} BLOCK;
-
-#define MAXBLOCKS 10000
-BLOCK block[MAXBLOCKS];
-int nblocks = 0;
 
 //
 // create routine to pre-generate and save a long list of "add" and "subtract" blocks

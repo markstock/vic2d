@@ -10,8 +10,6 @@
 #ifdef __LINUX__
 #include <malloc.h>
 #endif
-#include <math.h>
-//#include <f2c.h>
 #include <time.h>
 
 #define M_PI 3.14159265358979323846
@@ -69,24 +67,20 @@ extern int add_singular_blob_3d(int,int,int,int,int,int,float***,float,float,flo
 extern int add_cube_3d(int,int,int,int,int,int,float***,float,float,float,float,float);
 extern int add_vortex_ring_3d(int,int,int,int,int,int,float***,float***,float***,float,float,float,float,float,float,float,float,float);
 extern int find_shear_magnitude (int, int, int, int, float**, float, float**, float, float **);
+
 extern int write_output(char*,int,int,float**,float,float,int);
 extern int write_png (char*, int, int, int, int, float**, float, float, float**, float, float, float**, float, float);
 extern int read_png_res (char*, int*, int*);
 extern int read_png (char*, int, int, int, int, float, int, float**, float, float, float**, float, float, float**, float, float);
 extern int write_output_3d(char*,int,int,int,float***,float,float,int,int);
 extern int write_output_particles_rad(char*,int,float**,float**,float*);
+
 extern int explicit_particle_move_3d(int,int,int,int,int,int,float****,float,float,int,float**,float**);
 extern float step_forward_2d(int,int,int,int,int,int,int,int,float*,float*,int,int,float***,float***,float***,const int,float**,const float,float*,int,float*,float,int,float,float,float***);
 extern float step_forward_3d(int,int,int,int,int,int,int,int,float****,float****,float****,int,int*,float*,float,float);
 extern int make_solenoidal_3d(int,int,int,int,int,int,float***,float***,float***);
 extern float find_energy_3d(int,int,int,int,int,int,float***,float***,float***);
 extern float find_vmax(float***, float***, float***,int,int,int);
-
-// from maskops.c
-extern void populate_block_array (int, int);
-extern void update_mask_with_blocks_1 (float**, float***, int, int, float);
-extern void update_mask_with_blocks_2 (float**, float***, int, int, float, float);
-extern void overlay_mask (int, int, float**);
 
 // from mud2sp_extern.c
 extern void funcbndyc (int*, float*, float*, float*);
