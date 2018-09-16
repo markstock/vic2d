@@ -102,7 +102,7 @@ int add_block_of_particles (struct Particles *p, int nnew,
  * move the particles along the local flow, use 2nd order backward method
  */
 int move_particles (struct Particles *p,
-                    int nx, int ny, int xbdry, int ybdry,
+                    int nx, int ny, int xbdry, int ybdry, float yf,
                     float **mask, float **u, float **v, float **temp,
                     float *grav, const float dt) {
 
@@ -133,6 +133,15 @@ int move_particles (struct Particles *p,
       p->x[i] += dt*p->u[i];
    }
 
+   // and make sure particles stay in bounds
+   #pragma omp parallel for
+   for (int i=0; i<p->n; ++i) {
+      if (p->x[2*i+0] < 0.0) p->x[2*i+0] = 1.e-4;
+      if (p->x[2*i+1] < 0.0) p->x[2*i+1] = 1.e-4;
+      if (p->x[2*i+0] > 1.0) p->x[2*i+0] = 1.0-1.e-4;
+      if (p->x[2*i+1] > yf) p->x[2*i+1] = yf-1.e-4;
+   }
+
    //fprintf(stdout,"  particle 1 is at %g %g with velocity %g %g\n",p->x[0],p->x[1],p->u[0],p->u[1]);
 
    return p->n;
@@ -159,8 +168,10 @@ int draw_particles (struct Particles *p, float yf, int nx, int ny,
    for (int i=0; i<p->n; ++i) {
       const float px = p->x[2*i+0] * (float)(nx-1);
       const float py = p->x[2*i+1] * (float)(ny-1) / yf;
-      const int ix = (int)px;
-      const int iy = (int)py;
+      int ix = (int)px;
+      int iy = (int)py;
+      int ixp1 = ix+1;
+      int iyp1 = iy+1;
       const float fx = px - (float)ix;
       const float fy = py - (float)iy;
       // drop the color on weighted by the ballistic coefficient (so heavy particles draw more heavily)
@@ -171,17 +182,17 @@ int draw_particles (struct Particles *p, float yf, int nx, int ny,
       outgrn[ix][iy] = (outgrn[ix][iy] + fac*wgt*p->c[3*i+1]) / (1.0+fac*wgt);
       outblu[ix][iy] = (outblu[ix][iy] + fac*wgt*p->c[3*i+2]) / (1.0+fac*wgt);
       fac = fx*(1.0-fy);
-      outred[ix+1][iy] = (outred[ix+1][iy] + fac*wgt*p->c[3*i+0]) / (1.0+fac*wgt);
-      outgrn[ix+1][iy] = (outgrn[ix+1][iy] + fac*wgt*p->c[3*i+1]) / (1.0+fac*wgt);
-      outblu[ix+1][iy] = (outblu[ix+1][iy] + fac*wgt*p->c[3*i+2]) / (1.0+fac*wgt);
+      outred[ixp1][iy] = (outred[ixp1][iy] + fac*wgt*p->c[3*i+0]) / (1.0+fac*wgt);
+      outgrn[ixp1][iy] = (outgrn[ixp1][iy] + fac*wgt*p->c[3*i+1]) / (1.0+fac*wgt);
+      outblu[ixp1][iy] = (outblu[ixp1][iy] + fac*wgt*p->c[3*i+2]) / (1.0+fac*wgt);
       fac = fy*(1.0-fx);
-      outred[ix][iy+1] = (outred[ix][iy+1] + fac*wgt*p->c[3*i+0]) / (1.0+fac*wgt);
-      outgrn[ix][iy+1] = (outgrn[ix][iy+1] + fac*wgt*p->c[3*i+1]) / (1.0+fac*wgt);
-      outblu[ix][iy+1] = (outblu[ix][iy+1] + fac*wgt*p->c[3*i+2]) / (1.0+fac*wgt);
+      outred[ix][iyp1] = (outred[ix][iyp1] + fac*wgt*p->c[3*i+0]) / (1.0+fac*wgt);
+      outgrn[ix][iyp1] = (outgrn[ix][iyp1] + fac*wgt*p->c[3*i+1]) / (1.0+fac*wgt);
+      outblu[ix][iyp1] = (outblu[ix][iyp1] + fac*wgt*p->c[3*i+2]) / (1.0+fac*wgt);
       fac = fy*fx;
-      outred[ix+1][iy+1] = (outred[ix+1][iy+1] + fac*wgt*p->c[3*i+0]) / (1.0+fac*wgt);
-      outgrn[ix+1][iy+1] = (outgrn[ix+1][iy+1] + fac*wgt*p->c[3*i+1]) / (1.0+fac*wgt);
-      outblu[ix+1][iy+1] = (outblu[ix+1][iy+1] + fac*wgt*p->c[3*i+2]) / (1.0+fac*wgt);
+      outred[ixp1][iyp1] = (outred[ixp1][iyp1] + fac*wgt*p->c[3*i+0]) / (1.0+fac*wgt);
+      outgrn[ixp1][iyp1] = (outgrn[ixp1][iyp1] + fac*wgt*p->c[3*i+1]) / (1.0+fac*wgt);
+      outblu[ixp1][iyp1] = (outblu[ixp1][iyp1] + fac*wgt*p->c[3*i+2]) / (1.0+fac*wgt);
       //if (iy > -1) {
       //}
    }

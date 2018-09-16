@@ -61,7 +61,7 @@ int main(int argc,char **argv) {
    int use_strong_strat = FALSE;
    int overlay_color_lr = FALSE;
    int overlay_color_tb = FALSE;
-   int use_PARTICLES = FALSE;
+   int use_PARTICLES = TRUE;
 
    int writeOutput = TRUE;
    int print_vort = FALSE;
@@ -1044,7 +1044,9 @@ int main(int argc,char **argv) {
    // Set particles -------------------------------------------
 
    if (use_PARTICLES) {
-      (void) add_block_of_particles (&pts, 100000, 0.1, 0.9, 0.49*yf, 0.51*yf, 0.7, 0.9, 0.1, 0.2, 0.0);
+      (void) add_block_of_particles (&pts, 200000, 0.1, 0.9, 0.19*yf, 0.21*yf, 0.7, 0.9, 0.1, 0.1, 0.0);
+      (void) add_block_of_particles (&pts, 40000, 0.1, 0.9, 0.49*yf, 0.51*yf, 0.1, 0.9, 0.7, 1.0, 0.0);
+      (void) add_block_of_particles (&pts, 10000, 0.1, 0.9, 0.79*yf, 0.81*yf, 0.8, 0.1, 0.8, 10.0, 0.0);
 
       if (use_COLOR) {
          // generate the temporary color image for splatting the particles
@@ -1227,7 +1229,7 @@ int main(int argc,char **argv) {
 
       // move particles
       if (use_PARTICLES) {
-         (void) move_particles (&pts, nx,ny,xbdry,ybdry,mask,u[XV],u[YV],a[SF],gravity,dt);
+         (void) move_particles (&pts, nx,ny,xbdry,ybdry,yf, mask,u[XV],u[YV],a[SF],gravity,dt);
       }
 
       // read in the image again and overlay it!
