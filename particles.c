@@ -109,17 +109,23 @@ int move_particles (struct Particles *p,
    float spx, spy, newx, newy;
    float u0, v0, u1, v1;
 
+   #pragma omp parallel for private(i,spx,spy,newx,newy,u0,v0,u1,v1)
    for (int i=0; i<p->n; ++i) {
+      // find velocity right here
       spx = p->x[2*i+0];
       spy = p->x[2*i+1];
       interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,mask,u,v,spx,spy,&u0,&v0);
-      // must somehow apply effects of momentum force (m) and buoyancy force (b)
-      newx = spx - dt*u0;
-      newy = spy - dt*v0;
+      // now find velocity by looking back a half time step
+      newx = spx - 0.5*dt*u0;
+      newy = spy - 0.5*dt*v0;
       interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,mask,u,v,newx,newy,&u1,&v1);
-      // compose new velocity as weighted average of original and fluid velocities (do we need dt in this?)
+      // now find velocity by looking forward a half time step
+      newx = spx + 0.5*dt*u0;
+      newy = spy + 0.5*dt*v0;
+      interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,mask,u,v,newx,newy,&u0,&v0);
+      // compose new velocity as weighted average of forward and backward velocities
       p->u[2*i+0] = (p->m[i]*p->u[2*i+0] + 0.5*(u0+u1)) / (1.0+p->m[i]);
-      p->u[2*i+1] = (p->m[i]*p->u[2*i+0] + 0.5*(v0+v1)) / (1.0+p->m[i]);
+      p->u[2*i+1] = (p->m[i]*p->u[2*i+1] + 0.5*(v0+v1)) / (1.0+p->m[i]);
    }
 
    // apply the new velocity
