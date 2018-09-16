@@ -109,7 +109,7 @@ int move_particles (struct Particles *p,
    float spx, spy, newx, newy;
    float u0, v0, u1, v1;
 
-   #pragma omp parallel for private(i,spx,spy,newx,newy,u0,v0,u1,v1)
+   #pragma omp parallel for private(spx,spy,newx,newy,u0,v0,u1,v1)
    for (int i=0; i<p->n; ++i) {
       // find velocity right here
       spx = p->x[2*i+0];
