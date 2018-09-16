@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <math.h>
 #include "maskops.h"
+#include "inout.h"
 #include "utility.h"
 #include "vicmoc.h"
 
