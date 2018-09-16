@@ -21,6 +21,7 @@
 #include "utility.h"
 #include "maskops.h"
 #include "inout.h"
+#include "particles.h"
 #include "vicmoc.h"
 
 float compute_and_write_stats(int, int, float, float, float, int, int, int, int, float***);
@@ -60,6 +61,7 @@ int main(int argc,char **argv) {
    int use_strong_strat = FALSE;
    int overlay_color_lr = FALSE;
    int overlay_color_tb = FALSE;
+   int use_PARTICLES = FALSE;
 
    int writeOutput = TRUE;
    int print_vort = FALSE;
@@ -105,9 +107,12 @@ int main(int argc,char **argv) {
    float **mask;			// flow mask
    float **heat;			// constant heat source map
    float **c[3];			// color image storage
+   float **pc[3];			// particle color image
    float *cm[3];			// linear color map storage
    float **acc[2];			// Lagrangian acceleration
    float **shear;			// shear magnitude
+
+   struct Particles pts;		// collection of particles
 
    // bookkeeping
    unsigned long int tics,last_tics;
@@ -175,6 +180,7 @@ int main(int argc,char **argv) {
    vortscale = 10.;
    velscale = 1.;
    maskerr = 1.e-3;
+   (void) init_particles(&pts, 100);
 
    // read command-line
    (void) strcpy(progname,argv[0]);
@@ -731,15 +737,15 @@ int main(int argc,char **argv) {
    // first, find what index the scalar uses
    if (use_COLOR) {
       // zero the arrays
-      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[RR][ix][iy] = 0.0;
-      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[GG][ix][iy] = 0.0;
-      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[BB][ix][iy] = 0.0;
+      for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[RR][ix][iy] = 0.0;
+      for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[GG][ix][iy] = 0.0;
+      for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[BB][ix][iy] = 0.0;
       //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[RR][ix][iy] = 1.0;
       //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[GG][ix][iy] = 1.0;
       //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[BB][ix][iy] = 1.0;
-      for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[RR][ix][iy] = 0.10546875;
-      for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[GG][ix][iy] = 0.15234375;
-      for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[BB][ix][iy] = 0.05859375;
+      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[RR][ix][iy] = 0.10546875;
+      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[GG][ix][iy] = 0.15234375;
+      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[BB][ix][iy] = 0.05859375;
       if (use_color_img) {
          // read color PNG of exactly nx by ny resolution into
          //   the given fields
@@ -1002,20 +1008,26 @@ int main(int argc,char **argv) {
          cm[0] = allocate_1d_array_f(cnx);
          cm[1] = allocate_1d_array_f(cnx);
          cm[2] = allocate_1d_array_f(cnx);
+         float factor = 1.0;
          for (ix=0; ix<cnx; ix++) {
-            cm[0][ix] = c[0][ix][0];
-            cm[1][ix] = c[1][ix][0];
-            cm[2][ix] = c[2][ix][0];
+            //factor = 1.2 - 2.0*pow(0.6 - (float)ix/(float)(cnx-1), 2);
+            //factor = 1.4 - 3.0*pow(0.6 - (float)ix/(float)(cnx-1), 2);
+            factor = 1.6 - 3.5*pow(0.65 - (float)ix/(float)(cnx-1), 2);
+            cm[0][ix] = factor*c[0][ix][0];
+            cm[1][ix] = factor*c[1][ix][0];
+            cm[2][ix] = factor*c[2][ix][0];
          }
          cmn = cnx;
       } else {
          cm[0] = allocate_1d_array_f(cny);
          cm[1] = allocate_1d_array_f(cny);
          cm[2] = allocate_1d_array_f(cny);
+         float factor = 1.0;
          for (iy=0; iy<cny; iy++) {
-            cm[0][iy] = c[0][0][iy];
-            cm[1][iy] = c[1][0][iy];
-            cm[2][iy] = c[2][0][iy];
+            //factor = 1.4 - 3.0*pow(0.6 - (float)iy/(float)(cny-1), 2);
+            cm[0][iy] = factor*c[0][0][iy];
+            cm[1][iy] = factor*c[1][0][iy];
+            cm[2][iy] = factor*c[2][0][iy];
          }
          cmn = cny;
       }
@@ -1027,6 +1039,19 @@ int main(int argc,char **argv) {
       c[0] = allocate_2d_array_f(nx,ny);
       c[1] = allocate_2d_array_f(nx,ny);
       c[2] = allocate_2d_array_f(nx,ny);
+   }
+
+   // Set particles -------------------------------------------
+
+   if (use_PARTICLES) {
+      (void) add_block_of_particles (&pts, 100000, 0.1, 0.9, 0.49*yf, 0.51*yf, 0.7, 0.9, 0.1, 0.2, 0.0);
+
+      if (use_COLOR) {
+         // generate the temporary color image for splatting the particles
+         pc[0] = allocate_2d_array_f(nx,ny);
+         pc[1] = allocate_2d_array_f(nx,ny);
+         pc[2] = allocate_2d_array_f(nx,ny);
+      }
    }
 
    // -----------------------------------------------
@@ -1065,6 +1090,7 @@ int main(int argc,char **argv) {
             sprintf(outfileroot,"temp_%06d",step);
             if (use_color_map) {
                float tempramp = 60.0;
+               float mult = 1.0;
                // map temp to colors
                for (ix=0; ix<nx; ix++) {
                   for (iy=0; iy<ny; iy++) {
@@ -1074,7 +1100,7 @@ int main(int argc,char **argv) {
                      fval = 0.5 + fval*(float)(cmn-1);
                      int ival = floor(fval);
                      float frem = fval - (float)ival;
-                     float mult = 1.0 - (1.0-abs(a[SF][ix][iy])) * (1.0-MIN(1.0, simtime/60.0));
+                     //mult = 1.0 - (1.0-abs(a[SF][ix][iy])) * (1.0-MIN(1.0, simtime/60.0));
                      c[0][ix][iy] = mult * ((1.0-frem)*cm[0][ival] + frem*cm[0][ival+1]);
                      c[1][ix][iy] = mult * ((1.0-frem)*cm[1][ival] + frem*cm[1][ival+1]);
                      c[2][ix][iy] = mult * ((1.0-frem)*cm[2][ival] + frem*cm[2][ival+1]);
@@ -1094,11 +1120,21 @@ int main(int argc,char **argv) {
          }
          //#pragma omp section
          if (use_COLOR) {
-            sprintf(outfileroot,"out_%06d",step);
-            write_png (outfileroot,nx,ny,TRUE,use_16bpp,
-                       a[RR],0.0,1.0,
-                       a[GG],0.0,1.0,
-                       a[BB],0.0,1.0);
+            if (use_PARTICLES) {
+               // merge color field and particle splats
+               draw_particles(&pts, yf, nx, ny, a[RR], a[GG], a[BB], pc[0], pc[1], pc[2]);
+               sprintf(outfileroot,"out_%06d",step);
+               write_png (outfileroot,nx,ny,TRUE,use_16bpp,
+                          pc[0],0.0,1.0,
+                          pc[1],0.0,1.0,
+                          pc[2],0.0,1.0);
+            } else {
+               sprintf(outfileroot,"out_%06d",step);
+               write_png (outfileroot,nx,ny,TRUE,use_16bpp,
+                          a[RR],0.0,1.0,
+                          a[GG],0.0,1.0,
+                          a[BB],0.0,1.0);
+            }
          }
          //#pragma omp section
          if (print_vel) {
@@ -1187,6 +1223,11 @@ int main(int argc,char **argv) {
                            u,a,t,use_MASK,mask,maskerr,sc_diffus,
                            gravtype,gravity,(dt/(float)numsubsteps),
                            use_strong_strat,bn,dens_ratio,acc);
+      }
+
+      // move particles
+      if (use_PARTICLES) {
+         (void) move_particles (&pts, nx,ny,xbdry,ybdry,mask,u[XV],u[YV],a[SF],gravity,dt);
       }
 
       // read in the image again and overlay it!
