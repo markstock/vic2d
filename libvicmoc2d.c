@@ -290,7 +290,7 @@ int create_baroclinic_vorticity_2d (int nx,int ny,int xbdry,int ybdry,
    //float g[2] = {0.0,-1.0};
    static float **grad[2];
    static int set_grad = FALSE;
-   const float fac = dt*bn;
+   const float fac = dt;
 
    // fprintf(stderr,"in create_baroclinic_vorticity_2d\n"); fflush(stderr);
 
