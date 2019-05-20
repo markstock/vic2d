@@ -30,5 +30,5 @@ The idea for a semi-Lagrangian vortex methods comes from a 1969 paper on atmosph
 
 ## Thanks
 
-This code uses libpng and mudpack, a multigrid solver. All the rest of this ugly, ugly code is mine.
+This code uses [libpng](https://github.com/glennrp/libpng) and [mudpack](https://www2.cisl.ucar.edu/resources/legacy/mudpack), a multigrid solver. All the rest of this ugly, ugly code is mine.
 
