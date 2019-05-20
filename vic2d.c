@@ -61,7 +61,7 @@ int main(int argc,char **argv) {
    int use_strong_strat = FALSE;
    int overlay_color_lr = FALSE;
    int overlay_color_tb = FALSE;
-   int use_PARTICLES = TRUE;
+   int use_PARTICLES = FALSE;
 
    int writeOutput = TRUE;
    int print_vort = FALSE;
