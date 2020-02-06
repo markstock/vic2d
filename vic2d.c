@@ -179,7 +179,7 @@ int main(int argc,char **argv) {
    gravity[1] = 1.0;
    vortscale = 10.;
    velscale = 1.;
-   maskerr = 1.e-3;
+   maskerr = 5.e-3;
    (void) init_particles(&pts, 100);
 
    // read command-line
@@ -1173,18 +1173,22 @@ int main(int argc,char **argv) {
       // if we want a constant cn time step, compute it here
       if (courantconst > 0.0) {
          // average vmax over a number of steps
+         float vlast = ccnvmax[ccnidx];
          ccnidx = (ccnidx+1)%VMAXAVG;
          ccnvmax[ccnidx] = vmax;
          // if any were zero, reset them
          for (i=0; i<VMAXAVG; i++) if (ccnvmax[i] < 1.e-6) ccnvmax[i] = vmax;
          // find new thing
-         vmax = 0.0;
-         for (i=0; i<VMAXAVG; i++) vmax += ccnvmax[i];
-         vmax /= (float)VMAXAVG;
+         float vavg = 0.0;
+         for (i=0; i<VMAXAVG; i++) vavg += ccnvmax[i];
+         vavg /= (float)VMAXAVG;
          // recalculate dt
-         float newdt = (courantconst/vmax)/(nx+1);
+         float newdt = (courantconst/vavg)/(nx+1);
+         // and test vs. extrapolation of future vmax
+         float testdt = (courantconst/(2.0*vmax-vlast))/(nx+1);
+         if (testdt < newdt) newdt = testdt;
          // do not let dt change too much!
-         if (newdt > 2.0*dt) dt *= 2.0;
+         if (newdt > 1.4*dt) dt *= 1.4;
          else if (newdt < 0.5*dt) dt *= 0.5;
          else dt = newdt;
          if (!silent) fprintf(stderr,"  changing dt to %g\n",dt);
