@@ -886,7 +886,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
 
    // set maximum number of iterations
    if (use_MASK) {
-      maxstep = 1000;
+      maxstep = 100;
    } else {
       maxstep = 1;
    }
@@ -986,7 +986,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
 
          iparm[11] = 0;	// no initial guess for psi is provided
 			// why can't we provide psi from the last step?
-         iparm[12] = 100;	// max # multigrid cycles at finest res
+         iparm[12] = 10;	// max # multigrid cycles at finest res
          iparm[13] = 0;	// method of relaxation (0=point, 3=line x and y)
          iparm[14] = iworksize;	// size of workspace
 
@@ -1004,6 +1004,13 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
 
          mgopt[0] = 0;	// use default multigrid options
 
+         // initialize psi
+         for (i=0;i<nx;i++) {
+            for (j=0;j<ny;j++) {
+               psi[i][j] = 0.;
+            }
+         }
+
          // the boundary condition subroutine names
          // Apparently, the F77 solver calls these as "external"
          // I have no clue how to actually get them to work
@@ -1019,7 +1026,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
          if (ierr != 0) {
             fprintf(stderr,"ERROR (mud2sp_): ierr = %d\n",ierr);
             if (ierr == 9) fprintf(stderr,"  iparm[14] (%d) too small, must be > %d\n",iparm[14],iparm[15]);
-            if (ierr != -3) { fprintf(stderr,"Quitting.\n"); exit(0); }
+            if (ierr > 0) { fprintf(stderr,"Quitting.\n"); exit(0); }
          }
 
          // read workspace requirements!
@@ -1073,7 +1080,6 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
         fprintf(stderr,"    solving bcs\n"); fflush(stderr);
         find_open_boundary_psi (nx,ny,vort,yf,freestream,psi);
       } else if (xbdry == OPEN) {
-      //if (xbdry == OPEN) {
         // NOTE: must correct this if freestream is anything other than
         //   (1,0) or if yf != 1
         for (j=0;j<ny;j++) {
@@ -1101,13 +1107,14 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
       //}
 
       // catch a runtime error
-      if (ierr != 0 && ierr != -3) {
+      if (ierr < 0) {
+         fprintf(stderr,"WARNING (mud2sp_): ierr = %d\n",ierr);
+      } else if (ierr > 0) {
          fprintf(stderr,"ERROR (mud2sp_): ierr = %d\n",ierr);
          fprintf(stderr,"Quitting.\n");
          exit(0);
       }
 
-      //exit(0);
 
    // Use fishpak FFT solver ----------------------------------------------
    } else {
@@ -1193,6 +1200,26 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    // now, find the derivatives of streamfunction to make the velocities!
    find_gradient_of_scalar_2nd_2d (nx,ny,xbdry,ybdry,psi,NULL,v,-1.0,u,1.0);
 
+
+   // Apply freestream for periodic BCs here (for open BCs it's done in the solver)
+   if (xbdry == PERIODIC) {
+      // add freestream to every velocity!
+      for (i=0;i<nx;i++) {
+         for (j=0;j<ny;j++) {
+            u[i][j] += freestream[0];
+         }
+      }
+   }
+   if (ybdry == PERIODIC) {
+      // add freestream to every velocity!
+      for (i=0;i<nx;i++) {
+         for (j=0;j<ny;j++) {
+            v[i][j] += freestream[1];
+         }
+      }
+   }
+
+
    // if there's a mask, then find the counter-vorticity
    if (use_MASK) {
 
@@ -1270,7 +1297,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
             istep += maxstep;
             // reset back to full solve
             fparm[4] = muderr;
-            iparm[12] = 100;
+            iparm[12] = 10;
          } else if (maxcorr/maxvort < 5.*maskerr) {
             // always run a specific number of cycles
             fparm[4] = 0.0;
@@ -1286,7 +1313,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
                istep += maxstep;
                // reset back to full solve
                fparm[4] = muderr;
-               iparm[12] = 100;
+               iparm[12] = 10;
             } else {
                // whoah, something bad happened
                fprintf(stderr,"Quitting.\n");
