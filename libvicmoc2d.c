@@ -11,6 +11,7 @@
 #include <omp.h>
 #endif
 #include "utility.h"
+//#include "inout.h"
 #include "vicmoc.h"
 
 // setup routines
@@ -843,12 +844,15 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    static float **psi;
    static int allocated_arrays = FALSE;
    int istep,maxstep;
-   float maxvort,temp,maxcorr;
+   float maxvort,temp,maxcorr,tempscale;
    static float **cu;
    static float **cv;
    static float **cw;
    static float **cw_old;
    char outfileroot[150];
+   static int mask_grad_not_set = TRUE;
+   static float **maskgrad;
+   static float **mg;
 
    //fprintf(stderr,"in find_vels_2d\n"); fflush(stderr);
 
@@ -1223,13 +1227,45 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    // if there's a mask, then find the counter-vorticity
    if (use_MASK) {
 
+      // allocate space for the mask gradient magnitude
+      if (mask_grad_not_set) {
+         maskgrad = allocate_2d_array_f(nx,ny);
+         mg = allocate_2d_array_f(nx,ny);
+         find_gradient_of_scalar_2nd_2d (nx,ny,xbdry,ybdry,mask,NULL,maskgrad,1.0,mg,1.0);
+
+         // gradient calculation will add a scale
+         tempscale = 1.0/(ny-1);
+         if (nx > ny) {
+            tempscale = 1.0/(nx-1);
+         }
+
+         // combine into a scalar and scale properly
+         for (i=0;i<nx;i++) {
+            for (j=0;j<ny;j++) {
+               maskgrad[i][j] = tempscale * (fabs(maskgrad[i][j])+fabs(mg[i][j]));
+            }
+         }
+
+         free_2d_array_f(mg);
+         mask_grad_not_set = FALSE;
+
+         // test print this new mask
+         //write_png ("maskgrad",nx,ny,FALSE,FALSE,maskgrad,0.0,0.5,NULL,0.0,1.0,NULL,0.0,1.0);
+      }
+
       // first, find counter-velocity
       for (i=0;i<nx;i++) {
          for (j=0;j<ny;j++) {
             //cu[i][j] = -1.0*u[i][j]*mask[i][j];
             //cv[i][j] = -1.0*v[i][j]*mask[i][j];
-            cu[i][j] = -1.0*u[i][j]*(1.-mask[i][j]);
-            cv[i][j] = -1.0*v[i][j]*(1.-mask[i][j]);
+            //cu[i][j] = -1.0*u[i][j]*(1.-mask[i][j]);
+            //cv[i][j] = -1.0*v[i][j]*(1.-mask[i][j]);
+            // this is nice, but needs a soft mask edge to work!
+            //cu[i][j] = -4.0*u[i][j]*(1.-mask[i][j])*mask[i][j];
+            //cv[i][j] = -4.0*v[i][j]*(1.-mask[i][j])*mask[i][j];
+            // use the maskgrad now
+            cu[i][j] = -1.0*u[i][j]*maskgrad[i][j];
+            cv[i][j] = -1.0*v[i][j]*maskgrad[i][j];
          }
       }
 
@@ -1260,7 +1296,12 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
             //vort[i][j] = vort[i][j] + cw[i][j];
             // this should be the bomb.
             //vort[i][j] = (1.-mask[i][j]) * (vort[i][j] + cw[i][j]);
-            vort[i][j] = mask[i][j] * (vort[i][j] + cw[i][j]);
+            vort[i][j] = mask[i][j] * (vort[i][j] + cw[i][j]);	// this one worked
+            //vort[i][j] += 4.0*(1.-mask[i][j])*mask[i][j] * cw[i][j];
+            //vort[i][j] = mask[i][j]*vort[i][j] + (1.-mask[i][j])*cw[i][j];
+            //vort[i][j] += cw[i][j];
+            //vort[i][j] = mask[i][j]*vort[i][j] + cw[i][j];
+            //vort[i][j] = mask[i][j]*vort[i][j] + maskgrad[i][j]*cw[i][j];
          }
       }
 
