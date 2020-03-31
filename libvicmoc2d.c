@@ -835,7 +835,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    static float **rhs;
    static int mgopt[4];
    static int must_initialize = TRUE;
-   float muderr = 1.e-4;
+   float muderr = 1.e-5;
    // these are for both
    int ierr;
    long int iworksize = 3.67*nx*ny+100*nx+2000;	// OK for all?
@@ -1208,17 +1208,33 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    // Apply freestream for periodic BCs here (for open BCs it's done in the solver)
    if (xbdry == PERIODIC) {
       // add freestream to every velocity!
+      double usum = 0.0;
       for (i=0;i<nx;i++) {
          for (j=0;j<ny;j++) {
-            u[i][j] += freestream[0];
+            usum += u[i][j];
+         }
+      }
+      usum /= nx*(double)ny;
+      //fprintf(stderr,"  usum is %g\n", usum); // this is always right around 0.0
+      for (i=0;i<nx;i++) {
+         for (j=0;j<ny;j++) {
+            u[i][j] += (freestream[0]-usum);
          }
       }
    }
    if (ybdry == PERIODIC) {
       // add freestream to every velocity!
+      double vsum = 0.0;
       for (i=0;i<nx;i++) {
          for (j=0;j<ny;j++) {
-            v[i][j] += freestream[1];
+            vsum += v[i][j];
+         }
+      }
+      vsum /= nx*(double)ny;
+      //fprintf(stderr,"  vsum is %g\n", vsum);
+      for (i=0;i<nx;i++) {
+         for (j=0;j<ny;j++) {
+            v[i][j] += (freestream[1]-vsum);
          }
       }
    }
