@@ -75,7 +75,7 @@ extern void funccfx (float*, float*, float*, float*);
 extern void funccfy (float*, float*, float*, float*);
 
 // from, well, color stuff
-extern int get_random_color (float***, int, int, float*);
+extern void get_random_color (float***, int, int, float*);
 
 // in gr23.c
 //extern int hwscrt_(real *a, real *b, integer *m, integer *mbdcnd,

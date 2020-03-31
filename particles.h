@@ -1,7 +1,7 @@
 /*
  * VIC-MOC - particles.h - create, move, draw particles
  *
- * Copyright 2018 Mark J. Stock mstock@umich.edu
+ * Copyright 2018-20 Mark J. Stock mstock@umich.edu
  */
 
 #pragma once
@@ -30,7 +30,8 @@ struct Particles {
 };
 
 int init_particles (struct Particles*, const int);
+int add_one_particle (struct Particles*, float, float, float, float, float, float, float, float, float);
 int add_block_of_particles (struct Particles*, int, float, float, float, float, float, float, float, float, float);
 int move_particles (struct Particles*, int, int, int, int, float, float**, float**, float**, float**, float*, const float);
-int draw_particles (struct Particles*, float, int, int, float**, float**, float**, float**, float**, float**);
+int draw_particles (struct Particles*, float, int, int, float, float**, float**, float**, float, float**, float**, float**);
 

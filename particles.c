@@ -1,11 +1,14 @@
 /*
  * VIC-MOC - particles.c - create, move, draw particles
  *
- * Copyright 2018 Mark J. Stock mstock@umich.edu
+ * Copyright 2018-20 Mark J. Stock mstock@umich.edu
  */
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
+#include <signal.h>
+#include "vicmoc.h"
 #include "particles.h"
 #include "utility.h"
 
@@ -66,6 +69,38 @@ int resize_particles (struct Particles *p, const int nspace) {
 }
 
 /*
+ * add one particle
+ */
+int add_one_particle (struct Particles *p,
+                      float x, float y, float u, float v,
+                      float rr, float gg, float bb,
+                      float m, float b) {
+
+   // make sure we have room
+   if (p->n+1 > p->nmax) resize_particles(p, p->n+1);
+
+   int i = p->n;
+
+   // position and vel
+   p->x[2*i+0] = x;
+   p->x[2*i+1] = y;
+   p->u[2*i+0] = u;
+   p->u[2*i+1] = v;
+   // color
+   p->c[3*i+0] = rr;
+   p->c[3*i+1] = gg;
+   p->c[3*i+2] = bb;
+   // dynamics parameters
+   p->m[i] = m;
+   p->b[i] = b;
+
+   // update the active count
+   p->n++;
+
+   return p->n;
+}
+
+/*
  * generate a block of particles
  */
 int add_block_of_particles (struct Particles *p, int nnew,
@@ -107,9 +142,9 @@ int move_particles (struct Particles *p,
                     float *grav, const float dt) {
 
    float spx, spy, newx, newy;
-   float u0, v0, u1, v1;
+   float u0, v0, u1, v1, u2, v2;
 
-   #pragma omp parallel for private(spx,spy,newx,newy,u0,v0,u1,v1)
+   #pragma omp parallel for private(spx,spy,newx,newy,u0,v0,u1,v1,u2,v2)
    for (int i=0; i<p->n; ++i) {
       // find velocity right here
       spx = p->x[2*i+0];
@@ -122,10 +157,10 @@ int move_particles (struct Particles *p,
       // now find velocity by looking forward a half time step
       newx = spx + 0.5*dt*u0;
       newy = spy + 0.5*dt*v0;
-      interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,mask,u,v,newx,newy,&u0,&v0);
+      interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,mask,u,v,newx,newy,&u2,&v2);
       // compose new velocity as weighted average of forward and backward velocities
-      p->u[2*i+0] = (p->m[i]*p->u[2*i+0] + 0.5*(u0+u1)) / (1.0+p->m[i]);
-      p->u[2*i+1] = (p->m[i]*p->u[2*i+1] + 0.5*(v0+v1)) / (1.0+p->m[i]);
+      p->u[2*i+0] = (p->m[i]*p->u[2*i+0] + 0.5*(u2+u1)) / (1.0+p->m[i]);
+      p->u[2*i+1] = (p->m[i]*p->u[2*i+1] + 0.5*(v2+v1)) / (1.0+p->m[i]);
    }
 
    // apply the new velocity
@@ -134,12 +169,23 @@ int move_particles (struct Particles *p,
    }
 
    // and make sure particles stay in bounds
-   #pragma omp parallel for
-   for (int i=0; i<p->n; ++i) {
-      if (p->x[2*i+0] < 0.0) p->x[2*i+0] = 1.e-4;
-      if (p->x[2*i+1] < 0.0) p->x[2*i+1] = 1.e-4;
-      if (p->x[2*i+0] > 1.0) p->x[2*i+0] = 1.0-1.e-4;
-      if (p->x[2*i+1] > yf) p->x[2*i+1] = yf-1.e-4;
+   if (xbdry == PERIODIC) {
+      #pragma omp parallel for
+      for (int i=0; i<p->n; ++i) {
+         if (p->x[2*i+0] < 0.0) p->x[2*i+0] += 1.0;
+         if (p->x[2*i+1] < 0.0) p->x[2*i+1] += yf;
+         if (p->x[2*i+0] > 1.0) p->x[2*i+0] -= 1.0;
+         if (p->x[2*i+1] > yf) p->x[2*i+1] -= yf;
+      }
+   } else {
+      // wall or open
+      #pragma omp parallel for
+      for (int i=0; i<p->n; ++i) {
+         if (p->x[2*i+0] < 0.0) p->x[2*i+0] = 1.e-4;
+         if (p->x[2*i+1] < 0.0) p->x[2*i+1] = 1.e-4;
+         if (p->x[2*i+0] > 1.0) p->x[2*i+0] = 1.0-1.e-4;
+         if (p->x[2*i+1] > yf) p->x[2*i+1] = yf-1.e-4;
+      }
    }
 
    //fprintf(stdout,"  particle 1 is at %g %g with velocity %g %g\n",p->x[0],p->x[1],p->u[0],p->u[1]);
@@ -151,17 +197,18 @@ int move_particles (struct Particles *p,
  * splat particles onto a color image
  */
 int draw_particles (struct Particles *p, float yf, int nx, int ny,
-                    float **inred, float **ingrn, float **inblu,
-                    float **outred, float **outgrn, float **outblu) {
+                    float infac,  float **inred,  float **ingrn,  float **inblu,
+                    float outfac, float **outred, float **outgrn, float **outblu) {
 
-   // copy the in colors to the out array
+   // copy the in colors to the out array, and scale both
    for (int ix=0; ix<nx; ix++) {
       for (int iy=0; iy<ny; iy++) {
-         outred[ix][iy] = inred[ix][iy];
-         outgrn[ix][iy] = ingrn[ix][iy];
-         outblu[ix][iy] = inblu[ix][iy];
+         outred[ix][iy] = infac*inred[ix][iy] + outfac*outred[ix][iy];
+         outgrn[ix][iy] = infac*ingrn[ix][iy] + outfac*outgrn[ix][iy];
+         outblu[ix][iy] = infac*inblu[ix][iy] + outfac*outblu[ix][iy];
       }
    }
+
 
    // splat the particles over this
    //fprintf(stdout,"  splatting %d particles\n",p->n);
@@ -175,26 +222,47 @@ int draw_particles (struct Particles *p, float yf, int nx, int ny,
       const float fx = px - (float)ix;
       const float fy = py - (float)iy;
       // drop the color on weighted by the ballistic coefficient (so heavy particles draw more heavily)
-      const float wgt = p->m[i];
+      //const float wgt = p->m[i];
+      // weight by velocity also (04b)
+      const float velmag = sqrt(pow(p->u[2*i+0],2)+pow(p->u[2*i+1],2)+1.e-6);
+      //const float wgt = p->m[i] * velmag;
+      // shimmer a little by reflecting off a normal direction, and account for vel (04c)
+      //const float sheer = 10.0*(p->u[2*i+0]*0.8 + p->u[2*i+1]*0.2);
+      //const float wgt = 0.5 * p->m[i] * (sheer+velmag);
+      // shimmer more (04e)
+      const float sheer = (p->u[2*i+0]*0.95 - p->u[2*i+1]*0.1) / velmag;
+      //const float wgt = 2.0 * p->m[i] * (2.0*sheer*sheer*sheer*sheer+velmag);
+      // more shimmer, less weight on brightness (04f)
+      //const float wgt = 2.0 * (10.0*sheer*sheer*sheer*sheer+velmag);
+      // where is the shimmer, less weight on brightness (04g)
+      //const float wgt = 1.0*sheer*sheer*sheer*sheer + 8.0*velmag;
+      // less shimmer (04h)
+      //const float wgt = 0.3*sheer*sheer*sheer*sheer + 20.0*velmag;
+      const float wgt = 0.01*sheer*sheer*sheer*sheer + 0.5*velmag;
       //if (i==0) fprintf(stdout,"  particle 1 is at %g %g with index %d %d and weight %g\n",px,py,ix,iy,wgt);
-      float fac = (1.0-fx)*(1.0-fy);
-      outred[ix][iy] = (outred[ix][iy] + fac*wgt*p->c[3*i+0]) / (1.0+fac*wgt);
-      outgrn[ix][iy] = (outgrn[ix][iy] + fac*wgt*p->c[3*i+1]) / (1.0+fac*wgt);
-      outblu[ix][iy] = (outblu[ix][iy] + fac*wgt*p->c[3*i+2]) / (1.0+fac*wgt);
-      fac = fx*(1.0-fy);
-      outred[ixp1][iy] = (outred[ixp1][iy] + fac*wgt*p->c[3*i+0]) / (1.0+fac*wgt);
-      outgrn[ixp1][iy] = (outgrn[ixp1][iy] + fac*wgt*p->c[3*i+1]) / (1.0+fac*wgt);
-      outblu[ixp1][iy] = (outblu[ixp1][iy] + fac*wgt*p->c[3*i+2]) / (1.0+fac*wgt);
-      fac = fy*(1.0-fx);
-      outred[ix][iyp1] = (outred[ix][iyp1] + fac*wgt*p->c[3*i+0]) / (1.0+fac*wgt);
-      outgrn[ix][iyp1] = (outgrn[ix][iyp1] + fac*wgt*p->c[3*i+1]) / (1.0+fac*wgt);
-      outblu[ix][iyp1] = (outblu[ix][iyp1] + fac*wgt*p->c[3*i+2]) / (1.0+fac*wgt);
-      fac = fy*fx;
-      outred[ixp1][iyp1] = (outred[ixp1][iyp1] + fac*wgt*p->c[3*i+0]) / (1.0+fac*wgt);
-      outgrn[ixp1][iyp1] = (outgrn[ixp1][iyp1] + fac*wgt*p->c[3*i+1]) / (1.0+fac*wgt);
-      outblu[ixp1][iyp1] = (outblu[ixp1][iyp1] + fac*wgt*p->c[3*i+2]) / (1.0+fac*wgt);
-      //if (iy > -1) {
-      //}
+
+      const float fac1 = wgt * (1.0-fx)*(1.0-fy);
+      outred[ix][iy] = (outred[ix][iy] + fac1*p->c[3*i+0]) / (1.0+fac1);
+      outgrn[ix][iy] = (outgrn[ix][iy] + fac1*p->c[3*i+1]) / (1.0+fac1);
+      outblu[ix][iy] = (outblu[ix][iy] + fac1*p->c[3*i+2]) / (1.0+fac1);
+      if (ixp1 != nx) {
+         const float fac2 = wgt * fx*(1.0-fy);
+         outred[ixp1][iy] = (outred[ixp1][iy] + fac2*p->c[3*i+0]) / (1.0+fac2);
+         outgrn[ixp1][iy] = (outgrn[ixp1][iy] + fac2*p->c[3*i+1]) / (1.0+fac2);
+         outblu[ixp1][iy] = (outblu[ixp1][iy] + fac2*p->c[3*i+2]) / (1.0+fac2);
+      }
+      if (iyp1 != ny) {
+         const float fac3 = wgt * (1.0-fx)*fy;
+         outred[ix][iyp1] = (outred[ix][iyp1] + fac3*p->c[3*i+0]) / (1.0+fac3);
+         outgrn[ix][iyp1] = (outgrn[ix][iyp1] + fac3*p->c[3*i+1]) / (1.0+fac3);
+         outblu[ix][iyp1] = (outblu[ix][iyp1] + fac3*p->c[3*i+2]) / (1.0+fac3);
+      }
+      if (ixp1 != nx && iyp1 != ny) {
+         const float fac4 = wgt * fx*fy;
+         outred[ixp1][iyp1] = (outred[ixp1][iyp1] + fac4*p->c[3*i+0]) / (1.0+fac4);
+         outgrn[ixp1][iyp1] = (outgrn[ixp1][iyp1] + fac4*p->c[3*i+1]) / (1.0+fac4);
+         outblu[ixp1][iyp1] = (outblu[ixp1][iyp1] + fac4*p->c[3*i+2]) / (1.0+fac4);
+      }
    }
 }
 

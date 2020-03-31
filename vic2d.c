@@ -1,7 +1,7 @@
 /*
  * vic2d
  *
- * Copyright 2004-18 Mark J. Stock mstock@umich.edu
+ * Copyright 2004-20 Mark J. Stock mstock@umich.edu
  *
  * a 2D vortex method which uses the method of characteristics for the
  * convection step, and a single explicit step for diffusion and vorticity
@@ -26,7 +26,8 @@
 
 float compute_and_write_stats(int, int, float, float, float, int, int, int, int, float***);
 void paint_splat (float,float,float,float,float,float,float,float,float,int,int,int,float**,float**,float**);
-int get_random_color (float***,int,int,float*);
+void get_random_color (float***,int,int,float*);
+void get_color (float***,int,int,float,float,float*);
 int Usage(char[80],int);
 
 int main(int argc,char **argv) {
@@ -61,7 +62,7 @@ int main(int argc,char **argv) {
    int use_strong_strat = FALSE;
    int overlay_color_lr = FALSE;
    int overlay_color_tb = FALSE;
-   int use_PARTICLES = FALSE;
+   int use_PARTICLES = TRUE;
 
    int writeOutput = TRUE;
    int print_vort = FALSE;
@@ -106,9 +107,10 @@ int main(int argc,char **argv) {
    float **t[MAX_SCALARS];		// temporary velocities, vorticity, etc
    float **mask;			// flow mask
    float **heat;			// constant heat source map
-   float **c[3];			// color image storage
+   float **c[3];			// color image storage for temp field
    float **pc[3];			// particle color image
-   float *cm[3];			// linear color map storage
+   float *cml[3];			// linear color map storage
+   float **cmi[3];			// 2D color input storage
    float **acc[2];			// Lagrangian acceleration
    float **shear;			// shear magnitude
 
@@ -130,7 +132,8 @@ int main(int argc,char **argv) {
    char divfilename[160];
    int use_mask_img = FALSE;
    char maskfilename[160];
-   int use_color_map = FALSE;
+   int use_color_linear = FALSE;
+   int use_color_area = FALSE;
    char colorsrcfilename[160];
    char mdfilename[160];
    char tdfilename[160];
@@ -180,7 +183,7 @@ int main(int argc,char **argv) {
    vortscale = 10.;
    velscale = 1.;
    maskerr = 5.e-3;
-   (void) init_particles(&pts, 100);
+   (void) init_particles(&pts, 10000);
 
    // read command-line
    (void) strcpy(progname,argv[0]);
@@ -306,9 +309,12 @@ int main(int argc,char **argv) {
          }
       } else if (strncmp(argv[i], "-cd", 3) == 0) {
          cd = atof(argv[++i]);
-      } else if (strncmp(argv[i], "-cm", 3) == 0) {
+      } else if (strncmp(argv[i], "-cl", 3) == 0) {
          strcpy (colorsrcfilename,argv[++i]);
-         use_color_map = TRUE;
+         use_color_linear = TRUE;
+      } else if (strncmp(argv[i], "-ca", 3) == 0) {
+         strcpy (colorsrcfilename,argv[++i]);
+         use_color_area = TRUE;
       } else if (strncmp(argv[i], "-c", 2) == 0) {
          use_COLOR = TRUE;
 
@@ -344,8 +350,6 @@ int main(int argc,char **argv) {
       } else if (strncmp(argv[i], "-fs", 3) == 0) {
          freestream[0] = atof(argv[++i]);
          freestream[1] = atof(argv[++i]);
-         xbdry = OPEN;
-         ybdry = OPEN;
       } else if (strncmp(argv[i], "-grav", 2) == 0) {
          gravity[0] = atof(argv[++i]);
          gravity[1] = atof(argv[++i]);
@@ -987,72 +991,85 @@ int main(int argc,char **argv) {
    // Set color map -------------------------------------------
 
    // load in an image containing colors to grab
-   if (use_color_map) {
+   if (use_color_linear || use_color_area) {
 
       // interrogate the header for resolution
       read_png_res (colorsrcfilename,&cny,&cnx);
 
       // allocate space and read image
-      c[0] = allocate_2d_array_f(cnx,cny);
-      c[1] = allocate_2d_array_f(cnx,cny);
-      c[2] = allocate_2d_array_f(cnx,cny);
+      cmi[0] = allocate_2d_array_f(cnx,cny);
+      cmi[1] = allocate_2d_array_f(cnx,cny);
+      cmi[2] = allocate_2d_array_f(cnx,cny);
       read_png (colorsrcfilename,cnx,cny,TRUE,FALSE,1.0,FALSE,
-                c[0],0.0,1.0,c[1],0.0,1.0,c[2],0.0,1.0);
+                cmi[0],0.0,1.0,cmi[1],0.0,1.0,cmi[2],0.0,1.0);
 
       // later on, grab colors with
-      //(void) get_random_color (c,cnx,cny,thisc);
+      //(void) get_random_color (cmi,cnx,cny,thisc);
+   }
 
+   if (use_color_linear) {
       // set the linear color map (not a 2D image) along the longest side
       cmn = 0;
       if (cnx > cny) {
-         cm[0] = allocate_1d_array_f(cnx);
-         cm[1] = allocate_1d_array_f(cnx);
-         cm[2] = allocate_1d_array_f(cnx);
+         cml[0] = allocate_1d_array_f(cnx);
+         cml[1] = allocate_1d_array_f(cnx);
+         cml[2] = allocate_1d_array_f(cnx);
          float factor = 1.0;
          for (ix=0; ix<cnx; ix++) {
             //factor = 1.2 - 2.0*pow(0.6 - (float)ix/(float)(cnx-1), 2);
             //factor = 1.4 - 3.0*pow(0.6 - (float)ix/(float)(cnx-1), 2);
             factor = 1.6 - 3.5*pow(0.65 - (float)ix/(float)(cnx-1), 2);
-            cm[0][ix] = factor*c[0][ix][0];
-            cm[1][ix] = factor*c[1][ix][0];
-            cm[2][ix] = factor*c[2][ix][0];
+            cml[0][ix] = factor*cmi[0][ix][0];
+            cml[1][ix] = factor*cmi[1][ix][0];
+            cml[2][ix] = factor*cmi[2][ix][0];
          }
          cmn = cnx;
       } else {
-         cm[0] = allocate_1d_array_f(cny);
-         cm[1] = allocate_1d_array_f(cny);
-         cm[2] = allocate_1d_array_f(cny);
+         cml[0] = allocate_1d_array_f(cny);
+         cml[1] = allocate_1d_array_f(cny);
+         cml[2] = allocate_1d_array_f(cny);
          float factor = 1.0;
          for (iy=0; iy<cny; iy++) {
             //factor = 1.4 - 3.0*pow(0.6 - (float)iy/(float)(cny-1), 2);
-            cm[0][iy] = factor*c[0][0][iy];
-            cm[1][iy] = factor*c[1][0][iy];
-            cm[2][iy] = factor*c[2][0][iy];
+            cml[0][iy] = factor*cmi[0][0][iy];
+            cml[1][iy] = factor*cmi[1][0][iy];
+            cml[2][iy] = factor*cmi[2][0][iy];
          }
          cmn = cny;
       }
-
-      // now remove and re-allocate space for the output color image
-      (void) free_2d_array_f(c[0]);
-      (void) free_2d_array_f(c[1]);
-      (void) free_2d_array_f(c[2]);
-      c[0] = allocate_2d_array_f(nx,ny);
-      c[1] = allocate_2d_array_f(nx,ny);
-      c[2] = allocate_2d_array_f(nx,ny);
    }
 
    // Set particles -------------------------------------------
 
    if (use_PARTICLES) {
-      (void) add_block_of_particles (&pts, 200000, 0.1, 0.9, 0.19*yf, 0.21*yf, 0.7, 0.9, 0.1, 0.1, 0.0);
-      (void) add_block_of_particles (&pts, 40000, 0.1, 0.9, 0.49*yf, 0.51*yf, 0.1, 0.9, 0.7, 1.0, 0.0);
-      (void) add_block_of_particles (&pts, 10000, 0.1, 0.9, 0.79*yf, 0.81*yf, 0.8, 0.1, 0.8, 10.0, 0.0);
+      float thiscol[3];
+      // 04b started with 5000
+      // 04c started with 0
+      for (i=0; i<10000; ++i) {
+         (void) get_color (cmi, cnx, cny, rand()/(float)RAND_MAX, rand()/(float)RAND_MAX, thiscol);
+         (void) add_one_particle (&pts, rand()/(float)RAND_MAX,
+                                        yf*rand()/(float)RAND_MAX,
+                                        0.0, 0.0,
+                                        thiscol[0], thiscol[1], thiscol[2],
+                                        1.0+0.5*rand()/(float)RAND_MAX, 0.0);
+      }
+      //(void) add_block_of_particles (&pts, 200000, 0.1, 0.9, 0.19*yf, 0.21*yf, 0.7, 0.9, 0.1, 0.1, 0.0);
+      //(void) add_block_of_particles (&pts, 40000, 0.1, 0.9, 0.49*yf, 0.51*yf, 0.1, 0.9, 0.7, 1.0, 0.0);
+      //(void) add_block_of_particles (&pts, 10000, 0.1, 0.9, 0.79*yf, 0.81*yf, 0.8, 0.1, 0.8, 10.0, 0.0);
 
       if (use_COLOR) {
          // generate the temporary color image for splatting the particles
          pc[0] = allocate_2d_array_f(nx,ny);
          pc[1] = allocate_2d_array_f(nx,ny);
          pc[2] = allocate_2d_array_f(nx,ny);
+         // make sure to zero this
+         for (ix=0; ix<nx; ix++) {
+            for (iy=0; iy<ny; iy++) {
+               pc[0][ix][iy] = 0.0;
+               pc[1][ix][iy] = 0.0;
+               pc[2][ix][iy] = 0.0;
+            }
+         }
       }
    }
 
@@ -1065,6 +1082,30 @@ int main(int argc,char **argv) {
    while (TRUE) {
 
       // fprintf(stdout,"\nBegin step %d\n",step);
+
+      if (use_PARTICLES) {
+         if (step < 4000) {
+            float thiscol[3];
+            for (i=0; i<175; ++i) {
+               (void) get_color (cmi, cnx, cny, rand()/(float)RAND_MAX, rand()/(float)RAND_MAX, thiscol);
+               const float brite = 0.3*thiscol[0]+0.6*thiscol[1]+0.1*thiscol[2];
+               (void) add_one_particle (&pts, rand()/(float)RAND_MAX,
+                                              yf*rand()/(float)RAND_MAX,
+                                              0.0, 0.0,
+                                              thiscol[0], thiscol[1], thiscol[2],
+                                              exp(1.5*brite)-0.8, 0.0);
+               // 04b used 0.1+brite and 100 new ones per frame
+               // 04c used exp(2.0*brite)-1.0 and 200 new ones thru step 6000
+               // 04d used exp(brite)-1.0 and 200 new ones thru step 4000
+               // 04e used exp(brite)-0.8 and 150 new ones thru step 5000
+               // 04e used exp(brite)-0.8 and 150 new ones thru step 5000
+            }
+         } else {
+           // start removing them
+           pts.n -= 600;
+           if (pts.n < 0) pts.n = 0;
+         }
+      }
 
       // ----------------------------
       // write output
@@ -1090,7 +1131,7 @@ int main(int argc,char **argv) {
          //#pragma omp section
          if (print_temp) {
             sprintf(outfileroot,"temp_%06d",step);
-            if (use_color_map) {
+            if (use_color_linear) {
                float tempramp = 60.0;
                float mult = 1.0;
                // map temp to colors
@@ -1103,9 +1144,9 @@ int main(int argc,char **argv) {
                      int ival = floor(fval);
                      float frem = fval - (float)ival;
                      //mult = 1.0 - (1.0-abs(a[SF][ix][iy])) * (1.0-MIN(1.0, simtime/60.0));
-                     c[0][ix][iy] = mult * ((1.0-frem)*cm[0][ival] + frem*cm[0][ival+1]);
-                     c[1][ix][iy] = mult * ((1.0-frem)*cm[1][ival] + frem*cm[1][ival+1]);
-                     c[2][ix][iy] = mult * ((1.0-frem)*cm[2][ival] + frem*cm[2][ival+1]);
+                     c[0][ix][iy] = mult * ((1.0-frem)*cml[0][ival] + frem*cml[0][ival+1]);
+                     c[1][ix][iy] = mult * ((1.0-frem)*cml[1][ival] + frem*cml[1][ival+1]);
+                     c[2][ix][iy] = mult * ((1.0-frem)*cml[2][ival] + frem*cml[2][ival+1]);
                   }
                }
                // and write the image
@@ -1124,7 +1165,7 @@ int main(int argc,char **argv) {
          if (use_COLOR) {
             if (use_PARTICLES) {
                // merge color field and particle splats
-               draw_particles(&pts, yf, nx, ny, a[RR], a[GG], a[BB], pc[0], pc[1], pc[2]);
+               draw_particles(&pts, yf, nx, ny, 0.0, a[RR], a[GG], a[BB], 0.997, pc[0], pc[1], pc[2]);
                sprintf(outfileroot,"out_%06d",step);
                write_png (outfileroot,nx,ny,TRUE,use_16bpp,
                           pc[0],0.0,1.0,
@@ -1221,7 +1262,10 @@ int main(int argc,char **argv) {
 
       // take one computational step forward in time
       int numsubsteps = 1;
-      if (use_MASK) numsubsteps = 1 + (int)(vmax*(nx+1)*dt/10.);
+      if (use_MASK) {
+         numsubsteps = 1 + (int)(vmax*(nx+1)*dt/10.);
+         fprintf(stderr,"need %d substeps\n", numsubsteps); fflush(stderr);
+      }
       for (int istep=0; istep<numsubsteps; istep++) {
          effective_re = step_forward_2d (silent,step,isStam,4,
                            nx,ny,xbdry,ybdry,freestream,wallvel,
@@ -1233,7 +1277,10 @@ int main(int argc,char **argv) {
 
       // move particles
       if (use_PARTICLES) {
-         (void) move_particles (&pts, nx,ny,xbdry,ybdry,yf, mask,u[XV],u[YV],a[SF],gravity,dt);
+         const float particle_speed = 1.0;
+         (void) move_particles (&pts, nx,ny,xbdry,ybdry,yf, mask,u[XV],u[YV],a[SF],gravity,particle_speed*dt);
+         // move them half as fast (04ef uses 0.5)
+         // a little slower (04g used 0.3333)
       }
 
       // read in the image again and overlay it!
@@ -1450,6 +1497,26 @@ int main(int argc,char **argv) {
          }
       }
 
+      // overlay more random vorticity
+      if (randvortscale > 0.0 && FALSE) {
+         // add a random field of vorticity over the existing vorticity
+         for (ix=0; ix<nx; ix++) {
+            for (iy=0; iy<ny; iy++) {
+               a[W2][ix][iy] += 0.01*2.0*randvortscale*(rand()/(float)RAND_MAX - 0.5);
+            }
+         }
+      }
+
+      // clamp the temperature field
+      if (use_TEMP && TRUE) {
+         for (ix=0; ix<nx; ix++) {
+            for (iy=0; iy<ny; iy++) {
+               if (a[SF][ix][iy] > 1.0) a[SF][ix][iy] = 1.0;
+               if (a[SF][ix][iy] < -1.0) a[SF][ix][iy] = -1.0;
+            }
+         }
+      }
+
       // overlay the heat map
       if (use_heat_img) {
          for (ix=0; ix<nx; ix++) {
@@ -1487,6 +1554,22 @@ int main(int argc,char **argv) {
                a[RR][nx-1-ix][iy] = tfac*color_right[0][iy] + (1.0-tfac)*a[RR][nx-1-ix][iy];
                a[GG][nx-1-ix][iy] = tfac*color_right[1][iy] + (1.0-tfac)*a[GG][nx-1-ix][iy];
                a[BB][nx-1-ix][iy] = tfac*color_right[2][iy] + (1.0-tfac)*a[BB][nx-1-ix][iy];
+            }
+         }
+      }
+
+      // nudge colors toward a given color
+      if (use_COLOR && use_color_area && FALSE) {
+         const float tfac = 0.1;
+         float thiscol[3];
+         for (ix=0; ix<nx; ix++) {
+            for (iy=0; iy<ny; iy++) {
+               // use current vel to select color
+               const float thisvel = sqrt(pow(u[XV][ix][iy],2) + pow(u[YV][ix][iy],2));
+               (void) get_color (cmi, cnx, cny, 0.02*simtime, MIN(1.0,5.0*thisvel), thiscol);
+               a[RR][ix][iy] += tfac * (thiscol[0] - a[RR][ix][iy]);
+               a[GG][ix][iy] += tfac * (thiscol[1] - a[GG][ix][iy]);
+               a[BB][ix][iy] += tfac * (thiscol[2] - a[BB][ix][iy]);
             }
          }
       }
@@ -1650,7 +1733,7 @@ void paint_splat (float sx,float sy, float ex,float ey, float rad,float thresh,
 /*
  * grab a color from the color image
  */
-int get_random_color (float ***c, int nx, int ny, float *thisc) {
+void get_random_color (float ***cmi, int nx, int ny, float *thisc) {
 
    int ix,iy;
 
@@ -1658,9 +1741,30 @@ int get_random_color (float ***c, int nx, int ny, float *thisc) {
    ix = nx*(float)rand()/(float)RAND_MAX;
    iy = ny*(float)rand()/(float)RAND_MAX;
 
-   thisc[0] = c[0][ix][iy];
-   thisc[1] = c[1][ix][iy];
-   thisc[2] = c[2][ix][iy];
+   thisc[0] = cmi[0][ix][iy];
+   thisc[1] = cmi[1][ix][iy];
+   thisc[2] = cmi[2][ix][iy];
+}
+
+/*
+ * grab a color from the color image
+ */
+void get_color (float ***cmi, int imx, int imy, float x, float y, float *thisc) {
+
+   int ix,iy;
+
+   ix = x * imx;
+   iy = y * imy;
+
+   if (ix>-1 && iy>-1 && ix<imx && iy<imy) {
+     thisc[0] = cmi[0][ix][iy];
+     thisc[1] = cmi[1][ix][iy];
+     thisc[2] = cmi[2][ix][iy];
+   } else {
+     thisc[0] = cmi[0][0][0];
+     thisc[1] = cmi[1][0][0];
+     thisc[2] = cmi[2][0][0];
+   }
 }
 
 
@@ -1684,7 +1788,7 @@ int Usage(char progname[80],int status) {
    "   -bcb [float] set wall-tangent bondary vel on bottom side                ",
    "   -bct [float] set wall-tangent bondary vel on top side                   ",
    "                                                                           ",
-   "   -fs [float] [float] set freestream in x and y directions, sets open bc  ",
+   "   -fs [float] [float] set freestream in x and y directions                ",
    "                                                                           ",
    "   -uprint     write velocity field (vel_00000.png RGB )                   ",
    "   -uscale [float] scale factor for velocity output; default is 1.0        ",
