@@ -2178,10 +2178,14 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
          }
 
          // if this cell is on an inflow boundary, do not try to interpolate
-         if (i==0 && fs[0] > 0.0) do_this_pixel = FALSE;
-         if (i==nx-1 && fs[0] < 0.0) do_this_pixel = FALSE;
-         if (j==0 && fs[1] > 0.0) do_this_pixel = FALSE;
-         if (j==ny-1 && fs[1] < 0.0) do_this_pixel = FALSE;
+         if (xbdry == OPEN) {
+            if (i==0 && fs[0] > 0.0) do_this_pixel = FALSE;
+            if (i==nx-1 && fs[0] < 0.0) do_this_pixel = FALSE;
+         }
+         if (ybdry == OPEN) {
+            if (j==0 && fs[1] > 0.0) do_this_pixel = FALSE;
+            if (j==ny-1 && fs[1] < 0.0) do_this_pixel = FALSE;
+         }
 
          if (do_this_pixel) {
             // change interpolation order or advection order?
@@ -2460,8 +2464,8 @@ float interpolate_array_using_CIC_2d(int nx,int ny,int xbdry,int ybdry,
 
    /* compute the lowest corner index of the cells that the scheme needs */
    // these may be negative
-   si[0] = (int)(10+(nx-1)*(px)) - 10;
-   si[1] = (int)(10+(nx-1)*(py)) - 10;
+   si[0] = lrintf((nx-1)*px-0.5);
+   si[1] = lrintf((nx-1)*py-0.5);
    // fprintf(stdout,"location is %g %g, start index is %d %d\n",px,py,si[0],si[1]);
 
    // make the list of CIC weights
@@ -2492,7 +2496,8 @@ float interpolate_array_using_CIC_2d(int nx,int ny,int xbdry,int ybdry,
 
       /* near the min or max x bounds */
       if (xbdry == PERIODIC) {
-         ir = (i+(nx-1))%(nx-1);
+         ir = i%(nx-1);
+         if (ir<0) ir += nx-1;
       } else {
          ir = i;
          if (i<0) {
@@ -2506,7 +2511,8 @@ float interpolate_array_using_CIC_2d(int nx,int ny,int xbdry,int ybdry,
 
       /* near the min or max y bounds */
       if (ybdry == PERIODIC) {
-         jr = (j+(ny-1))%(ny-1);
+         jr = j%(ny-1);
+         if (jr<0) jr += ny-1;
       } else {
          jr = j;
          if (j<0) {
@@ -2553,9 +2559,8 @@ float interpolate_array_using_TSC_2d(int nx,int ny,int xbdry,int ybdry,
 
    /* compute the lowest corner index of the cells that the scheme needs */
    // these may be negative
-   si[0] = (int)(30.5+(nx-1)*(px)) - 31;
-   // si[1] = (int)(30+(ny-1)*(py)) - 31;
-   si[1] = (int)(30.5+(nx-1)*(py)) - 31;
+   si[0] = lrintf((nx-1)*px-1.0);
+   si[1] = lrintf((nx-1)*py-1.0);
    //fprintf(stdout,"location is %g %g, start index is %d %d\n",px,py,si[0],si[1]);
 
    // make the list of M3 weights
@@ -2594,7 +2599,8 @@ float interpolate_array_using_TSC_2d(int nx,int ny,int xbdry,int ybdry,
 
       /* near the min or max x bounds */
       if (xbdry == PERIODIC) {
-         ir = (i+(nx-1))%(nx-1);
+         ir = i%(nx-1);
+         if (ir<0) ir += nx-1;
       } else {
          ir = i;
          if (i<0) {
@@ -2608,7 +2614,8 @@ float interpolate_array_using_TSC_2d(int nx,int ny,int xbdry,int ybdry,
 
       /* near the min or max y bounds */
       if (ybdry == PERIODIC) {
-         jr = (j+(ny-1))%(ny-1);
+         jr = j%(ny-1);
+         if (jr<0) jr += ny-1;
       } else {
          jr = j;
          if (j<0) {
@@ -2667,8 +2674,8 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       nm1 = ny-1;
    }
    // 4 flops here
-   si[0] = (int)(20+(nm1)*(px)) - 21;
-   si[1] = (int)(20+(nm1)*(py)) - 21;
+   si[0] = lrintf(nm1*px-1.5);
+   si[1] = lrintf(nm1*py-1.5);
    if (debug) fprintf(stdout,"location is %g %g, start index is %d %d\n",px,py,si[0],si[1]);
 
    // make the list of M4 weights (28 flops *2)
@@ -2715,7 +2722,8 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       /* near the min or max x bounds */
       ir = i;
       if (xbdry == PERIODIC) {
-         ir = (i+(nx-1))%(nx-1);
+         ir = i%(nx-1);
+         if (ir<0) ir += nx-1;
       } else if (xbdry == OPEN) {
          if (i<0) {
             ir = 0;
@@ -2735,7 +2743,8 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       /* near the min or max y bounds */
       jr = j;
       if (ybdry == PERIODIC) {
-         jr = (j+(ny-1))%(ny-1);
+         jr = j%(ny-1);
+         if (jr<0) jr += ny-1;
       } else if (ybdry == OPEN) {
          if (j<0) {
             jr = 0;
@@ -2754,8 +2763,8 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
 
       /* find the m4-factor for this cell's contribution */
       mf = m4[0][ii] * m4[1][ji];
-      if (mask != NULL) mf *= mask[ir][jr];
       mfsum += mf;
+      if (mask != NULL) mf *= mask[ir][jr];
 
       if (debug) fprintf(stdout,"    ii,ji %d %d   ir,jr %d %d   weight %g\n",ii,ji,ir,jr,mf);
 
@@ -2769,7 +2778,7 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
 
    // numout+1 flops
    // correct by the actual sum of the weights
-   if (fabs(mfsum) > 0.) {
+   if (fabs(mfsum) > 1.e-5) {
       for (k=0; k<numout; k++) out[k] /= mfsum;
    }
    if (debug) for (k=0; k<numout; k++) fprintf(stdout,"    k %d   val %g\n",k,out[k]);
@@ -2799,8 +2808,8 @@ int interpolate_vel_using_CIC_2d(int nx,int ny,int xbdry,int ybdry,float **ua,fl
 
    /* compute the lowest corner index of the cells that the scheme needs */
    // these may be negative
-   si[0] = (int)(10+(nx-1)*(px)) - 10;
-   si[1] = (int)(10+(nx-1)*(py)) - 10;
+   si[0] = lrintf((nx-1)*px-0.5);
+   si[1] = lrintf((nx-1)*py-0.5);
    // fprintf(stdout,"location is %g %g, start index is %d %d\n",px,py,si[0],si[1]);
 
    // make the list of CIC weights
@@ -2834,7 +2843,8 @@ int interpolate_vel_using_CIC_2d(int nx,int ny,int xbdry,int ybdry,float **ua,fl
 
       /* near the min or max x bounds */
       if (xbdry == PERIODIC) {
-         ir = (i+(nx-1))%(nx-1);
+         ir = i%(nx-1);
+         if (ir<0) ir += nx-1;
       } else {
          ir = i;
          if (i==0) {
@@ -2852,7 +2862,8 @@ int interpolate_vel_using_CIC_2d(int nx,int ny,int xbdry,int ybdry,float **ua,fl
 
       /* near the min or max y bounds */
       if (ybdry == PERIODIC) {
-         jr = (j+(ny-1))%(ny-1);
+         jr = j%(ny-1);
+         if (jr<0) jr += ny-1;
       } else {
          jr = j;
          if (j==0) {
@@ -2904,9 +2915,8 @@ int interpolate_vel_using_TSC_2d(int nx,int ny,int xbdry,int ybdry,float **ua,fl
 
    /* compute the lowest corner index of the cells that the scheme needs */
    // these may be negative
-   si[0] = (int)(30.5+(nx-1)*(px)) - 31;
-   // si[1] = (int)(30+(ny-1)*(py)) - 31;
-   si[1] = (int)(30.5+(nx-1)*(py)) - 31;
+   si[0] = lrintf((nx-1)*px-1.0);
+   si[1] = lrintf((nx-1)*py-1.0);
    // fprintf(stdout,"location is %g %g, start index is %d %d\n",px,py,si[0],si[1]);
 
    // make the list of M4 weights
@@ -2944,7 +2954,8 @@ int interpolate_vel_using_TSC_2d(int nx,int ny,int xbdry,int ybdry,float **ua,fl
 
       /* near the min or max x bounds */
       if (xbdry == PERIODIC) {
-         ir = (i+(nx-1))%(nx-1);
+         ir = i%(nx-1);
+         if (ir<0) ir += nx-1;
       } else {
          ir = i;
          if (i==0) {
@@ -2962,7 +2973,8 @@ int interpolate_vel_using_TSC_2d(int nx,int ny,int xbdry,int ybdry,float **ua,fl
 
       /* near the min or max y bounds */
       if (ybdry == PERIODIC) {
-         jr = (j+(ny-1))%(ny-1);
+         jr = j%(ny-1);
+         if (jr<0) jr += ny-1;
       } else {
          jr = j;
          if (j==0) {
@@ -3025,8 +3037,8 @@ int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       nm1 = ny-1;
    }
    // 4 flops here
-   si[0] = (int)(20+(nm1)*(px)) - 21;
-   si[1] = (int)(20+(nm1)*(py)) - 21;
+   si[0] = lrintf(nm1*px-1.5);
+   si[1] = lrintf(nm1*py-1.5);
    // fprintf(stdout,"location is %g %g, start index is %d %d\n",px,py,si[0],si[1]);
 
    // make the list of M4 weights
@@ -3076,7 +3088,8 @@ int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       /* near the min or max x bounds */
       ir = i;
       if (xbdry == PERIODIC) {
-         ir = (i+(nx-1))%(nx-1);
+         ir = i%(nx-1);
+         if (ir<0) ir += nx-1;
       } else if (xbdry == OPEN) {
          if (i<0) {
             ir = 0;
@@ -3100,7 +3113,8 @@ int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       /* near the min or max y bounds */
       jr = j;
       if (ybdry == PERIODIC) {
-         jr = (j+(ny-1))%(ny-1);
+         jr = j%(ny-1);
+         if (jr<0) jr += ny-1;
       } else if (ybdry == OPEN) {
          if (j<0) {
             jr = 0;
@@ -3123,8 +3137,8 @@ int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
 
       /* find the m4-factor for this cell's contribution */
       mf = m4[0][ii] * m4[1][ji];
-      if (mask != NULL) mf *= mask[ir][jr];
       mfsum += mf;
+      if (mask != NULL) mf *= mask[ir][jr];
 
       /* apply them to the grid node in question */
       *(u) += ua[ir][jr]*mf;
@@ -3134,7 +3148,7 @@ int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
 
    // 4 flops
    // correct by the actual sum of the weights
-   if (fabs(mfsum) > 0.) {
+   if (fabs(mfsum) > 1.e-5) {
       *(u) /= mfsum;
       *(v) /= mfsum;
    }
