@@ -1041,7 +1041,7 @@ int main(int argc,char **argv) {
 
    // Set particles -------------------------------------------
 
-   if (use_PARTICLES) {
+   if (use_PARTICLES && (use_color_linear || use_color_area)) {
       float thiscol[3];
       // 04b started with 5000
       // 04c started with 0
@@ -1083,7 +1083,7 @@ int main(int argc,char **argv) {
 
       // fprintf(stdout,"\nBegin step %d\n",step);
 
-      if (use_PARTICLES) {
+      if (use_PARTICLES && (use_color_linear || use_color_area)) {
          if (step < 4000) {
             float thiscol[3];
             for (i=0; i<175; ++i) {
@@ -1166,6 +1166,17 @@ int main(int argc,char **argv) {
             if (use_PARTICLES) {
                // merge color field and particle splats
                draw_particles(&pts, yf, nx, ny, 0.0, a[RR], a[GG], a[BB], 0.997, pc[0], pc[1], pc[2]);
+               // draw over it with the mask
+               if (use_MASK) {
+                  for (ix=0; ix<nx; ix++) {
+                     for (iy=0; iy<ny; iy++) {
+                        pc[0][ix][iy] *= mask[ix][iy];
+                        pc[1][ix][iy] *= mask[ix][iy];
+                        pc[2][ix][iy] *= mask[ix][iy];
+                     }
+                  }
+               }
+               // and write the png
                sprintf(outfileroot,"out_%06d",step);
                write_png (outfileroot,nx,ny,TRUE,use_16bpp,
                           pc[0],0.0,1.0,
@@ -1503,6 +1514,17 @@ int main(int argc,char **argv) {
          for (ix=0; ix<nx; ix++) {
             for (iy=0; iy<ny; iy++) {
                a[W2][ix][iy] += 0.01*2.0*randvortscale*(rand()/(float)RAND_MAX - 0.5);
+            }
+         }
+      }
+
+      // supppress vorticity according to the square
+      if (TRUE) {
+         // multiply entire field by a decay factor
+         const float factor = 1.e-4 * dt;
+         for (ix=0; ix<nx; ix++) {
+            for (iy=0; iy<ny; iy++) {
+               a[W2][ix][iy] *= exp(-factor*a[W2][ix][iy]*a[W2][ix][iy]);
             }
          }
       }
