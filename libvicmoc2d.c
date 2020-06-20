@@ -1,7 +1,7 @@
 /*
  * VIC-MOC - libvicmoc.c - the library for the 2D routines
  *
- * Copyright 2004-10 Mark J. Stock mstock@umich.edu
+ * Copyright 2004-20 Mark J. Stock mstock@umich.edu
  */
 
 #include <stdlib.h>
@@ -11,7 +11,7 @@
 #include <omp.h>
 #endif
 #include "utility.h"
-//#include "inout.h"
+#include "inout.h"
 #include "vicmoc.h"
 
 // setup routines
@@ -484,7 +484,7 @@ float diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,
    for (istep=0; istep<numsteps; istep++) {
 
    // do the middle part of the field, regardless of the BCs
-   if (use_MASK) {
+   if (FALSE && use_MASK) {
      if (vartype == W2) {
        // this is vorticity, allow it to diffuse from masks
        #pragma omp parallel for private(i,j)
@@ -637,7 +637,7 @@ float diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,
  * diffuse scalar field according to laplacian of vorticity, return
  * to a different scalar field
  *
- * where mask is 1.0, do not diffuse, where mask is 0.0, fully diffuse
+ * where mask is 1.0, do not diffuse, where mask is 0.0, fully diffuse - no, ignore mask
  *
  * diffus is the scalar diffusivity, like nu for vorticity: 1/Re
  */
@@ -680,8 +680,7 @@ float variable_diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,
    for (istep=0; istep<numsteps; istep++) {
 
    // do the middle part of the field, regardless of the BCs
-   //if (use_MASK) {
-   if (FALSE) {
+   if (FALSE && use_MASK) {
      #pragma omp parallel for private(i,j)
      for (i=1;i<nxm1;i++) {
        for (j=1;j<nym1;j++) {
@@ -805,7 +804,7 @@ float variable_diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,
 /*
  * find_vels_2d takes a vorticity field, and solves for the velocity field
  *
- * mask is a flow mask, where 1.0 means solid and 0.0 means open
+ * mask is a flow mask, where 0.0 means solid and 1.0 means open
  *
  * if driven cavity problem, force the lid to vel=1
  */
@@ -848,6 +847,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    static float **cu;
    static float **cv;
    static float **cw;
+   static float **cw_sum;
    static float **cw_old;
    char outfileroot[150];
    static int mask_grad_not_set = TRUE;
@@ -871,6 +871,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
          cu = allocate_2d_array_f(nx,ny);
          cv = allocate_2d_array_f(nx,ny);
          cw = allocate_2d_array_f(nx,ny);
+         cw_sum = allocate_2d_array_f(nx,ny);
          cw_old = allocate_2d_array_f(nx,ny);
       }
 
@@ -888,6 +889,21 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
      yf = 1.0;
    }
 
+   if (use_MASK) {
+      // enforce no vorticity in the mask before the calculation starts
+      for (i=0;i<nx;i++) {
+         for (j=0;j<ny;j++) {
+            vort[i][j] *= mask[i][j];
+         }
+      }
+      // zero cw_sum for this iteration
+      for (i=0;i<nx;i++) {
+         for (j=0;j<ny;j++) {
+            cw_sum[i][j] = 0.0;
+         }
+      }
+   }
+
    // set maximum number of iterations
    if (use_MASK) {
       maxstep = 100;
@@ -895,7 +911,9 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
       maxstep = 1;
    }
 
+   //
    // begin iterative solution
+   //
    for (istep=0; istep<maxstep; istep++) {
 
 
@@ -1244,7 +1262,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    if (use_MASK) {
 
       // allocate space for the mask gradient magnitude
-      if (mask_grad_not_set) {
+      if (FALSE && mask_grad_not_set) {
          maskgrad = allocate_2d_array_f(nx,ny);
          mg = allocate_2d_array_f(nx,ny);
          find_gradient_of_scalar_2nd_2d (nx,ny,xbdry,ybdry,mask,NULL,maskgrad,1.0,mg,1.0);
@@ -1272,25 +1290,17 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
       // first, find counter-velocity
       for (i=0;i<nx;i++) {
          for (j=0;j<ny;j++) {
-            //cu[i][j] = -1.0*u[i][j]*mask[i][j];
-            //cv[i][j] = -1.0*v[i][j]*mask[i][j];
-            //cu[i][j] = -1.0*u[i][j]*(1.-mask[i][j]);
-            //cv[i][j] = -1.0*v[i][j]*(1.-mask[i][j]);
-            // this is nice, but needs a soft mask edge to work!
-            //cu[i][j] = -4.0*u[i][j]*(1.-mask[i][j])*mask[i][j];
-            //cv[i][j] = -4.0*v[i][j]*(1.-mask[i][j])*mask[i][j];
-            // use the maskgrad now
-            cu[i][j] = -1.0*u[i][j]*maskgrad[i][j];
-            cv[i][j] = -1.0*v[i][j]*maskgrad[i][j];
+            cu[i][j] = -1.0*u[i][j]*(1.-mask[i][j]);
+            cv[i][j] = -1.0*v[i][j]*(1.-mask[i][j]);
          }
       }
 
       // test-print counter-velocity
       //sprintf(outfileroot,"cu_%05d",istep);
-      //write_png (outfileroot,nx,ny,FALSE,FALSE,cu,-1.0,2.0,
+      //write_png (outfileroot,nx,ny,FALSE,FALSE,cu,-0.1,0.2,
       //           NULL,0.0,1.0,NULL,0.0,1.0);
       //sprintf(outfileroot,"cv_%05d",istep);
-      //write_png (outfileroot,nx,ny,FALSE,FALSE,cv,-1.0,2.0,
+      //write_png (outfileroot,nx,ny,FALSE,FALSE,cv,-0.1,0.2,
       //           NULL,0.0,1.0,NULL,0.0,1.0);
 
       // compute counter-vorticity
@@ -1305,28 +1315,23 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
       for (i=0;i<nx;i++) {
          for (j=0;j<ny;j++) {
             // no good: sharp points get too strong
-            //vort[i][j] = vort[i][j] + cw[i][j]*(1.-mask[i][j]);
+            //vort[i][j] += cw[i][j]*(1.-mask[i][j]);
             // also no good: flat walls grow stuff...
-            //vort[i][j] = vort[i][j] + cw[i][j]*mask[i][j];
+            //vort[i][j] += cw[i][j]*mask[i][j];
             // works well, if all vort with mask>.999 are set to zero
-            //vort[i][j] = vort[i][j] + cw[i][j];
-            // this should be the bomb.
-            //vort[i][j] = (1.-mask[i][j]) * (vort[i][j] + cw[i][j]);
-            vort[i][j] = mask[i][j] * (vort[i][j] + cw[i][j]);	// this one worked
-            //vort[i][j] += 4.0*(1.-mask[i][j])*mask[i][j] * cw[i][j];
-            //vort[i][j] = mask[i][j]*vort[i][j] + (1.-mask[i][j])*cw[i][j];
             //vort[i][j] += cw[i][j];
-            //vort[i][j] = mask[i][j]*vort[i][j] + cw[i][j];
-            //vort[i][j] = mask[i][j]*vort[i][j] + maskgrad[i][j]*cw[i][j];
+            // this should be the bomb.
+            //vort[i][j] = mask[i][j] * (vort[i][j] + cw[i][j]);	// this one worked
+            // DO NOT suppress mask edge vorticity every step!
+            //vort[i][j] += cw[i][j];
+            // run10,11 - this works ok
+            //vort[i][j] += mask[i][j]*cw[i][j];
+            // run12 - keep track of effective cw
+            cw[i][j] *= mask[i][j];
+            cw_sum[i][j] += cw[i][j];
+            vort[i][j] += cw[i][j];
          }
       }
-
-      // finally, zero out vorticity fully inside of mask
-      //for (i=0;i<nx;i++) {
-      //   for (j=0;j<ny;j++) {
-      //      if (mask[i][j] > 0.999) vort[i][j] = 0.;
-      //   }
-      //}
 
       // check difference between this and last iterations - completion check
 
@@ -1412,6 +1417,49 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
 
    }  // end iterative solution
    //exit(0);
+
+   // if we had to generate wall vorticity to satisfy internal BCs,
+   //   diffuse and replace that counter vorticity here. this ensures
+   //   that even high-Re simulations shed enough from those walls
+   const int ncnt = 1;
+   if (use_MASK && ncnt>0) {
+
+      // first, subtract off the stuff we added
+      for (i=0;i<nx;i++) {
+         for (j=0;j<ny;j++) {
+            vort[i][j] -= cw_sum[i][j];
+         }
+      }
+
+      // what diffusivity to use?
+      float diffus = 1.0;
+      if (nx > ny) {
+         diffus = 0.124 / pow(nxm1,2);
+      } else {
+         diffus = 0.124 / pow(nym1,2);
+      }
+
+      // diffuse possibly multiple times
+      for (int icnt=0; icnt<ncnt; ++icnt) {
+         // diffuse cw_sum into cw
+         (void) diffuse_scalar_2d (nx,ny,xbdry,ybdry,W2,cw_sum,cw,
+                                   diffus,FALSE,NULL,1.0);
+
+         // copy cw back into cw_sum
+         for (i=0;i<nx;i++) {
+            for (j=0;j<ny;j++) {
+               cw_sum[i][j] = cw[i][j];
+            }
+         }
+      }
+
+      // add the diffused amount back on to true vort
+      for (i=0;i<nx;i++) {
+         for (j=0;j<ny;j++) {
+            vort[i][j] += cw_sum[i][j];
+         }
+      }
+   }
 
    return(0);
 }
@@ -2821,7 +2869,7 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       /* find the m4-factor for this cell's contribution */
       mf = m4[0][ii] * m4[1][ji];
       mfsum += mf;
-      if (mask != NULL) mf *= mask[ir][jr];
+      //if (mask != NULL) mf *= mask[ir][jr];
 
       if (debug) fprintf(stdout,"    ii,ji %d %d   ir,jr %d %d   weight %g\n",ii,ji,ir,jr,mf);
 
@@ -3195,7 +3243,7 @@ int interpolate_vel_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       /* find the m4-factor for this cell's contribution */
       mf = m4[0][ii] * m4[1][ji];
       mfsum += mf;
-      if (mask != NULL) mf *= mask[ir][jr];
+      //if (mask != NULL) mf *= mask[ir][jr];
 
       /* apply them to the grid node in question */
       *(u) += ua[ir][jr]*mf;
