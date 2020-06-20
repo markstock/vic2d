@@ -106,6 +106,7 @@ int main(int argc,char **argv) {
    float **color_left, **color_right, **color_top, **color_bottom;
 
    int use_PARTICLES = FALSE;
+   int part_draw_fade_frames = 100;
    int part_add_step_start = 0;
    int part_add_step_end = 0;
    int part_add_count_end = 10000;
@@ -365,6 +366,8 @@ int main(int argc,char **argv) {
          part_rem_count_end = atoi(argv[++i]);
       } else if (strncmp(argv[i], "-ps", 3) == 0) {
          particle_speed = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-pf", 3) == 0) {
+         part_draw_fade_frames = atof(argv[++i]);
 
       } else if (strncmp(argv[i], "-ores", 3) == 0) {
          // NOT IMPLEMENTED
@@ -1202,8 +1205,10 @@ int main(int argc,char **argv) {
          //#pragma omp section
          if (use_COLOR) {
             if (use_PARTICLES) {
+               // convert particle fade frames to a factor here
+               const float factor = expf(-1.0/(float)part_draw_fade_frames);
                // merge color field and particle splats
-               draw_particles(&pts, yf, nx, ny, 0.0, a[RR], a[GG], a[BB], 0.997, pc[0], pc[1], pc[2]);
+               draw_particles(&pts, yf, nx, ny, 0.0, a[RR], a[GG], a[BB], factor, pc[0], pc[1], pc[2]);
                // draw over it with the mask
                if (use_MASK) {
                   for (ix=0; ix<nx; ix++) {
@@ -1892,6 +1897,7 @@ int Usage(char progname[MAXCHARS],int status) {
    "               remove particles starting at step stepstart, at step        ",
    "               stepend there should be endcount                            ",
    "   -ps [float] multiplier on particle speed                                ",
+   "   -pf [float] number of frames to fade particles by 1/e                   ",
    "                                                                           ",
    "   -va [float] add random vorticity every time step, value is magnitude    ",
    "   -vr [float] suppress vorticity according to its square, val is coeff    ",
