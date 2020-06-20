@@ -1,7 +1,7 @@
 /*
  * VIC-MOC - advection and interpolation routine for vic2d/vic3d
  *
- * Copyright 2011 Mark J. Stock mstock@umich.edu
+ * Copyright 2011 Mark J. Stock <mstock@umich.edu>
  */
 
 #include "vicmoc.h"

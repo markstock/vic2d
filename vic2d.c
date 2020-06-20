@@ -1,7 +1,7 @@
 /*
- * vic2d
+ * vic2d.c - driver file for two-dimensional vortex-in-cell method-of-characteristics
  *
- * Copyright 2004-20 Mark J. Stock mstock@umich.edu
+ * Copyright 2004-20 Mark J. Stock <mstock@umich.edu>
  *
  * a 2D vortex method which uses the method of characteristics for the
  * convection step, and a single explicit step for diffusion and vorticity
@@ -28,7 +28,7 @@ float compute_and_write_stats(int, int, float, float, float, int, int, int, int,
 void paint_splat (float,float,float,float,float,float,float,float,float,int,int,int,float**,float**,float**);
 void get_random_color (float***,int,int,float*);
 void get_color (float***,int,int,float,float,float*);
-int Usage(char[80],int);
+int Usage(char[MAXCHARS],int);
 
 int main(int argc,char **argv) {
 
@@ -118,26 +118,26 @@ int main(int argc,char **argv) {
 
    // bookkeeping
    unsigned long int tics,last_tics;
-   char progname[160];
-   char outfileroot[150];
+   char progname[MAXCHARS];
+   char outfileroot[MAXCHARS];
    int use_vort_img = FALSE;
-   char vortfilename[160];
+   char vortfilename[MAXCHARS];
    int use_temp_img = FALSE;
-   char tempfilename[160];
+   char tempfilename[MAXCHARS];
    int use_heat_img = FALSE;
-   char heatfilename[160];
+   char heatfilename[MAXCHARS];
    int use_color_img = FALSE;
-   char colorfilename[160];
+   char colorfilename[MAXCHARS];
    int use_div_img = FALSE;
-   char divfilename[160];
+   char divfilename[MAXCHARS];
    int use_mask_img = FALSE;
-   char maskfilename[160];
+   char maskfilename[MAXCHARS];
    int use_color_linear = FALSE;
    int use_color_area = FALSE;
-   char colorsrcfilename[160];
-   char mdfilename[160];
-   char tdfilename[160];
-   char cdfilename[160];
+   char colorsrcfilename[MAXCHARS];
+   char mdfilename[MAXCHARS];
+   char tdfilename[MAXCHARS];
+   char cdfilename[MAXCHARS];
 
 
    // set default simulation properties
@@ -1637,7 +1637,7 @@ float compute_and_write_stats(int silent, int step, float dt, float simtime, flo
 
    int i,j;
    float ke,base_mult,multx,multy,velsq,vmax,cn;
-   static char outfile[80];
+   static char outfile[MAXCHARS];
    static int initialized = FALSE;
    static FILE *outp;
 
@@ -1794,7 +1794,7 @@ void get_color (float ***cmi, int imx, int imy, float x, float y, float *thisc) 
  * This function writes basic usage information to stderr,
  * and then quits. Too bad.
  */
-int Usage(char progname[80],int status) {
+int Usage(char progname[MAXCHARS],int status) {
 
    static char **cpp, *help_message[] = {
    "where [-options] are one or more of the following:                         ",
@@ -1848,6 +1848,17 @@ int Usage(char progname[80],int status) {
    "   -mf [name]  read PNG file and use as flow mask, black areas are solid,  ",
    "               white areas are completely open                             ",
    "   -me [float] set residual error in iterations; default is 1.e-3          ",
+   "                                                                           ",
+   "   -pa [stepstart] [stepend] [endcount]                                    ",
+   "               add particles, at stepstart there should be no particles,   ",
+   "               and at stepend there should be endcount                     ",
+   "   -pr [stepstart] [stepend] [endcount]                                    ",
+   "               remove particles, at stepstart there should be no parts,    ",
+   "               and at stepend there should be endcount                     ",
+   "   -ps [float] multiplier on particle speed                                ",
+   "                                                                           ",
+   "   -va [float] add random vorticity every time step, value is magnitude    ",
+   "   -vr [float] suppress vorticity according to its square, val is coeff    ",
    "                                                                           ",
    "   -dt [float] set the time step increment, if unused, Courant number will ",
    "               determine the time step; no default                         ",

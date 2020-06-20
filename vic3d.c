@@ -1,7 +1,7 @@
 /*
- * vic3d
+ * vic3d.c - driver program for three-dimensional vortex-in-cell method of characteristics
  *
- * Copyright 2004,2005 Mark J. Stock mstock@umich.edu
+ * Copyright 2004,2005,20 Mark J. Stock <mstock@umich.edu>
  *
  * a 3D vortex method which uses the method of characteristics for the
  * convection step, and a single explicit step for diffusion and vorticity
@@ -74,8 +74,8 @@ int main(int argc,char **argv) {
    // lastly, the bookkeeping
    unsigned long int tics,last_tics;	// timers
    float **tempArry;
-   char outfileroot[70];
-   char progname[80];
+   char outfileroot[MAXCHARS];
+   char progname[MAXCHARS];
 
 
    // set default simulation properties
@@ -601,7 +601,7 @@ int main(int argc,char **argv) {
  * This function writes basic usage information to stderr,
  * and then quits. Too bad.
  */
-int Usage(char progname[80],int status) {
+int Usage(char progname[MAXCHARS],int status) {
 
    static char **cpp, *help_message[] = {
    "where [-options] are one or more of the following:                         ",

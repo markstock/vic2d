@@ -1,7 +1,7 @@
 /*
  * VIC-MOC - particles.c - create, move, draw particles
  *
- * Copyright 2018-20 Mark J. Stock mstock@umich.edu
+ * Copyright 2018-20 Mark J. Stock <mstock@umich.edu>
  */
 
 #include <stdlib.h>

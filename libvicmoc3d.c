@@ -1,7 +1,7 @@
 /*
- * VIC-MOC - libvicmoc.c - the library for the 2D and 3D routines
+ * VIC-MOC - libvicmoc3d.c - the library for the 2D and 3D routines
  *
- * Copyright 2004-8 Mark J. Stock mstock@umich.edu
+ * Copyright 2004-8,20 Mark J. Stock <mstock@umich.edu>
  */
 
 #include "vicmoc.h"
@@ -1032,7 +1032,7 @@ float find_vels_3d (int step,int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    //static float ***div;
    float div,maxdiv;
    static int set_grad = TRUE;		// FALSE if you need it
-   char outfileroot[70];
+   char outfileroot[MAXCHARS];
 
    fprintf(stderr,"  in find_vels_3d\n"); fflush(stderr);
 
@@ -1963,7 +1963,7 @@ int make_solenoidal_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    static float **yswx,**yswy,**yswz,**yfwx,**yfwy,**yfwz;
    static float **zswx,**zswy,**zswz,**zfwx,**zfwy,**zfwz;
    float div,maxdiv;
-   char outfileroot[70];
+   char outfileroot[MAXCHARS];
 
    fprintf(stderr,"  in make_solenoidal_3d\n"); fflush(stderr);
 

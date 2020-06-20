@@ -1,7 +1,7 @@
 /*
- * VIC-MOC - libvicmoc.c - the library for the 2D routines
+ * VIC-MOC - libvicmoc2d.c - the library for the 2D routines
  *
- * Copyright 2004-20 Mark J. Stock mstock@umich.edu
+ * Copyright 2004-20 Mark J. Stock <mstock@umich.edu>
  */
 
 #include <stdlib.h>
@@ -141,7 +141,7 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
 
   int i,j,k;
   float Re,coeff;
-  char outfileroot[70];
+  char outfileroot[MAXCHARS];
 
   // ----------------------------
   if (isStam) {
@@ -849,7 +849,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    static float **cw;
    static float **cw_sum;
    static float **cw_old;
-   char outfileroot[150];
+   char outfileroot[MAXCHARS];
    static int mask_grad_not_set = TRUE;
    static float **maskgrad;
    static float **mg;

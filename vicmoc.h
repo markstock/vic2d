@@ -1,12 +1,13 @@
 /*
- * VIC-MOC - vicmoc.h - structures and defines for the program
+ * VIC-MOC - vicmoc.h - structures and defines for both codes
  *
- * Copyright 2004 Mark J. Stock mstock@umich.edu
+ * Copyright 2004-7,20 Mark J. Stock <mstock@umich.edu>
  */
 
 #pragma once
 
 #define M_PI 3.14159265358979323846
+#define MAXCHARS 255
 
 // these can be changed
 // for ordering of the arrays in "a", they will change depending on what is being tracked

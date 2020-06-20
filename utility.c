@@ -1,7 +1,7 @@
 /*
  * VIC-MOC - utility.c - the library for the 2D routines
  *
- * Copyright 2004-10 Mark J. Stock mstock@umich.edu
+ * Copyright 2004-10 Mark J. Stock <mstock@umich.edu>
  */
 
 #include <stdlib.h>

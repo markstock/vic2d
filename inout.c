@@ -1,7 +1,7 @@
 /*
  * VIC-MOC - inout.c - routines for input and output
  *
- * Copyright 2004-7 Mark J. Stock mstock@umich.edu
+ * Copyright 2004-7,20 Mark J. Stock <mstock@umich.edu>
  */
 
 #include <stdlib.h>
@@ -28,9 +28,9 @@ int write_output(char *outfileroot,int nx,int ny,
    int low_depth = TRUE;
    int make_pngs = FALSE;
    int i,j,ii,jj,printval;
-   char outfile1[80];
-   char outfile2[80];
-   char command[170];
+   char outfile1[MAXCHARS];
+   char outfile2[MAXCHARS];
+   char command[MAXCHARS];
    float vortval,top,bottom,left,right;
    int autorange = FALSE;
    float newminrange,newmaxrange,newrange;
@@ -241,7 +241,7 @@ int write_png (char *outfileroot, int nx, int ny,
 
    int autorange = FALSE;
    int i,j,printval,bit_depth;
-   char outfile[80];
+   char outfile[MAXCHARS];
    float newminrange,newmaxrange;
    // gamma of 1.8 looks normal on most monitors...that display properly.
    //float gamma = 1.8;
@@ -946,7 +946,7 @@ int write_3d_vtk(char *outfileroot,int nx,int ny,int nz,
    float ***u,float ***v,float ***w) {
 
    int i,j,k;
-   char outfilename[80];
+   char outfilename[MAXCHARS];
    FILE *outfile;
 
    // make the filename
@@ -997,7 +997,7 @@ int write_output_particles_rad(char *outfileroot,int pnum,
    float **ploc,float **pvel,float *prad) {
 
    int i;
-   char outfile[80];
+   char outfile[MAXCHARS];
    FILE *outp;
 
    sprintf(outfile,"%s.rad",outfileroot);

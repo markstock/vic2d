@@ -1,7 +1,7 @@
 /*
- * VIC-MOC - maskops.c - operations on dynamics masks
+ * VIC-MOC - maskops.c - operations on dynamic masks
  *
- * Copyright 2014 Mark J. Stock mstock@umich.edu
+ * Copyright 2014,20 Mark J. Stock <mstock@umich.edu>
  */
 
 #include <stdlib.h>
@@ -24,7 +24,7 @@ void populate_block_array (int nx, int ny) {
    // first, prepare for colors
 
    // the color image from which to grab colors
-   char colorsrcfilename[255];
+   char colorsrcfilename[MAXCHARS];
    sprintf(colorsrcfilename,"color_source.png");
    const int cnx = 300;
    const int cny = 169;
@@ -399,8 +399,8 @@ void overlay_mask (int nx, int ny, float** mask) {
 
    static int first_time = TRUE;
    static float** overlay = NULL;
-   //char maskfilename[255] = "burn_it_down_edges5_1025.png";
-   char maskfilename[255] = "burn_it_down_edges3_2049.png";
+   //char maskfilename[MAXCHARS] = "burn_it_down_edges5_1025.png";
+   char maskfilename[MAXCHARS] = "burn_it_down_edges3_2049.png";
 
    // if we're not using a mask, just ignore this
    if (mask == NULL) return;
