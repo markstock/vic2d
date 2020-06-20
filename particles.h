@@ -14,6 +14,8 @@ struct Particles {
 
    // position (2*n)
    float* x;
+   // last position (2*n)
+   float* oldx;
    // velocity (2*n)
    float* u;
    // color (3*n)

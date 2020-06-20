@@ -25,6 +25,7 @@ int init_particles (struct Particles *p, const int nspace) {
    p->n = 0;
    p->nmax = nspace;
    p->x = allocate_1d_array_f(2*nspace);
+   p->oldx = allocate_1d_array_f(2*nspace);
    p->u = allocate_1d_array_f(2*nspace);
    p->c = allocate_1d_array_f(3*nspace);
    p->m = allocate_1d_array_f(nspace);
@@ -42,6 +43,11 @@ int resize_particles (struct Particles *p, const int nspace) {
    float* temp = p->x;
    p->x = allocate_1d_array_f(2*nspace);
    for (int i=0; i<2*p->nmax; ++i) p->x[i] = temp[i];
+   free_1d_array_f(temp);
+
+   temp = p->oldx;
+   p->oldx = allocate_1d_array_f(2*nspace);
+   for (int i=0; i<2*p->nmax; ++i) p->oldx[i] = temp[i];
    free_1d_array_f(temp);
 
    temp = p->u;
@@ -84,6 +90,8 @@ int add_one_particle (struct Particles *p,
    // position and vel
    p->x[2*i+0] = x;
    p->x[2*i+1] = y;
+   p->oldx[2*i+0] = x;
+   p->oldx[2*i+1] = y;
    p->u[2*i+0] = u;
    p->u[2*i+1] = v;
    // color
@@ -116,6 +124,8 @@ int add_block_of_particles (struct Particles *p, int nnew,
       // position and vel
       p->x[2*i+0] = xs + (xf-xs)*(rand()/(float)RAND_MAX);
       p->x[2*i+1] = ys + (yf-ys)*(rand()/(float)RAND_MAX);
+      p->oldx[2*i+0] = p->x[2*i+0];
+      p->oldx[2*i+1] = p->x[2*i+1];
       p->u[2*i+0] = 0.0;
       p->u[2*i+1] = 0.0;
       // color
@@ -163,6 +173,11 @@ int move_particles (struct Particles *p,
       p->u[2*i+1] = (p->m[i]*p->u[2*i+1] + 0.5*(v2+v1)) / (1.0+p->m[i]);
    }
 
+   // save the old positions
+   for (int i=0; i<2*p->n; ++i) {
+      p->oldx[i] = p->x[i];
+   }
+
    // apply the new velocity
    for (int i=0; i<2*p->n; ++i) {
       p->x[i] += dt*p->u[i];
@@ -172,10 +187,10 @@ int move_particles (struct Particles *p,
    if (xbdry == PERIODIC) {
       #pragma omp parallel for
       for (int i=0; i<p->n; ++i) {
-         if (p->x[2*i+0] < 0.0) p->x[2*i+0] += 1.0;
-         if (p->x[2*i+1] < 0.0) p->x[2*i+1] += yf;
-         if (p->x[2*i+0] > 1.0) p->x[2*i+0] -= 1.0;
-         if (p->x[2*i+1] > yf) p->x[2*i+1] -= yf;
+         if (p->x[2*i+0] < 0.0) { p->x[2*i+0] += 1.0; p->oldx[2*i+0] += 1.0; }
+         if (p->x[2*i+1] < 0.0) { p->x[2*i+1] += yf;  p->oldx[2*i+1] += yf; }
+         if (p->x[2*i+0] > 1.0) { p->x[2*i+0] -= 1.0; p->oldx[2*i+0] -= 1.0; }
+         if (p->x[2*i+1] > yf)  { p->x[2*i+1] -= yf;  p->oldx[2*i+1] -= yf; }
       }
    } else {
       // wall or open
@@ -213,51 +228,72 @@ int draw_particles (struct Particles *p, float yf, int nx, int ny,
    // splat the particles over this
    //fprintf(stdout,"  splatting %d particles\n",p->n);
    for (int i=0; i<p->n; ++i) {
-      const float px = p->x[2*i+0] * (float)(nx-1);
-      const float py = p->x[2*i+1] * (float)(ny-1) / yf;
-      int ix = (int)px;
-      int iy = (int)py;
-      int ixp1 = ix+1;
-      int iyp1 = iy+1;
-      const float fx = px - (float)ix;
-      const float fy = py - (float)iy;
-      // drop the color on weighted by the ballistic coefficient (so heavy particles draw more heavily)
-      //const float wgt = p->m[i];
-      // weight by velocity also (04b)
-      const float velmag = sqrt(pow(p->u[2*i+0],2)+pow(p->u[2*i+1],2)+1.e-6);
-      //const float wgt = p->m[i] * velmag;
-      // shimmer a little by reflecting off a normal direction, and account for vel (04c)
-      //const float sheer = 10.0*(p->u[2*i+0]*0.8 + p->u[2*i+1]*0.2);
-      //const float wgt = 0.5 * p->m[i] * (sheer+velmag);
-      // shimmer more (04e)
-      const float sheer = (p->u[2*i+0]*0.95 - p->u[2*i+1]*0.1) / velmag;
-      //const float wgt = 2.0 * p->m[i] * (2.0*sheer*sheer*sheer*sheer+velmag);
-      // more shimmer, less weight on brightness (04f)
-      //const float wgt = 2.0 * (10.0*sheer*sheer*sheer*sheer+velmag);
-      // where is the shimmer, less weight on brightness (04g)
-      //const float wgt = 1.0*sheer*sheer*sheer*sheer + 8.0*velmag;
-      // less shimmer (04h)
-      //const float wgt = 0.3*sheer*sheer*sheer*sheer + 20.0*velmag;
-      const float wgt = 0.01*sheer*sheer*sheer*sheer + 0.5*velmag;
-      //if (i==0) fprintf(stdout,"  particle 1 is at %g %g with index %d %d and weight %g\n",px,py,ix,iy,wgt);
+      const float npx = p->x[2*i+0] * (float)(nx-1);
+      const float npy = p->x[2*i+1] * (float)(ny-1) / yf;
+      const float opx = p->oldx[2*i+0] * (float)(nx-1);
+      const float opy = p->oldx[2*i+1] * (float)(ny-1) / yf;
 
-      const float fac1 = wgt * (1.0-fx)*(1.0-fy);
-      outred[ix][iy] = (outred[ix][iy] + fac1*p->c[3*i+0]) / (1.0+fac1);
-      outgrn[ix][iy] = (outgrn[ix][iy] + fac1*p->c[3*i+1]) / (1.0+fac1);
-      outblu[ix][iy] = (outblu[ix][iy] + fac1*p->c[3*i+2]) / (1.0+fac1);
-      if (ixp1 != nx) {
+      // how many segments will we need?
+      const int nseg = (int)(1.0 + 1.2 * sqrtf(powf(npx-opx,2)+powf(npy-opy,2)));
+      //fprintf(stderr,"part %d needs %d segments\n", i, nseg); fflush(stderr);
+
+      for (int j=0; j<nseg; ++j) {
+         const float tfac = (j+0.5) / (float)nseg;
+         const float px = opx + tfac*(npx-opx);
+         const float py = opy + tfac*(npy-opy);
+         //fprintf(stderr,"  seg %d at %g %g\n", j, px, py); fflush(stderr);
+
+         int ix = rintf(px-0.5);
+         int iy = rintf(py-0.5);
+         int ixp1 = ix+1;
+         int iyp1 = iy+1;
+         const float fx = px - (float)ix;
+         const float fy = py - (float)iy;
+         // drop the color on weighted by the ballistic coefficient (so heavy particles draw more heavily)
+         //const float wgt = p->m[i];
+         // weight by velocity also (04b)
+         const float velmag = sqrt(pow(p->u[2*i+0],2)+pow(p->u[2*i+1],2)+1.e-6);
+         //const float wgt = p->m[i] * velmag;
+         // shimmer a little by reflecting off a normal direction, and account for vel (04c)
+         //const float sheer = 10.0*(p->u[2*i+0]*0.8 + p->u[2*i+1]*0.2);
+         //const float wgt = 0.5 * p->m[i] * (sheer+velmag);
+         // shimmer more (04e)
+         const float sheer = (p->u[2*i+0]*0.95 - p->u[2*i+1]*0.1) / velmag;
+         //const float wgt = 2.0 * p->m[i] * (2.0*sheer*sheer*sheer*sheer+velmag);
+         // more shimmer, less weight on brightness (04f)
+         //const float wgt = 2.0 * (10.0*sheer*sheer*sheer*sheer+velmag);
+         // where is the shimmer, less weight on brightness (04g)
+         //const float wgt = 1.0*sheer*sheer*sheer*sheer + 8.0*velmag;
+         // less shimmer (04h)
+         //const float wgt = 0.3*sheer*sheer*sheer*sheer + 20.0*velmag;
+         const float wgt = (0.01*sheer*sheer*sheer*sheer + 0.5*velmag) / (float)nseg;
+         //if (i==0) fprintf(stdout,"  particle 1 is at %g %g with index %d %d and weight %g\n",px,py,ix,iy,wgt);
+
+         if (ix<0) ix += nx;
+         if (ixp1<0) ixp1 += nx;
+         if (iy<0) iy += ny;
+         if (iyp1<0) iyp1 += ny;
+
+         if (ix>=nx) ix -= nx;
+         if (ixp1>=nx) ixp1 -= nx;
+         if (iy>=ny) iy -= ny;
+         if (iyp1>=ny) iyp1 -= ny;
+
+         const float fac1 = wgt * (1.0-fx)*(1.0-fy);
+         outred[ix][iy] = (outred[ix][iy] + fac1*p->c[3*i+0]) / (1.0+fac1);
+         outgrn[ix][iy] = (outgrn[ix][iy] + fac1*p->c[3*i+1]) / (1.0+fac1);
+         outblu[ix][iy] = (outblu[ix][iy] + fac1*p->c[3*i+2]) / (1.0+fac1);
+
          const float fac2 = wgt * fx*(1.0-fy);
          outred[ixp1][iy] = (outred[ixp1][iy] + fac2*p->c[3*i+0]) / (1.0+fac2);
          outgrn[ixp1][iy] = (outgrn[ixp1][iy] + fac2*p->c[3*i+1]) / (1.0+fac2);
          outblu[ixp1][iy] = (outblu[ixp1][iy] + fac2*p->c[3*i+2]) / (1.0+fac2);
-      }
-      if (iyp1 != ny) {
+
          const float fac3 = wgt * (1.0-fx)*fy;
          outred[ix][iyp1] = (outred[ix][iyp1] + fac3*p->c[3*i+0]) / (1.0+fac3);
          outgrn[ix][iyp1] = (outgrn[ix][iyp1] + fac3*p->c[3*i+1]) / (1.0+fac3);
          outblu[ix][iyp1] = (outblu[ix][iyp1] + fac3*p->c[3*i+2]) / (1.0+fac3);
-      }
-      if (ixp1 != nx && iyp1 != ny) {
+
          const float fac4 = wgt * fx*fy;
          outred[ixp1][iyp1] = (outred[ixp1][iyp1] + fac4*p->c[3*i+0]) / (1.0+fac4);
          outgrn[ixp1][iyp1] = (outgrn[ixp1][iyp1] + fac4*p->c[3*i+1]) / (1.0+fac4);
