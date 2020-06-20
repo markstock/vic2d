@@ -51,7 +51,6 @@ int main(int argc,char **argv) {
    int use_DF = FALSE;
    int use_COLOR = FALSE;
    int reread_color = FALSE;
-   int reread_vort = FALSE;
    int darkenonly = TRUE;
    int freeze_flow = FALSE;
    int freeze_at = -1;
@@ -62,7 +61,9 @@ int main(int argc,char **argv) {
    int use_strong_strat = FALSE;
    int overlay_color_lr = FALSE;
    int overlay_color_tb = FALSE;
-   int use_PARTICLES = TRUE;
+   int vort_reread = FALSE;
+   int vort_add_rand = FALSE;
+   int vort_suppress = FALSE;
 
    int writeOutput = TRUE;
    int print_vort = FALSE;
@@ -93,6 +94,8 @@ int main(int argc,char **argv) {
    float vortscale,velscale,vmax,velsq;
    float ccnvmax[VMAXAVG];
    float randvortscale = -1;
+   float vort_add_factor = -1;
+   float vort_suppress_factor = -1;
    float overlay_fraction = 0.01;
    float cputime = 0.;
    float totcputime = 0.;
@@ -101,6 +104,15 @@ int main(int argc,char **argv) {
    float thisc[3];
    float maskerr;
    float **color_left, **color_right, **color_top, **color_bottom;
+
+   int use_PARTICLES = FALSE;
+   int part_add_step_start = 0;
+   int part_add_step_end = 0;
+   int part_add_count_end = 10000;
+   int part_rem_step_start = 999999;
+   int part_rem_step_end = 999999;
+   int part_rem_count_end = 0;
+   float particle_speed = 1.0;
 
    float **u[2];			// velocities
    float **a[MAX_SCALARS];		// other scalars
@@ -215,10 +227,8 @@ int main(int argc,char **argv) {
       } else if (strncmp(argv[i], "-vf", 3) == 0) {
          strcpy (vortfilename,argv[++i]);
          use_vort_img = TRUE;
-      } else if (strncmp(argv[i], "-vr", 3) == 0) {
-         reread_vort = TRUE;
-      } else if (strncmp(argv[i], "-vscale", 3) == 0) {
-         vortscale = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-vrr", 4) == 0) {
+         vort_reread = TRUE;
       } else if (strncmp(argv[i], "-vdf", 4) == 0) {
          strcpy (mdfilename,argv[++i]);
          mdlow = atof(argv[++i]);
@@ -228,8 +238,17 @@ int main(int argc,char **argv) {
          print_mu = TRUE;
       } else if (strncmp(argv[i], "-vd", 3) == 0) {
          md = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-va", 3) == 0) {
+         vort_add_rand = TRUE;
+         vort_add_factor = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-vr", 3) == 0) {
+         vort_suppress = TRUE;
+         vort_suppress_factor = atof(argv[++i]);
       } else if (strncmp(argv[i], "-vprint", 3) == 0) {
          print_vort = TRUE;
+      } else if (strncmp(argv[i], "-vscale", 3) == 0) {
+         vortscale = atof(argv[++i]);
+
       } else if (strncmp(argv[i], "-uscale", 3) == 0) {
          velscale = atof(argv[++i]);
       } else if (strncmp(argv[i], "-uprint", 3) == 0) {
@@ -246,7 +265,7 @@ int main(int argc,char **argv) {
          stop_flow = TRUE;
          if (argc > i+1) {
             if (isdigit((int)argv[i+1][0]) || isdigit((int)argv[i+1][1])) {
-               // first number after elevation is frame at which to stop
+               // first number after keyword is frame at which to stop
                stop_at = atoi(argv[++i]);
             }
          }
@@ -334,6 +353,18 @@ int main(int argc,char **argv) {
          print_mask = TRUE;
       } else if (strncmp(argv[i], "-m", 2) == 0) {
          use_MASK = TRUE;
+
+      } else if (strncmp(argv[i], "-pa", 3) == 0) {
+         use_PARTICLES = TRUE;
+         part_add_step_start = atoi(argv[++i]);
+         part_add_step_end = atoi(argv[++i]);
+         part_add_count_end = atoi(argv[++i]);
+      } else if (strncmp(argv[i], "-pr", 3) == 0) {
+         part_rem_step_start = atoi(argv[++i]);
+         part_rem_step_end = atoi(argv[++i]);
+         part_rem_count_end = atoi(argv[++i]);
+      } else if (strncmp(argv[i], "-ps", 3) == 0) {
+         particle_speed = atof(argv[++i]);
 
       } else if (strncmp(argv[i], "-ores", 3) == 0) {
          // NOT IMPLEMENTED
@@ -1041,18 +1072,8 @@ int main(int argc,char **argv) {
 
    // Set particles -------------------------------------------
 
-   if (use_PARTICLES && (use_color_linear || use_color_area)) {
-      float thiscol[3];
-      // 04b started with 5000
-      // 04c started with 0
-      for (i=0; i<10000; ++i) {
-         (void) get_color (cmi, cnx, cny, rand()/(float)RAND_MAX, rand()/(float)RAND_MAX, thiscol);
-         (void) add_one_particle (&pts, rand()/(float)RAND_MAX,
-                                        yf*rand()/(float)RAND_MAX,
-                                        0.0, 0.0,
-                                        thiscol[0], thiscol[1], thiscol[2],
-                                        1.0+0.5*rand()/(float)RAND_MAX, 0.0);
-      }
+   //if (use_PARTICLES && (use_color_linear || use_color_area)) {
+   if (use_PARTICLES) {
       //(void) add_block_of_particles (&pts, 200000, 0.1, 0.9, 0.19*yf, 0.21*yf, 0.7, 0.9, 0.1, 0.1, 0.0);
       //(void) add_block_of_particles (&pts, 40000, 0.1, 0.9, 0.49*yf, 0.51*yf, 0.1, 0.9, 0.7, 1.0, 0.0);
       //(void) add_block_of_particles (&pts, 10000, 0.1, 0.9, 0.79*yf, 0.81*yf, 0.8, 0.1, 0.8, 10.0, 0.0);
@@ -1083,26 +1104,43 @@ int main(int argc,char **argv) {
 
       // fprintf(stdout,"\nBegin step %d\n",step);
 
-      if (use_PARTICLES && (use_color_linear || use_color_area)) {
-         if (step < 4000) {
+      if (use_PARTICLES) {
+         // how many particles should there be?
+         int npart = 0;
+         if (step < part_add_step_start) {
+            npart = 0;
+         } else if (step < part_add_step_end) {
+            npart = (int)(part_add_count_end*
+                    (float)(step-part_add_step_start)/(float)(part_add_step_end-part_add_step_start));
+         } else if (step < part_rem_step_start) {
+            npart = part_add_count_end;
+         } else if (step < part_rem_step_end) {
+            npart = part_rem_count_end + (int)((part_add_count_end-part_rem_count_end)*
+                    (float)(part_rem_step_end-step)/(float)(part_rem_step_end-part_rem_step_start));
+         } else {
+            npart = part_rem_count_end;
+         }
+
+         if (npart > pts.n) {
+            // add as many as needed to hit the number
             float thiscol[3];
-            for (i=0; i<175; ++i) {
-               (void) get_color (cmi, cnx, cny, rand()/(float)RAND_MAX, rand()/(float)RAND_MAX, thiscol);
+            const int nadd = npart - pts.n;
+            for (i=0; i<nadd; ++i) {
+               if (use_color_linear || use_color_area) {
+                  (void) get_color (cmi, cnx, cny, rand()/(float)RAND_MAX, rand()/(float)RAND_MAX, thiscol);
+               } else {
+                  thiscol[0] = 0.6; thiscol[1] = 0.6; thiscol[2] = 0.6;
+               }
                const float brite = 0.3*thiscol[0]+0.6*thiscol[1]+0.1*thiscol[2];
                (void) add_one_particle (&pts, rand()/(float)RAND_MAX,
                                               yf*rand()/(float)RAND_MAX,
                                               0.0, 0.0,
                                               thiscol[0], thiscol[1], thiscol[2],
                                               exp(1.5*brite)-0.8, 0.0);
-               // 04b used 0.1+brite and 100 new ones per frame
-               // 04c used exp(2.0*brite)-1.0 and 200 new ones thru step 6000
-               // 04d used exp(brite)-1.0 and 200 new ones thru step 4000
-               // 04e used exp(brite)-0.8 and 150 new ones thru step 5000
-               // 04e used exp(brite)-0.8 and 150 new ones thru step 5000
             }
-         } else {
-           // start removing them
-           pts.n -= 600;
+         } else if (npart < pts.n) {
+           // remove some particles
+           pts.n = npart;
            if (pts.n < 0) pts.n = 0;
          }
       }
@@ -1288,10 +1326,7 @@ int main(int argc,char **argv) {
 
       // move particles
       if (use_PARTICLES) {
-         const float particle_speed = 1.0;
          (void) move_particles (&pts, nx,ny,xbdry,ybdry,yf, mask,u[XV],u[YV],a[SF],gravity,particle_speed*dt);
-         // move them half as fast (04ef uses 0.5)
-         // a little slower (04g used 0.3333)
       }
 
       // read in the image again and overlay it!
@@ -1316,7 +1351,7 @@ int main(int argc,char **argv) {
       }
 
       // read in the vorticity image and overlay it
-      if (recalc_vel && reread_vort && use_vort_img) {
+      if (recalc_vel && vort_reread && use_vort_img) {
          // read grayscale PNG of exactly nx by ny resolution
          // the 2 is to force the new data to be simply added to the old
          // the funny min bounds are to allow value of 127 to become 0.0
@@ -1509,19 +1544,20 @@ int main(int argc,char **argv) {
       }
 
       // overlay more random vorticity
-      if (randvortscale > 0.0 && FALSE) {
+      if (vort_add_rand) {
          // add a random field of vorticity over the existing vorticity
+         const float factor = vort_add_factor * dt;
          for (ix=0; ix<nx; ix++) {
             for (iy=0; iy<ny; iy++) {
-               a[W2][ix][iy] += 0.01*2.0*randvortscale*(rand()/(float)RAND_MAX - 0.5);
+               a[W2][ix][iy] += 2.0*factor*(rand()/(float)RAND_MAX - 0.5);
             }
          }
       }
 
       // supppress vorticity according to the square
-      if (TRUE) {
+      if (vort_suppress) {
          // multiply entire field by a decay factor
-         const float factor = 1.e-4 * dt;
+         const float factor = vort_suppress_factor * dt;
          for (ix=0; ix<nx; ix++) {
             for (iy=0; iy<ny; iy++) {
                a[W2][ix][iy] *= exp(-factor*a[W2][ix][iy]*a[W2][ix][iy]);
@@ -1853,8 +1889,8 @@ int Usage(char progname[MAXCHARS],int status) {
    "               add particles, at stepstart there should be no particles,   ",
    "               and at stepend there should be endcount                     ",
    "   -pr [stepstart] [stepend] [endcount]                                    ",
-   "               remove particles, at stepstart there should be no parts,    ",
-   "               and at stepend there should be endcount                     ",
+   "               remove particles starting at step stepstart, at step        ",
+   "               stepend there should be endcount                            ",
    "   -ps [float] multiplier on particle speed                                ",
    "                                                                           ",
    "   -va [float] add random vorticity every time step, value is magnitude    ",
