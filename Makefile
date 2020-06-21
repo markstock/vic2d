@@ -11,21 +11,20 @@ UNAME := $(shell uname)
 CC=gcc
 LINKER=gcc
 FC=gfortran
-CFLAGS=
+FFLAGS=
 LDFLAGS=
 EXE=vic2d
 MACH=-march=native
 
 ifdef DEBUG
-  CFLAGS+=-g -p -ggdb -fbounds-check
+  FFLAGS+=-g -p -ggdb -fbounds-check
 else
-  CFLAGS+=-O2 -funroll-loops -ffast-math -fomit-frame-pointer
-  #CFLAGS+=-mtune=native
+  FFLAGS+=-O2 -funroll-loops -ffast-math -fomit-frame-pointer
+  #FFLAGS+=-mtune=native
 endif
 ifdef OPENMP
-  CFLAGS+=-fopenmp
+  FFLAGS+=-fopenmp
 endif
-CFLAGS+=-std=c99
 
 ifeq ($(UNAME), Linux)
   LDFLAGS+=
@@ -34,8 +33,8 @@ ifeq ($(UNAME), Darwin)
   #LDFLAGS+=-L/opt/X11/lib
   LDFLAGS+=-L/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk/usr/X11/lib
   LDFLAGS+=-L/usr/local/gfortran/lib
-  #CFLAGS+=-I /opt/X11/include
-  CFLAGS+=-I /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk/usr/X11/include
+  #FFLAGS+=-I /opt/X11/include
+  FFLAGS+=-I /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk/usr/X11/include
 endif
 ifdef MINGW
   CC=x86_64-w64-mingw32-gcc
@@ -46,22 +45,24 @@ ifdef MINGW
 endif
 LDFLAGS+=-lgfortran -lpng -lm -lz
 
+CFLAGS=$(FFLAGS) -std=c99
+
 # build targets
 all: $(EXE)
 #all: vic3d
 #all: vic2d vic3d
 
 gr2.o : gr2.f Makefile
-	$(FC) $(CFLAGS) $(MACH) -c $<
+	$(FC) $(FFLAGS) $(MACH) -c $<
 
 gr3.o : gr3.f Makefile
-	$(FC) $(CFLAGS) $(MACH) -c $<
+	$(FC) $(FFLAGS) $(MACH) -c $<
 
 mud2sp_full.o : mud2sp_full.f Makefile
-	$(FC) $(CFLAGS) $(MACH) -c $<
+	$(FC) $(FFLAGS) $(MACH) -c $<
 
 mud3sp.o : mud3sp.f Makefile
-	$(FC) $(CFLAGS) $(MACH) -c $<
+	$(FC) $(FFLAGS) $(MACH) -c $<
 
 %.o : %.c vicmoc.h Makefile
 	$(CC) $(CFLAGS) $(MACH) -c $<
