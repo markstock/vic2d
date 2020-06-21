@@ -13,6 +13,20 @@
 #include "vicmoc.h"
 
 
+// definitions to support block creation and destruction of masks
+typedef struct block_record {
+   float tstart;
+   float tlen;
+   int startx,endx,starty,endy;
+   float r,g,b;
+   int mask;
+} BLOCK;
+
+#define MAXBLOCKS 10000
+BLOCK block[MAXBLOCKS];
+int nblocks = 0;
+
+
 //
 // ===== general operations for modifying masks =====
 //
@@ -45,8 +59,56 @@ void overlay_mask (int nx, int ny, float** mask) {
    // lay it over the existing mask
    for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++)
       mask[ix][iy] = MIN(overlay[ix][iy], mask[ix][iy]);
+}
 
-   return;
+//
+// Change the mask based on a master temporal mask
+//
+void set_mask_from_temporal (int step, int nx, int ny,
+                   float** mask, char* masterfn,
+                   int sstart, float vstart,
+                   int send, float vend,
+                   float width) {
+
+   static int first_time = TRUE;
+   static float** mastermask = NULL;
+
+   // if we're not using a mask, just ignore this
+   if (mask == NULL) return;
+
+   // read in the mask file
+   if (first_time) {
+      mastermask = allocate_2d_array_f(nx,ny);
+      // read grayscale PNG of exactly nx by ny resolution
+      // 0.0 = black = masked, 1.0 = white = open
+      read_png(masterfn,nx,ny,FALSE,FALSE,1.0,FALSE,
+         mastermask,0.0,1.0,NULL,0.0,1.0,NULL,0.0,1.0);
+      // do not normalize mask
+      // never re-load or reallocate
+      first_time = FALSE;
+   }
+
+   // given step number, find grey value that will become 0.5 in the new mask
+   float midval = 0.5;
+   if (step < sstart) {
+      midval = vstart;
+   } else if (step < send) {
+      midval = vstart;
+   } else {
+      midval = vend;
+   }
+
+   // replace existing mask
+   const float hwid = 0.5 * width;
+   for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) {
+      if (mastermask[ix][iy] < midval-hwid) {
+         mask[ix][iy] = 0.0;
+      } else if (mastermask[ix][iy] > midval+hwid) {
+         mask[ix][iy] = 1.0;
+      } else {
+         mask[ix][iy] = 0.5 + 0.5*sin(M_PI*(mastermask[ix][iy]-midval)/width);
+      }
+   }
 }
 
 

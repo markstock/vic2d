@@ -64,6 +64,7 @@ int main(int argc,char **argv) {
    int vort_reread = FALSE;
    int vort_add_rand = FALSE;
    int vort_suppress = FALSE;
+   int adaptive_mask = FALSE;
 
    int writeOutput = TRUE;
    int print_vort = FALSE;
@@ -114,6 +115,13 @@ int main(int argc,char **argv) {
    int part_rem_step_end = 999999;
    int part_rem_count_end = 0;
    float particle_speed = 1.0;
+
+   int dynamic_mask = FALSE;
+   int dmask_step_start = 0;
+   int dmask_step_end = 1000;
+   float dmask_val_start = 0.5;
+   float dmask_val_end = 0.5;
+   float dmask_width = 0.5;
 
    float **u[2];			// velocities
    float **a[MAX_SCALARS];		// other scalars
@@ -352,6 +360,17 @@ int main(int argc,char **argv) {
          maskerr = atof(argv[++i]);
       } else if (strncmp(argv[i], "-mprint", 3) == 0) {
          print_mask = TRUE;
+      } else if (strncmp(argv[i], "-mdyn", 3) == 0) {
+         use_MASK = TRUE;
+         dynamic_mask = TRUE;
+         strcpy (maskfilename,argv[++i]);
+         dmask_step_start = atoi(argv[++i]);
+         dmask_val_start = atof(argv[++i]);
+         dmask_step_end = atoi(argv[++i]);
+         dmask_val_end = atof(argv[++i]);
+         dmask_width = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-madaptu", 3) == 0) {
+         adaptive_mask = TRUE;
       } else if (strncmp(argv[i], "-m", 2) == 0) {
          use_MASK = TRUE;
 
@@ -740,6 +759,12 @@ int main(int argc,char **argv) {
             if (mask[ix][iy] > 1.0) mask[ix][iy] = 1.0;
          }
       }
+      }
+
+      if (dynamic_mask) {
+         (void) set_mask_from_temporal (0, nx, ny, mask, maskfilename,
+                                        dmask_step_start, dmask_val_start,
+                                        dmask_step_end, dmask_val_end, dmask_width);
       }
    }
 
@@ -1372,6 +1397,12 @@ int main(int argc,char **argv) {
          (void) update_mask_with_blocks_2 (mask, a, nx, ny, simtime, dt);
          // optionally generate repeatedly-overlaid mask
          (void) overlay_mask (nx, ny, mask);
+      }
+
+      if (dynamic_mask) {
+         (void) set_mask_from_temporal (step, nx, ny, mask, maskfilename,
+                                        dmask_step_start, dmask_val_start,
+                                        dmask_step_end, dmask_val_end, dmask_width);
       }
 
       if (FALSE && step%50 == 0 && step < 1001) {

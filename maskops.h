@@ -6,19 +6,9 @@
 
 #pragma once
 
-typedef struct block_record {
-   float tstart;
-   float tlen;
-   int startx,endx,starty,endy;
-   float r,g,b;
-   int mask;
-} BLOCK;
-
-#define MAXBLOCKS 10000
-BLOCK block[MAXBLOCKS];
-int nblocks = 0;
 
 void overlay_mask (int, int, float**);
+void set_mask_from_temporal (int, int, int, float**, char*, int, float, int, float, float);
 
 void mod_mask_with_vel (int, int, float, float**, float**, float**);
 void mod_mask_with_vort (int, int, float, float**, float**);
