@@ -13,6 +13,8 @@
 #include "utility.h"
 
 // external functions
+//extern float interpolate_using_M4p_2d(int,int,int,int,float**,float,float);
+extern float interpolate_array_using_M4p_2d (int,int,int,int,float**,float***,float,float,int,float*);
 extern int interpolate_vel_using_M4p_2d (int,int,int,int,float**,float**,float**,float,float,float*,float*);
 
 // internal functions
@@ -210,29 +212,55 @@ int move_particles (struct Particles *p,
 
 /*
  * splat particles onto a color image
+ *
+ * input color image is nx by ny
+ * particle color image is pnx by pny
  */
-int draw_particles (struct Particles *p, float yf, int nx, int ny,
+int draw_particles (struct Particles *p, float yf,
+                    int nx, int ny,
                     float infac,  float **inred,  float **ingrn,  float **inblu,
+                    int pnx, int pny,
                     float outfac, float **outred, float **outgrn, float **outblu,
                     float draw_fac, float mass_pow, float vel_pow) {
 
-   // copy the in colors to the out array, and scale both
-   for (int ix=0; ix<nx; ix++) {
-      for (int iy=0; iy<ny; iy++) {
-         outred[ix][iy] = infac*inred[ix][iy] + outfac*outred[ix][iy];
-         outgrn[ix][iy] = infac*ingrn[ix][iy] + outfac*outgrn[ix][iy];
-         outblu[ix][iy] = infac*inblu[ix][iy] + outfac*outblu[ix][iy];
+   // scale the particle (output) colors first
+   for (int ix=0; ix<pnx; ix++) {
+      for (int iy=0; iy<pny; iy++) {
+         outred[ix][iy] *= outfac;
+         outgrn[ix][iy] *= outfac;
+         outblu[ix][iy] *= outfac;
       }
    }
 
+   // then copy over colors with the input array
+   if (infac != 0.0) {
+      float** tempin[3];
+      tempin[0] = inred;
+      tempin[1] = ingrn;
+      tempin[2] = inblu;
+      float outvals[3];
+      for (int ix=0; ix<pnx; ix++) {
+         for (int iy=0; iy<pny; iy++) {
+            const float px = ix * (float)(pnx-1);
+            const float py = iy * (float)(pny-1) / yf;
+            // pick color from the input map at nx by ny (use the interp array call?)
+            //const float vred = interpolate_using_M4p_2d(nx,ny,PERIODIC,PERIODIC,inred,px,py);
+            interpolate_array_using_M4p_2d(nx,ny,PERIODIC,PERIODIC,NULL,tempin,px,py,3,outvals);
+            // apply it to the output map at pnx by pny
+            outred[ix][iy] += infac*outvals[0];
+            outgrn[ix][iy] += infac*outvals[1];
+            outblu[ix][iy] += infac*outvals[2];
+         }
+      }
+   }
 
    // splat the particles over this
    //fprintf(stdout,"  splatting %d particles\n",p->n);
    for (int i=0; i<p->n; ++i) {
-      const float npx = p->x[2*i+0] * (float)(nx-1);
-      const float npy = p->x[2*i+1] * (float)(ny-1) / yf;
-      const float opx = p->oldx[2*i+0] * (float)(nx-1);
-      const float opy = p->oldx[2*i+1] * (float)(ny-1) / yf;
+      const float npx = p->x[2*i+0] * (float)(pnx-1);
+      const float npy = p->x[2*i+1] * (float)(pny-1) / yf;
+      const float opx = p->oldx[2*i+0] * (float)(pnx-1);
+      const float opy = p->oldx[2*i+1] * (float)(pny-1) / yf;
 
       // how many segments will we need?
       const int nseg = (int)(1.0 + 1.2 * sqrtf(powf(npx-opx,2)+powf(npy-opy,2)));
@@ -265,15 +293,15 @@ int draw_particles (struct Particles *p, float yf, int nx, int ny,
          const float wgt = draw_fac * powf(p->m[i], mass_pow) * powf(velmag, vel_pow) / (float)nseg;
          //if (i==0) fprintf(stdout,"  particle 1 is at %g %g with index %d %d and weight %g\n",px,py,ix,iy,wgt);
 
-         if (ix<0) ix += nx;
-         if (ixp1<0) ixp1 += nx;
-         if (iy<0) iy += ny;
-         if (iyp1<0) iyp1 += ny;
+         if (ix<0) ix += pnx;
+         if (ixp1<0) ixp1 += pnx;
+         if (iy<0) iy += pny;
+         if (iyp1<0) iyp1 += pny;
 
-         if (ix>=nx) ix -= nx;
-         if (ixp1>=nx) ixp1 -= nx;
-         if (iy>=ny) iy -= ny;
-         if (iyp1>=ny) iyp1 -= ny;
+         if (ix>=pnx) ix -= pnx;
+         if (ixp1>=pnx) ixp1 -= pnx;
+         if (iy>=pny) iy -= pny;
+         if (iyp1>=pny) iyp1 -= pny;
 
          const float fac1 = wgt * (1.0-fx)*(1.0-fy);
          outred[ix][iy] = (outred[ix][iy] + fac1*p->c[3*i+0]) / (1.0+fac1);
@@ -294,6 +322,35 @@ int draw_particles (struct Particles *p, float yf, int nx, int ny,
          outred[ixp1][iyp1] = (outred[ixp1][iyp1] + fac4*p->c[3*i+0]) / (1.0+fac4);
          outgrn[ixp1][iyp1] = (outgrn[ixp1][iyp1] + fac4*p->c[3*i+1]) / (1.0+fac4);
          outblu[ixp1][iyp1] = (outblu[ixp1][iyp1] + fac4*p->c[3*i+2]) / (1.0+fac4);
+      }
+   }
+}
+
+//
+// multiply the particle image by the mask image
+//
+// input mask image is nx by ny
+// particle color image is pnx by pny
+//
+void mult_part_by_mask (float yf, int nx, int ny, float **mask,
+                        int pnx, int pny, float **red, float **grn, float **blu) {
+
+   float** tempin[1];
+   tempin[0] = mask;
+   float outvals[1];
+
+   // copy the in colors to the out array, and scale both
+   for (int ix=0; ix<pnx; ix++) {
+      for (int iy=0; iy<pny; iy++) {
+         const float px = ix * (float)(pnx-1);
+         const float py = iy * (float)(pny-1) / yf;
+         // pick color from the input map at nx by ny (use the interp array call?)
+         //const float maskval = interpolate_using_M4p_2d(nx,ny,PERIODIC,PERIODIC,mask,px,py);
+         interpolate_array_using_M4p_2d(nx,ny,PERIODIC,PERIODIC,NULL,tempin,px,py,1,outvals);
+         // apply it to the output map at pnx by pny
+         red[ix][iy] *= outvals[0];
+         grn[ix][iy] *= outvals[0];
+         blu[ix][iy] *= outvals[0];
       }
    }
 }

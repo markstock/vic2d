@@ -112,6 +112,7 @@ int main(int argc,char **argv) {
    float **color_left, **color_right, **color_top, **color_bottom;
 
    int use_PARTICLES = FALSE;
+   int pnx,pny;
    int part_draw_fade_frames = 100;
    int part_add_step_start = 0;
    int part_add_step_end = 0;
@@ -1141,14 +1142,20 @@ int main(int argc,char **argv) {
       //(void) add_block_of_particles (&pts, 40000, 0.1, 0.9, 0.49*yf, 0.51*yf, 0.1, 0.9, 0.7, 1.0, 0.0);
       //(void) add_block_of_particles (&pts, 10000, 0.1, 0.9, 0.79*yf, 0.81*yf, 0.8, 0.1, 0.8, 10.0, 0.0);
 
+      // set particle image resolution
+      pnx = nx;
+      pny = ny;
+      pnx = 2048;
+      pny = 1024;
+
       if (use_COLOR) {
          // generate the temporary color image for splatting the particles
-         pc[0] = allocate_2d_array_f(nx,ny);
-         pc[1] = allocate_2d_array_f(nx,ny);
-         pc[2] = allocate_2d_array_f(nx,ny);
+         pc[0] = allocate_2d_array_f(pnx,pny);
+         pc[1] = allocate_2d_array_f(pnx,pny);
+         pc[2] = allocate_2d_array_f(pnx,pny);
          // make sure to zero this
-         for (ix=0; ix<nx; ix++) {
-            for (iy=0; iy<ny; iy++) {
+         for (ix=0; ix<pnx; ix++) {
+            for (iy=0; iy<pny; iy++) {
                pc[0][ix][iy] = 0.0;
                pc[1][ix][iy] = 0.0;
                pc[2][ix][iy] = 0.0;
@@ -1268,22 +1275,17 @@ int main(int argc,char **argv) {
                // convert particle fade frames to a factor here
                const float factor = expf(-1.0/(float)part_draw_fade_frames);
                // merge color field and particle splats
-               draw_particles(&pts, yf, nx, ny, 0.0, a[RR], a[GG], a[BB],
-                              factor, pc[0], pc[1], pc[2],
+               draw_particles(&pts, yf,
+                              nx, ny, 0.0, a[RR], a[GG], a[BB],
+                              pnx, pny, factor, pc[0], pc[1], pc[2],
                               part_draw_fac, part_draw_mass_pow, part_draw_vel_pow);
                // draw over it with the mask
                if (use_MASK) {
-                  for (ix=0; ix<nx; ix++) {
-                     for (iy=0; iy<ny; iy++) {
-                        pc[0][ix][iy] *= mask[ix][iy];
-                        pc[1][ix][iy] *= mask[ix][iy];
-                        pc[2][ix][iy] *= mask[ix][iy];
-                     }
-                  }
+                  (void) mult_part_by_mask (yf, nx,ny,mask, pnx,pny,pc[0],pc[1],pc[2]);
                }
                // and write the png
                sprintf(outfileroot,"out_%06d",step);
-               write_png (outfileroot,nx,ny,TRUE,use_16bpp,
+               write_png (outfileroot,pnx,pny,TRUE,use_16bpp,
                           pc[0],0.0,1.0,
                           pc[1],0.0,1.0,
                           pc[2],0.0,1.0);
