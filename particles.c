@@ -213,7 +213,8 @@ int move_particles (struct Particles *p,
  */
 int draw_particles (struct Particles *p, float yf, int nx, int ny,
                     float infac,  float **inred,  float **ingrn,  float **inblu,
-                    float outfac, float **outred, float **outgrn, float **outblu) {
+                    float outfac, float **outred, float **outgrn, float **outblu,
+                    float mass_fac, float mass_pow, float vel_fac, float vel_pow) {
 
    // copy the in colors to the out array, and scale both
    for (int ix=0; ix<nx; ix++) {
@@ -259,14 +260,10 @@ int draw_particles (struct Particles *p, float yf, int nx, int ny,
          //const float wgt = 0.5 * p->m[i] * (sheer+velmag);
          // shimmer more (04e)
          const float sheer = (p->u[2*i+0]*0.95 - p->u[2*i+1]*0.1) / velmag;
-         //const float wgt = 2.0 * p->m[i] * (2.0*sheer*sheer*sheer*sheer+velmag);
-         // more shimmer, less weight on brightness (04f)
-         //const float wgt = 2.0 * (10.0*sheer*sheer*sheer*sheer+velmag);
-         // where is the shimmer, less weight on brightness (04g)
-         //const float wgt = 1.0*sheer*sheer*sheer*sheer + 8.0*velmag;
-         // less shimmer (04h)
-         //const float wgt = 0.3*sheer*sheer*sheer*sheer + 20.0*velmag;
-         const float wgt = (0.01*sheer*sheer*sheer*sheer + 0.5*velmag) / (float)nseg;
+
+         //const float wgt = (0.01*sheer*sheer*sheer*sheer + 0.5*velmag) / (float)nseg;
+         const float wgt = (mass_fac*powf(p->m[i], mass_pow) + 
+                            vel_fac*powf(velmag, vel_pow)) / (float)nseg;
          //if (i==0) fprintf(stdout,"  particle 1 is at %g %g with index %d %d and weight %g\n",px,py,ix,iy,wgt);
 
          if (ix<0) ix += nx;

@@ -82,7 +82,12 @@ int main(int argc,char **argv) {
    float heat_coeff;			// coefficient on the heat term
    float dt;
    float courant,courantconst;		// non-dim time step size
-   float *freestream;
+   float freestream[2];
+   int dynamic_freestream = FALSE;
+   float fs_start[2];
+   int fs_start_step;
+   float fs_end[2];
+   int fs_end_step;
    float *wallvel;
    int recalc_vel;
    int move_colors;
@@ -115,6 +120,10 @@ int main(int argc,char **argv) {
    int part_rem_step_end = 999999;
    int part_rem_count_end = 0;
    float particle_speed = 1.0;
+   float part_draw_mass_fac = 0.0;
+   float part_draw_mass_pow = 1.0;
+   float part_draw_vel_fac = 1.0;
+   float part_draw_vel_pow = 1.0;
 
    int dynamic_mask = FALSE;
    int dmask_step_start = 0;
@@ -187,7 +196,6 @@ int main(int argc,char **argv) {
    for (i=0; i<MAX_SCALARS; i++) a[i] = NULL;
    for (i=0; i<MAX_SCALARS; i++) t[i] = NULL;
    writeOutput = TRUE;
-   freestream = allocate_1d_array_f(2);
    freestream[0] = 0.0;
    freestream[1] = 0.0;
    wallvel = allocate_1d_array_f(4);
@@ -387,6 +395,11 @@ int main(int argc,char **argv) {
          particle_speed = atof(argv[++i]);
       } else if (strncmp(argv[i], "-pf", 3) == 0) {
          part_draw_fade_frames = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-pd", 3) == 0) {
+         part_draw_mass_fac = atof(argv[++i]);
+         part_draw_mass_pow = atof(argv[++i]);
+         part_draw_vel_fac = atof(argv[++i]);
+         part_draw_vel_pow = atof(argv[++i]);
 
       } else if (strncmp(argv[i], "-ores", 3) == 0) {
          // NOT IMPLEMENTED
@@ -400,6 +413,14 @@ int main(int argc,char **argv) {
          maxstep = atoi(argv[++i]);
       } else if (strncmp(argv[i], "-stam", 5) == 0) {
          isStam = TRUE;
+      } else if (strncmp(argv[i], "-fsdyn", 4) == 0) {
+         dynamic_freestream = TRUE;
+         fs_start_step = atoi(argv[++i]);
+         fs_start[0] = atof(argv[++i]);
+         fs_start[1] = atof(argv[++i]);
+         fs_end_step = atoi(argv[++i]);
+         fs_end[0] = atof(argv[++i]);
+         fs_end[1] = atof(argv[++i]);
       } else if (strncmp(argv[i], "-fs", 3) == 0) {
          freestream[0] = atof(argv[++i]);
          freestream[1] = atof(argv[++i]);
@@ -770,6 +791,22 @@ int main(int argc,char **argv) {
 
    // optionally generate repeatedly-overlaid mask
    //(void) overlay_mask (nx, ny, mask);
+
+   // set freestream ----------------------------------
+
+   if (dynamic_freestream) {
+      if (0 < fs_start_step) {
+         freestream[0] = fs_start[0];
+         freestream[1] = fs_start[1];
+      } else if (0 < fs_end_step) {
+         const float factor = (float)(0-fs_start_step) / (float)(fs_end_step-fs_start_step);
+         freestream[0] = fs_start[0] + factor*(fs_end[0]-fs_start[0]);
+         freestream[1] = fs_start[1] + factor*(fs_end[1]-fs_start[1]);
+      } else {
+         freestream[0] = fs_end[0];
+         freestream[1] = fs_end[1];
+      }
+   }
 
    // Initial velocity solve -------------------------
 
@@ -1233,7 +1270,9 @@ int main(int argc,char **argv) {
                // convert particle fade frames to a factor here
                const float factor = expf(-1.0/(float)part_draw_fade_frames);
                // merge color field and particle splats
-               draw_particles(&pts, yf, nx, ny, 0.0, a[RR], a[GG], a[BB], factor, pc[0], pc[1], pc[2]);
+               draw_particles(&pts, yf, nx, ny, 0.0, a[RR], a[GG], a[BB],
+                              factor, pc[0], pc[1], pc[2], part_draw_mass_fac,
+                              part_draw_mass_pow, part_draw_vel_fac, part_draw_vel_pow);
                // draw over it with the mask
                if (use_MASK) {
                   for (ix=0; ix<nx; ix++) {
@@ -1288,6 +1327,21 @@ int main(int argc,char **argv) {
           // this will work for the negative diffusivity trigger, too
           sc_diffus[i] *= 1.1;
         }
+      }
+
+      // reset freestream
+      if (dynamic_freestream) {
+         if (step < fs_start_step) {
+            freestream[0] = fs_start[0];
+            freestream[1] = fs_start[1];
+         } else if (step < fs_end_step) {
+            const float factor = (float)(step-fs_start_step) / (float)(fs_end_step-fs_start_step);
+            freestream[0] = fs_start[0] + factor*(fs_end[0]-fs_start[0]);
+            freestream[1] = fs_start[1] + factor*(fs_end[1]-fs_start[1]);
+         } else {
+            freestream[0] = fs_end[0];
+            freestream[1] = fs_end[1];
+         }
       }
 
       // if we want a constant cn time step, compute it here
