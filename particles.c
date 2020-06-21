@@ -214,7 +214,7 @@ int move_particles (struct Particles *p,
 int draw_particles (struct Particles *p, float yf, int nx, int ny,
                     float infac,  float **inred,  float **ingrn,  float **inblu,
                     float outfac, float **outred, float **outgrn, float **outblu,
-                    float mass_fac, float mass_pow, float vel_fac, float vel_pow) {
+                    float draw_fac, float mass_pow, float vel_pow) {
 
    // copy the in colors to the out array, and scale both
    for (int ix=0; ix<nx; ix++) {
@@ -262,8 +262,7 @@ int draw_particles (struct Particles *p, float yf, int nx, int ny,
          const float sheer = (p->u[2*i+0]*0.95 - p->u[2*i+1]*0.1) / velmag;
 
          //const float wgt = (0.01*sheer*sheer*sheer*sheer + 0.5*velmag) / (float)nseg;
-         const float wgt = (mass_fac*powf(p->m[i], mass_pow) + 
-                            vel_fac*powf(velmag, vel_pow)) / (float)nseg;
+         const float wgt = draw_fac * powf(p->m[i], mass_pow) * powf(velmag, vel_pow) / (float)nseg;
          //if (i==0) fprintf(stdout,"  particle 1 is at %g %g with index %d %d and weight %g\n",px,py,ix,iy,wgt);
 
          if (ix<0) ix += nx;

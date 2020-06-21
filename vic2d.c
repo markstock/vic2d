@@ -120,9 +120,8 @@ int main(int argc,char **argv) {
    int part_rem_step_end = 999999;
    int part_rem_count_end = 0;
    float particle_speed = 1.0;
-   float part_draw_mass_fac = 0.0;
-   float part_draw_mass_pow = 1.0;
-   float part_draw_vel_fac = 1.0;
+   float part_draw_fac = 1.0;
+   float part_draw_mass_pow = 0.0;
    float part_draw_vel_pow = 1.0;
 
    int dynamic_mask = FALSE;
@@ -396,9 +395,8 @@ int main(int argc,char **argv) {
       } else if (strncmp(argv[i], "-pf", 3) == 0) {
          part_draw_fade_frames = atof(argv[++i]);
       } else if (strncmp(argv[i], "-pd", 3) == 0) {
-         part_draw_mass_fac = atof(argv[++i]);
+         part_draw_fac = atof(argv[++i]);
          part_draw_mass_pow = atof(argv[++i]);
-         part_draw_vel_fac = atof(argv[++i]);
          part_draw_vel_pow = atof(argv[++i]);
 
       } else if (strncmp(argv[i], "-ores", 3) == 0) {
@@ -1271,8 +1269,8 @@ int main(int argc,char **argv) {
                const float factor = expf(-1.0/(float)part_draw_fade_frames);
                // merge color field and particle splats
                draw_particles(&pts, yf, nx, ny, 0.0, a[RR], a[GG], a[BB],
-                              factor, pc[0], pc[1], pc[2], part_draw_mass_fac,
-                              part_draw_mass_pow, part_draw_vel_fac, part_draw_vel_pow);
+                              factor, pc[0], pc[1], pc[2],
+                              part_draw_fac, part_draw_mass_pow, part_draw_vel_pow);
                // draw over it with the mask
                if (use_MASK) {
                   for (ix=0; ix<nx; ix++) {
@@ -1879,7 +1877,9 @@ int Usage(char progname[MAXCHARS],int status) {
    "               remove particles starting at step stepstart, at step        ",
    "               stepend there should be endcount                            ",
    "   -ps [float] multiplier on particle speed                                ",
-   "   -pf [float] number of frames to fade particles by 1/e                   ",
+   "   -pf [float] number of frames to fade particles by factor of 1/e         ",
+   "   -pd [factor] [mass power] [vel power]                                   ",
+   "               scale particle drawing value using these properties         ",
    "                                                                           ",
    "   -va [float] add random vorticity every time step, value is magnitude    ",
    "   -vr [float] suppress vorticity according to its square, val is coeff    ",
