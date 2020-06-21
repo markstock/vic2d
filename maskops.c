@@ -93,7 +93,7 @@ void set_mask_from_temporal (int step, int nx, int ny,
    if (step < sstart) {
       midval = vstart;
    } else if (step < send) {
-      midval = vstart;
+      midval = vstart + (vend-vstart)*(float)(step-sstart)/(float)(send-sstart);
    } else {
       midval = vend;
    }
