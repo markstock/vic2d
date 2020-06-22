@@ -279,7 +279,7 @@ int draw_particles (struct Particles *p, float yf,
       const float sheer = (p->u[2*i+0]*0.95 - p->u[2*i+1]*0.1) / velmag;
       //const float wgt = (0.01*sheer*sheer*sheer*sheer + 0.5*velmag) / (float)nseg;
       const float wgt = draw_fac * powf(p->m[i], mass_pow) * powf(velmag, vel_pow) / (float)nseg;
-      if (i==0) fprintf(stdout,"  particle 1 is at %g %g with weight %g\n",npx,npy,wgt);
+      //if (i==0) fprintf(stdout,"  particle 1 is at %g %g with weight %g\n",npx,npy,wgt);
 
       for (int j=0; j<nseg; ++j) {
          const float tfac = (j+0.5) / (float)nseg;
