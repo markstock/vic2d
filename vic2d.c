@@ -1202,14 +1202,15 @@ int main(int argc,char **argv) {
                if (use_color_linear || use_color_area) {
                   (void) get_color (cmi, cnx, cny, rand()/(float)RAND_MAX, rand()/(float)RAND_MAX, thiscol);
                } else {
-                  thiscol[0] = 0.6; thiscol[1] = 0.6; thiscol[2] = 0.6;
+                  const float grey = rand()/(float)RAND_MAX;
+                  thiscol[0] = grey; thiscol[1] = grey; thiscol[2] = grey;
                }
-               const float brite = 0.3*thiscol[0]+0.6*thiscol[1]+0.1*thiscol[2];
+               const float brite = 0.3*thiscol[0] + 0.6*thiscol[1] + 0.1*thiscol[2];
                (void) add_one_particle (&pts, rand()/(float)RAND_MAX,
                                               yf*rand()/(float)RAND_MAX,
                                               0.0, 0.0,
                                               thiscol[0], thiscol[1], thiscol[2],
-                                              exp(1.5*brite)-0.8, 0.0);
+                                              expf(1.5*brite)-0.8, 0.0);
             }
          } else if (npart < pts.n) {
            // remove some particles
