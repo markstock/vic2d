@@ -15,6 +15,7 @@
 // external functions
 //extern float interpolate_using_M4p_2d(int,int,int,int,float**,float,float);
 extern float interpolate_array_using_M4p_2d (int,int,int,int,float**,float***,float,float,int,float*);
+extern float interpolate_array_using_TSC_2d (int,int,int,int,float***,float,float,int,float*);
 extern int interpolate_vel_using_M4p_2d (int,int,int,int,float**,float**,float**,float,float,float*,float*);
 
 // internal functions
@@ -241,8 +242,8 @@ int draw_particles (struct Particles *p, float yf,
       float outvals[3];
       for (int ix=0; ix<pnx; ix++) {
          for (int iy=0; iy<pny; iy++) {
-            const float px = ix * (float)(pnx-1);
-            const float py = iy * (float)(pny-1) / yf;
+            const float px = ix / (float)(pnx-1);
+            const float py = yf * iy / (float)(pny-1);
             // pick color from the input map at nx by ny (use the interp array call?)
             //const float vred = interpolate_using_M4p_2d(nx,ny,PERIODIC,PERIODIC,inred,px,py);
             interpolate_array_using_M4p_2d(nx,ny,PERIODIC,PERIODIC,NULL,tempin,px,py,3,outvals);
@@ -332,8 +333,8 @@ int draw_particles (struct Particles *p, float yf,
 // input mask image is nx by ny
 // particle color image is pnx by pny
 //
-void mult_part_by_mask (float yf, int nx, int ny, float **mask,
-                        int pnx, int pny, float **red, float **grn, float **blu) {
+void mult_part_by_mask (float yf, int nx, int ny, float** mask,
+                        int pnx, int pny, float** red, float** grn, float** blu) {
 
    float** tempin[1];
    tempin[0] = mask;
@@ -342,11 +343,11 @@ void mult_part_by_mask (float yf, int nx, int ny, float **mask,
    // copy the in colors to the out array, and scale both
    for (int ix=0; ix<pnx; ix++) {
       for (int iy=0; iy<pny; iy++) {
-         const float px = ix * (float)(pnx-1);
-         const float py = iy * (float)(pny-1) / yf;
+         const float px = ix / (float)(pnx-1);
+         const float py = yf * iy / (float)(pny-1);
          // pick color from the input map at nx by ny (use the interp array call?)
          //const float maskval = interpolate_using_M4p_2d(nx,ny,PERIODIC,PERIODIC,mask,px,py);
-         interpolate_array_using_M4p_2d(nx,ny,PERIODIC,PERIODIC,NULL,tempin,px,py,1,outvals);
+         interpolate_array_using_TSC_2d(nx,ny,PERIODIC,PERIODIC,tempin,px,py,1,outvals);
          // apply it to the output map at pnx by pny
          red[ix][iy] *= outvals[0];
          grn[ix][iy] *= outvals[0];
