@@ -112,7 +112,8 @@ int main(int argc,char **argv) {
    float **color_left, **color_right, **color_top, **color_bottom;
 
    int use_PARTICLES = FALSE;
-   int pnx,pny;
+   int pnx = -1;
+   int pny = -1;
    int part_draw_fade_frames = 100;
    int part_add_step_start = 0;
    int part_add_step_end = 0;
@@ -399,6 +400,10 @@ int main(int argc,char **argv) {
          part_draw_fac = atof(argv[++i]);
          part_draw_mass_pow = atof(argv[++i]);
          part_draw_vel_pow = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-pnx", 4) == 0) {
+         pnx = atoi(argv[++i]);
+      } else if (strncmp(argv[i], "-pny", 4) == 0) {
+         pny = atoi(argv[++i]);
 
       } else if (strncmp(argv[i], "-ores", 3) == 0) {
          // NOT IMPLEMENTED
@@ -1143,10 +1148,8 @@ int main(int argc,char **argv) {
       //(void) add_block_of_particles (&pts, 10000, 0.1, 0.9, 0.79*yf, 0.81*yf, 0.8, 0.1, 0.8, 10.0, 0.0);
 
       // set particle image resolution
-      pnx = nx;
-      pny = ny;
-      pnx = 2048;
-      pny = 1024;
+      if (pnx < 0) pnx = nx;
+      if (pny < 0) pny = ny;
 
       if (use_COLOR) {
          // generate the temporary color image for splatting the particles
