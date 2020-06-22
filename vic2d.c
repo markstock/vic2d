@@ -122,6 +122,7 @@ int main(int argc,char **argv) {
    int part_rem_step_end = 999999;
    int part_rem_count_end = 0;
    float particle_speed = 1.0;
+   float part_ballistic = 1.0;
    float part_draw_fac = 1.0;
    float part_draw_mass_pow = 0.0;
    float part_draw_vel_pow = 1.0;
@@ -394,6 +395,8 @@ int main(int argc,char **argv) {
          part_rem_count_end = atoi(argv[++i]);
       } else if (strncmp(argv[i], "-ps", 3) == 0) {
          particle_speed = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-pb", 3) == 0) {
+         part_ballistic = atof(argv[++i]);
       } else if (strncmp(argv[i], "-pf", 3) == 0) {
          part_draw_fade_frames = atof(argv[++i]);
       } else if (strncmp(argv[i], "-pd", 3) == 0) {
@@ -1210,7 +1213,7 @@ int main(int argc,char **argv) {
                                               yf*rand()/(float)RAND_MAX,
                                               0.0, 0.0,
                                               thiscol[0], thiscol[1], thiscol[2],
-                                              expf(1.5*brite)-0.8, 0.0);
+                                              expf(1.5*brite)-0.8, part_ballistic);
             }
          } else if (npart < pts.n) {
            // remove some particles
@@ -1883,6 +1886,7 @@ int Usage(char progname[MAXCHARS],int status) {
    "               remove particles starting at step stepstart, at step        ",
    "               stepend there should be endcount                            ",
    "   -ps [float] multiplier on particle speed                                ",
+   "   -pb [float] multiplier on particle ballistic coefficient                ",
    "   -pf [float] number of frames to fade particles by factor of 1/e         ",
    "   -pd [factor] [mass power] [vel power]                                   ",
    "               scale particle drawing value using these properties         ",

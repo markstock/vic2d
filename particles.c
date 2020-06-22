@@ -172,8 +172,10 @@ int move_particles (struct Particles *p,
       newy = spy + 0.5*dt*v0;
       interpolate_vel_using_M4p_2d(nx,ny,xbdry,ybdry,mask,u,v,newx,newy,&u2,&v2);
       // compose new velocity as weighted average of forward and backward velocities
-      p->u[2*i+0] = (p->m[i]*p->u[2*i+0] + 0.5*(u2+u1)) / (1.0+p->m[i]);
-      p->u[2*i+1] = (p->m[i]*p->u[2*i+1] + 0.5*(v2+v1)) / (1.0+p->m[i]);
+      // and using ballistic coefficient (higher means more resistant to change)
+      const float fac = p->b[i]*p->m[i];
+      p->u[2*i+0] = (fac*p->u[2*i+0] + 0.5*(u2+u1)) / (1.0+fac);
+      p->u[2*i+1] = (fac*p->u[2*i+1] + 0.5*(v2+v1)) / (1.0+fac);
    }
 
    // save the old positions
