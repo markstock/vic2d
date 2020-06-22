@@ -267,6 +267,20 @@ int draw_particles (struct Particles *p, float yf,
       const int nseg = (int)(1.0 + 1.2 * sqrtf(powf(npx-opx,2)+powf(npy-opy,2)));
       //fprintf(stderr,"part %d needs %d segments\n", i, nseg); fflush(stderr);
 
+      // drop the color on weighted by the ballistic coefficient (so heavy particles draw more heavily)
+      //const float wgt = p->m[i];
+      // weight by velocity also (04b)
+      const float velmag = sqrt(pow(p->u[2*i+0],2)+pow(p->u[2*i+1],2)+1.e-6);
+      //const float wgt = p->m[i] * velmag;
+      // shimmer a little by reflecting off a normal direction, and account for vel (04c)
+      //const float sheer = 10.0*(p->u[2*i+0]*0.8 + p->u[2*i+1]*0.2);
+      //const float wgt = 0.5 * p->m[i] * (sheer+velmag);
+      // shimmer more (04e)
+      const float sheer = (p->u[2*i+0]*0.95 - p->u[2*i+1]*0.1) / velmag;
+      //const float wgt = (0.01*sheer*sheer*sheer*sheer + 0.5*velmag) / (float)nseg;
+      const float wgt = draw_fac * powf(p->m[i], mass_pow) * powf(velmag, vel_pow) / (float)nseg;
+      if (i==0) fprintf(stdout,"  particle 1 is at %g %g with weight %g\n",npx,npy,wgt);
+
       for (int j=0; j<nseg; ++j) {
          const float tfac = (j+0.5) / (float)nseg;
          const float px = opx + tfac*(npx-opx);
@@ -279,30 +293,16 @@ int draw_particles (struct Particles *p, float yf,
          int iyp1 = iy+1;
          const float fx = px - (float)ix;
          const float fy = py - (float)iy;
-         // drop the color on weighted by the ballistic coefficient (so heavy particles draw more heavily)
-         //const float wgt = p->m[i];
-         // weight by velocity also (04b)
-         const float velmag = sqrt(pow(p->u[2*i+0],2)+pow(p->u[2*i+1],2)+1.e-6);
-         //const float wgt = p->m[i] * velmag;
-         // shimmer a little by reflecting off a normal direction, and account for vel (04c)
-         //const float sheer = 10.0*(p->u[2*i+0]*0.8 + p->u[2*i+1]*0.2);
-         //const float wgt = 0.5 * p->m[i] * (sheer+velmag);
-         // shimmer more (04e)
-         const float sheer = (p->u[2*i+0]*0.95 - p->u[2*i+1]*0.1) / velmag;
 
-         //const float wgt = (0.01*sheer*sheer*sheer*sheer + 0.5*velmag) / (float)nseg;
-         const float wgt = draw_fac * powf(p->m[i], mass_pow) * powf(velmag, vel_pow) / (float)nseg;
-         //if (i==0) fprintf(stdout,"  particle 1 is at %g %g with index %d %d and weight %g\n",px,py,ix,iy,wgt);
+         if (ix<0) ix += pnx-1;
+         if (ixp1<0) ixp1 += pnx-1;
+         if (iy<0) iy += pny-1;
+         if (iyp1<0) iyp1 += pny-1;
 
-         if (ix<0) ix += pnx;
-         if (ixp1<0) ixp1 += pnx;
-         if (iy<0) iy += pny;
-         if (iyp1<0) iyp1 += pny;
-
-         if (ix>=pnx) ix -= pnx;
-         if (ixp1>=pnx) ixp1 -= pnx;
-         if (iy>=pny) iy -= pny;
-         if (iyp1>=pny) iyp1 -= pny;
+         if (ix>=pnx) ix -= pnx-1;
+         if (ixp1>=pnx) ixp1 -= pnx-1;
+         if (iy>=pny) iy -= pny-1;
+         if (iyp1>=pny) iyp1 -= pny-1;
 
          const float fac1 = wgt * (1.0-fx)*(1.0-fy);
          outred[ix][iy] = (outred[ix][iy] + fac1*p->c[3*i+0]) / (1.0+fac1);
