@@ -219,12 +219,12 @@ int move_particles (struct Particles *p,
  * input color image is nx by ny
  * particle color image is pnx by pny
  */
-int draw_particles (struct Particles *p, float yf,
-                    int nx, int ny,
-                    float infac,  float **inred,  float **ingrn,  float **inblu,
-                    int pnx, int pny,
-                    float outfac, float **outred, float **outgrn, float **outblu,
-                    float draw_fac, float mass_pow, float vel_pow) {
+void draw_particles (struct Particles *p, float yf,
+                     int nx, int ny,
+                     float infac,  float **inred,  float **ingrn,  float **inblu,
+                     int pnx, int pny,
+                     float outfac, float **outred, float **outgrn, float **outblu,
+                     float draw_fac, float mass_pow, float vel_pow) {
 
    // scale the particle (output) colors first
    for (int ix=0; ix<pnx; ix++) {
@@ -278,7 +278,7 @@ int draw_particles (struct Particles *p, float yf,
       //const float sheer = 10.0*(p->u[2*i+0]*0.8 + p->u[2*i+1]*0.2);
       //const float wgt = 0.5 * p->m[i] * (sheer+velmag);
       // shimmer more (04e)
-      const float sheer = (p->u[2*i+0]*0.95 - p->u[2*i+1]*0.1) / velmag;
+      //const float sheer = (p->u[2*i+0]*0.95 - p->u[2*i+1]*0.1) / velmag;
       //const float wgt = (0.01*sheer*sheer*sheer*sheer + 0.5*velmag) / (float)nseg;
       const float wgt = draw_fac * powf(p->m[i], mass_pow) * powf(velmag, vel_pow) / (float)nseg;
       //if (i==0) fprintf(stdout,"  particle 1 is at %g %g with weight %g\n",npx,npy,wgt);

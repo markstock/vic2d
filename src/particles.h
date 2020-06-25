@@ -35,6 +35,6 @@ int init_particles (struct Particles*, const int);
 int add_one_particle (struct Particles*, float, float, float, float, float, float, float, float, float);
 int add_block_of_particles (struct Particles*, int, float, float, float, float, float, float, float, float, float);
 int move_particles (struct Particles*, int, int, int, int, float, float**, float**, float**, float**, float*, const float);
-int draw_particles (struct Particles*, float, int, int, float, float**, float**, float**, int, int, float, float**, float**, float**, float, float, float);
+void draw_particles (struct Particles*, float, int, int, float, float**, float**, float**, int, int, float, float**, float**, float**, float, float, float);
 void mult_part_by_mask (float, int, int, float**, int, int, float**, float**, float**);
 

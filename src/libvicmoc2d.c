@@ -217,7 +217,7 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
   }
 
   // project forward to find the new fields (both)
-  if (!silent) fprintf(stderr,"  now in moc_advect_2d\n"); fflush(stderr);
+  if (!silent) { fprintf(stderr,"  now in moc_advect_2d\n"); fflush(stderr); }
   moc_advect_2d (nx,ny,xbdry,ybdry,mask,u[XV],u[YV],freestream,t,a,dt,mocOrder,move_colors);
 
   // split on method for advection step
@@ -269,7 +269,7 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
 
   // find the velocity field from the vorticity field
   if (recalc_vel) {
-    if (!silent) fprintf(stderr,"  now in find_vels_2d\n"); fflush(stderr);
+    if (!silent) { fprintf(stderr,"  now in find_vels_2d\n"); fflush(stderr); }
     find_vels_2d (silent,step,isStam,nx,ny,xbdry,ybdry,freestream,wallvel,u[XV],u[YV],a[W2],use_MASK,mask,maskerr);
   }
 
@@ -1053,7 +1053,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
 
          // read workspace requirements!
          if (!silent) fprintf(stderr,"work array needs %d\n",iparm[15]);
-         if (!silent) fprintf(stderr,"  we currently allocate %d\n",iworksize);
+         if (!silent) fprintf(stderr,"  we currently allocate %ld\n",iworksize);
          if (iparm[15] > iworksize) {
            free_1d_array_f(work);
            work = allocate_1d_array_f(iworksize);
@@ -1115,7 +1115,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
         }
       }
 
-      if (!silent) fprintf(stderr,"    running mud2sp\n"); fflush(stderr);
+      if (!silent) { fprintf(stderr,"    running mud2sp\n"); fflush(stderr); }
       mud2sp_(iparm, fparm, work, &funccfx, &funccfy,
               &funcbndyc, rhs[0], psi[0], mgopt, &ierr);
       if (!silent) fprintf(stdout,"    mud2sp solved in %d cycles\n",iparm[16]);
