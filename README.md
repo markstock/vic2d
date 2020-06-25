@@ -4,10 +4,13 @@ A command-line two-dimensional fluid simulator using a novel semi-Lagrangian adv
 
 ## Building vic2d
 
-This should be easy, at least on Linux. This should be all that you need to do:
+We are now using CMake to build the code, though you can still use the unmaintained unix `Makefile`.
 
     git clone https://github.com/markstock/vic2d.git
-    cd vic2d/src
+    cd vic2d
+    mkdir build
+    cd build
+    cmake -DCMAKE_BUILD_TYPE=Release ..
     make
 
 Or, Windows users can run the cross-compiled binary included in this distribution (`vic2d.exe`).
