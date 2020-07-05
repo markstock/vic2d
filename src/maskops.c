@@ -84,11 +84,18 @@ void set_mask_from_temporal (int step, int nx, int ny,
    // read in the mask file
    if (first_time) {
       mastermask = allocate_2d_array_f(nx,ny);
+
       // read grayscale PNG of exactly nx by ny resolution
       // 0.0 = black = masked, 1.0 = white = open
       read_png(masterfn,nx,ny,FALSE,FALSE,1.0,FALSE,
          mastermask,0.0,1.0,NULL,0.0,1.0,NULL,0.0,1.0);
+
       // do not normalize mask
+
+      // but apply a gamma to the mask so that we move through it more smoothly
+      for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++)
+         mastermask[ix][iy] = expf(0.3f*logf(mastermask[ix][iy]));
+
       // never re-load or reallocate
       first_time = FALSE;
    }
