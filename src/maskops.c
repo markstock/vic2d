@@ -76,6 +76,11 @@ void set_mask_from_temporal (int step, int nx, int ny,
    // if we're not using a mask, just ignore this
    if (mask == NULL) return;
 
+   if (vend < vstart) {
+      printf("Dynamic mask end points only supported if vend > vstart. Quitting.\n");
+      exit(1);
+   }
+
    // read in the mask file
    if (first_time) {
       mastermask = allocate_2d_array_f(nx,ny);
@@ -88,18 +93,21 @@ void set_mask_from_temporal (int step, int nx, int ny,
       first_time = FALSE;
    }
 
+   // how many time steps steps is the half-width of the sliding function?
+   const float hwid = 0.5 * width;
+
    // given step number, find grey value that will become 0.5 in the new mask
+   // this "midval" will typically be in the range -hwid..1+hwid
    float midval = 0.5;
    if (step < sstart) {
-      midval = vstart;
+      midval = vstart - hwid;
    } else if (step < send) {
-      midval = vstart + (vend-vstart)*(float)(step-sstart)/(float)(send-sstart);
+      midval = vstart - hwid + (vend+width-vstart)*(float)(step-sstart)/(float)(send-sstart);
    } else {
-      midval = vend;
+      midval = vend + hwid;
    }
 
    // replace existing mask
-   const float hwid = 0.5 * width;
    for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) {
       if (mastermask[ix][iy] < midval-hwid) {
          mask[ix][iy] = 0.0;
