@@ -94,7 +94,7 @@ void set_mask_from_temporal (int step, int nx, int ny,
 
       // but apply a gamma to the mask so that we move through it more smoothly
       for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++)
-         mastermask[ix][iy] = expf(0.3f*logf(mastermask[ix][iy]));
+         mastermask[ix][iy] = expf(0.5f*logf(mastermask[ix][iy]));
 
       // never re-load or reallocate
       first_time = FALSE;
