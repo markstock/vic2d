@@ -86,7 +86,7 @@ int add_one_particle (struct Particles *p,
                       float m, float b) {
 
    // make sure we have room
-   if (p->n+1 > p->nmax) resize_particles(p, p->n+1);
+   if (p->n+1 > p->nmax) resize_particles(p, (int)(1.2*(p->n+100)));
 
    int i = p->n;
 
