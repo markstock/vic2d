@@ -133,6 +133,7 @@ int main(int argc,char **argv) {
    float dmask_val_start = 0.5;
    float dmask_val_end = 0.5;
    float dmask_width = 0.5;
+   float mask_color_mult = 1.0;
 
    float **u[2];			// velocities
    float **a[MAX_SCALARS];		// other scalars
@@ -381,6 +382,8 @@ int main(int argc,char **argv) {
          dmask_width = atof(argv[++i]);
       } else if (strncmp(argv[i], "-madaptu", 3) == 0) {
          adaptive_mask = TRUE;
+      } else if (strncmp(argv[i], "-mcm", 3) == 0) {
+         mask_color_mult = atof(argv[++i]);
       } else if (strncmp(argv[i], "-m", 2) == 0) {
          use_MASK = TRUE;
 
@@ -1288,7 +1291,7 @@ int main(int argc,char **argv) {
                               part_draw_fac, part_draw_mass_pow, part_draw_vel_pow);
                // draw over it with the mask
                if (use_MASK) {
-                  (void) mult_part_by_mask (yf, nx,ny,mask, pnx,pny,pc[0],pc[1],pc[2]);
+                  (void) mult_part_by_mask (mask_color_mult, yf, nx,ny,mask, pnx,pny,pc[0],pc[1],pc[2]);
                }
                // and write the png
                sprintf(outfileroot,"out_%06d",step);

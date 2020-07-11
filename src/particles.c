@@ -335,7 +335,7 @@ void draw_particles (struct Particles *p, float yf,
 // input mask image is nx by ny
 // particle color image is pnx by pny
 //
-void mult_part_by_mask (float yf, int nx, int ny, float** mask,
+void mult_part_by_mask (float magnitude, float yf, int nx, int ny, float** mask,
                         int pnx, int pny, float** red, float** grn, float** blu) {
 
    float** tempin[1];
@@ -350,10 +350,12 @@ void mult_part_by_mask (float yf, int nx, int ny, float** mask,
          // pick color from the input map at nx by ny (use the interp array call?)
          //const float maskval = interpolate_using_M4p_2d(nx,ny,PERIODIC,PERIODIC,mask,px,py);
          interpolate_array_using_TSC_2d(nx,ny,PERIODIC,PERIODIC,tempin,px,py,1,outvals);
+         const float mult = (1.0 + magnitude*outvals[0]) / (1.0+magnitude);
+         // remember, 1.0 is open flow, 0.0 is fully masked
          // apply it to the output map at pnx by pny
-         red[ix][iy] *= outvals[0];
-         grn[ix][iy] *= outvals[0];
-         blu[ix][iy] *= outvals[0];
+         red[ix][iy] *= mult;
+         grn[ix][iy] *= mult;
+         blu[ix][iy] *= mult;
       }
    }
 }
