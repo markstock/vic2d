@@ -68,7 +68,7 @@ void set_mask_from_temporal (int step, int nx, int ny,
                    float** mask, char* masterfn,
                    int sstart, float vstart,
                    int send, float vend,
-                   float width) {
+                   float width, float power) {
 
    static int first_time = TRUE;
    static float** mastermask = NULL;

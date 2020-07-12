@@ -133,6 +133,7 @@ int main(int argc,char **argv) {
    float dmask_val_start = 0.5;
    float dmask_val_end = 0.5;
    float dmask_width = 0.5;
+   float dmask_power = 1.0;
    float mask_color_mult = 1.0;
 
    float **u[2];			// velocities
@@ -369,7 +370,7 @@ int main(int argc,char **argv) {
          use_MASK = TRUE;
       } else if (strncmp(argv[i], "-me", 3) == 0) {
          maskerr = atof(argv[++i]);
-      } else if (strncmp(argv[i], "-mprint", 3) == 0) {
+      } else if (strncmp(argv[i], "-mprint", 4) == 0) {
          print_mask = TRUE;
       } else if (strncmp(argv[i], "-mdyn", 3) == 0) {
          use_MASK = TRUE;
@@ -380,6 +381,8 @@ int main(int argc,char **argv) {
          dmask_step_end = atoi(argv[++i]);
          dmask_val_end = atof(argv[++i]);
          dmask_width = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-mpow", 4) == 0) {
+         dmask_power = atof(argv[++i]);
       } else if (strncmp(argv[i], "-madaptu", 3) == 0) {
          adaptive_mask = TRUE;
       } else if (strncmp(argv[i], "-mcm", 3) == 0) {
@@ -795,7 +798,8 @@ int main(int argc,char **argv) {
       if (dynamic_mask) {
          (void) set_mask_from_temporal (0, nx, ny, mask, maskfilename,
                                         dmask_step_start, dmask_val_start,
-                                        dmask_step_end, dmask_val_end, dmask_width);
+                                        dmask_step_end, dmask_val_end,
+                                        dmask_width, dmask_power);
       }
    }
 
@@ -1299,6 +1303,9 @@ int main(int argc,char **argv) {
                           pc[0],0.0,1.0,
                           pc[1],0.0,1.0,
                           pc[2],0.0,1.0);
+               // now optionally diffuse the particle colors (before we draw again)
+               //if (part_img_diffus > 0.0) {
+               //}
             } else {
                sprintf(outfileroot,"out_%06d",step);
                write_png (outfileroot,nx,ny,TRUE,use_16bpp,
@@ -1466,7 +1473,8 @@ int main(int argc,char **argv) {
       if (dynamic_mask) {
          (void) set_mask_from_temporal (step, nx, ny, mask, maskfilename,
                                         dmask_step_start, dmask_val_start,
-                                        dmask_step_end, dmask_val_end, dmask_width);
+                                        dmask_step_end, dmask_val_end,
+                                        dmask_width, dmask_power);
       }
 
       if (FALSE && step%50 == 0 && step < 1001) {

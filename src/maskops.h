@@ -8,7 +8,7 @@
 
 
 void overlay_mask (int, int, float**);
-void set_mask_from_temporal (int, int, int, float**, char*, int, float, int, float, float);
+void set_mask_from_temporal (int, int, int, float**, char*, int, float, int, float, float, float);
 
 void mod_mask_with_vel (int, int, float, float**, float**, float**);
 void mod_mask_with_vort (int, int, float, float**, float**);
