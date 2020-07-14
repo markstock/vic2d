@@ -17,6 +17,7 @@
 extern float interpolate_array_using_M4p_2d (int,int,int,int,float**,float***,float,float,int,float*);
 extern float interpolate_array_using_TSC_2d (int,int,int,int,float***,float,float,int,float*);
 extern int interpolate_vel_using_M4p_2d (int,int,int,int,float**,float**,float**,float,float,float*,float*);
+extern float diffuse_scalar_2d (int,int,int,int,int,float**,float**,float,int,float**,float);
 
 // internal functions
 int resize_particles (struct Particles*, const int);
@@ -360,3 +361,35 @@ void mult_part_by_mask (float magnitude, float yf, int nx, int ny, float** mask,
    }
 }
 
+//
+// diffuse the particle image
+//
+void diffuse_color_img (float diffus, int nx, int ny,
+                        int xbdry, int ybdry,
+                        float **red, float **grn, float **blu) {
+
+   static int first_time = TRUE;
+   static float** temp;
+
+   // first time in: make a temporary array
+   if (first_time) {
+     temp = allocate_2d_array_f(nx,ny);
+     first_time = FALSE;
+   }
+
+   // set the diffusivity to 0.124 (just under stability limit) for each 1.0 of input diffusivity
+   // i.e. set -pid 1.0 to do one round of grid-based diffusion
+   const float D = diffus * 0.124 * pow((float)(nx-1), -2);
+
+   // call the diffusion routine in libvicmoc2d
+   (void) diffuse_scalar_2d(nx, ny, xbdry, ybdry, 0, red, temp, D, FALSE, NULL, 1.0);
+   for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) red[ix][iy] = temp[ix][iy];
+
+   // continue for green and blue
+   (void) diffuse_scalar_2d(nx, ny, xbdry, ybdry, 0, grn, temp, D, FALSE, NULL, 1.0);
+   for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) grn[ix][iy] = temp[ix][iy];
+   (void) diffuse_scalar_2d(nx, ny, xbdry, ybdry, 0, blu, temp, D, FALSE, NULL, 1.0);
+   for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) blu[ix][iy] = temp[ix][iy];
+
+   return;
+}

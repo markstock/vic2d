@@ -36,7 +36,7 @@ int main(int argc,char **argv) {
    int isStam;
    int i,j;
    int nx,ny;
-   int cnx,cny,cmn;
+   int cnx,cny,cmn = 0;
    int xbdry,ybdry;
    int ix,iy;
    int step = -1;
@@ -82,12 +82,12 @@ int main(int argc,char **argv) {
    float heat_coeff;			// coefficient on the heat term
    float dt;
    float courant,courantconst;		// non-dim time step size
-   float freestream[2];
+   float freestream[2] = {0.0, 0.0};
    int dynamic_freestream = FALSE;
-   float fs_start[2];
-   int fs_start_step;
-   float fs_end[2];
-   int fs_end_step;
+   float fs_start[2] = {0.0, 0.0};
+   int fs_start_step = 0;
+   float fs_end[2] = {0.0, 0.0};
+   int fs_end_step = 100000;
    float *wallvel;
    int recalc_vel;
    int move_colors;
@@ -126,6 +126,7 @@ int main(int argc,char **argv) {
    float part_draw_fac = 1.0;
    float part_draw_mass_pow = 0.0;
    float part_draw_vel_pow = 1.0;
+   float part_img_diffus = -1.0;
 
    int dynamic_mask = FALSE;
    int dmask_step_start = 0;
@@ -409,6 +410,8 @@ int main(int argc,char **argv) {
          part_draw_fac = atof(argv[++i]);
          part_draw_mass_pow = atof(argv[++i]);
          part_draw_vel_pow = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-pid", 4) == 0) {
+         part_img_diffus = atof(argv[++i]);
       } else if (strncmp(argv[i], "-pnx", 4) == 0) {
          pnx = atoi(argv[++i]);
       } else if (strncmp(argv[i], "-pny", 4) == 0) {
@@ -1254,7 +1257,7 @@ int main(int argc,char **argv) {
          if (print_temp) {
             sprintf(outfileroot,"temp_%06d",step);
             if (use_color_linear) {
-               float tempramp = 60.0;
+               //float tempramp = 60.0;
                float mult = 1.0;
                // map temp to colors
                for (ix=0; ix<nx; ix++) {
@@ -1304,8 +1307,9 @@ int main(int argc,char **argv) {
                           pc[1],0.0,1.0,
                           pc[2],0.0,1.0);
                // now optionally diffuse the particle colors (before we draw again)
-               //if (part_img_diffus > 0.0) {
-               //}
+               if (part_img_diffus > 0.0) {
+                  (void) diffuse_color_img (part_img_diffus, pnx, pny, xbdry, ybdry, pc[0],pc[1],pc[2]);
+               }
             } else {
                sprintf(outfileroot,"out_%06d",step);
                write_png (outfileroot,nx,ny,TRUE,use_16bpp,

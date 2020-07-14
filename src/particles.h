@@ -37,4 +37,4 @@ int add_block_of_particles (struct Particles*, int, float, float, float, float, 
 int move_particles (struct Particles*, int, int, int, int, float, float**, float**, float**, float**, float*, const float);
 void draw_particles (struct Particles*, float, int, int, float, float**, float**, float**, int, int, float, float**, float**, float**, float, float, float);
 void mult_part_by_mask (float, float, int, int, float**, int, int, float**, float**, float**);
-
+void diffuse_color_img (float, int, int, int, int, float**, float**, float**);
