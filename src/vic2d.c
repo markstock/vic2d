@@ -62,7 +62,6 @@ int main(int argc,char **argv) {
    int overlay_color_lr = FALSE;
    int overlay_color_tb = FALSE;
    int vort_reread = FALSE;
-   int vort_add_rand = FALSE;
    int vort_suppress = FALSE;
    int adaptive_mask = FALSE;
 
@@ -100,7 +99,6 @@ int main(int argc,char **argv) {
    float vortscale,velscale,vmax,velsq;
    float ccnvmax[VMAXAVG];
    float randvortscale = -1;
-   float vort_add_factor = -1;
    float vort_suppress_factor = -1;
    float overlay_fraction = 0.01;
    float cputime = 0.;
@@ -110,6 +108,13 @@ int main(int argc,char **argv) {
    float thisc[3];
    float maskerr;
    float **color_left, **color_right, **color_top, **color_bottom;
+
+   int vort_add_rand = FALSE;
+   float vort_add_factor = -1;
+   int vort_add_start = -1;
+   int vort_add_peak = -1;
+   int vort_add_down = -1;
+   int vort_add_end = -1;
 
    int use_PARTICLES = FALSE;
    int pnx = -1;
@@ -260,6 +265,11 @@ int main(int argc,char **argv) {
          print_mu = TRUE;
       } else if (strncmp(argv[i], "-vd", 3) == 0) {
          md = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-vas", 4) == 0) {
+         vort_add_start = atoi(argv[++i]);
+         vort_add_peak = atoi(argv[++i]);
+         vort_add_down = atoi(argv[++i]);
+         vort_add_end = atoi(argv[++i]);
       } else if (strncmp(argv[i], "-va", 3) == 0) {
          vort_add_rand = TRUE;
          vort_add_factor = atof(argv[++i]);
@@ -1514,6 +1524,7 @@ int main(int argc,char **argv) {
          float maxshear = -9.9e+9;
          float meanshear = 0.0;
 
+         //#pragma omp parallel for private() reduce()
          for (ix=0; ix<nx; ix++) {
             for (iy=0; iy<ny; iy++) {
                if (shear[ix][iy] < minshear) minshear = shear[ix][iy];
@@ -1555,10 +1566,30 @@ int main(int argc,char **argv) {
       // overlay more random vorticity
       if (vort_add_rand) {
          // add a random field of vorticity over the existing vorticity
-         const float factor = vort_add_factor * dt;
-         for (ix=0; ix<nx; ix++) {
-            for (iy=0; iy<ny; iy++) {
-               a[W2][ix][iy] += 2.0*factor*(rand()/(float)RAND_MAX - 0.5);
+         float factor = 2.0 * vort_add_factor * dt;
+         int doit = FALSE;
+         if (step < vort_add_start) {
+            doit = FALSE;
+         } else if (step < vort_add_peak) {
+            doit = TRUE;
+            // lerp magnitude
+            factor *= (float)(step-vort_add_start)/(float)(vort_add_peak-vort_add_start);
+         } else if (step < vort_add_down) {
+            doit = TRUE;
+            // constant peak magnitude
+         } else if (step < vort_add_end) {
+            doit = TRUE;
+            // lerp magnitude
+            factor *= (float)(vort_add_end-step)/(float)(vort_add_end-vort_add_down);
+         } else {
+            doit = FALSE;
+         }
+         if (doit) {
+            #pragma omp parallel for
+            for (ix=0; ix<nx; ix++) {
+               for (iy=0; iy<ny; iy++) {
+                  a[W2][ix][iy] += factor * (rand()/(float)RAND_MAX - 0.5);
+               }
             }
          }
       }
@@ -1567,6 +1598,7 @@ int main(int argc,char **argv) {
       if (vort_suppress) {
          // multiply entire field by a decay factor
          const float factor = vort_suppress_factor * dt;
+         #pragma omp parallel for
          for (ix=0; ix<nx; ix++) {
             for (iy=0; iy<ny; iy++) {
                a[W2][ix][iy] *= exp(-factor*a[W2][ix][iy]*a[W2][ix][iy]);
@@ -1576,6 +1608,7 @@ int main(int argc,char **argv) {
 
       // clamp the temperature field
       if (use_TEMP && TRUE) {
+         #pragma omp parallel for
          for (ix=0; ix<nx; ix++) {
             for (iy=0; iy<ny; iy++) {
                if (a[SF][ix][iy] > 1.0) a[SF][ix][iy] = 1.0;
@@ -1586,6 +1619,7 @@ int main(int argc,char **argv) {
 
       // overlay the heat map
       if (use_heat_img) {
+         #pragma omp parallel for
          for (ix=0; ix<nx; ix++) {
             for (iy=0; iy<ny; iy++) {
                a[SF][ix][iy] += dt * heat_coeff * heat[ix][iy];
