@@ -228,6 +228,7 @@ void draw_particles (struct Particles *p, float yf,
                      float draw_fac, float mass_pow, float vel_pow) {
 
    // scale the particle (output) colors first
+   #pragma omp parallel for
    for (int ix=0; ix<pnx; ix++) {
       for (int iy=0; iy<pny; iy++) {
          outred[ix][iy] *= outfac;
@@ -243,6 +244,7 @@ void draw_particles (struct Particles *p, float yf,
       tempin[1] = ingrn;
       tempin[2] = inblu;
       float outvals[3];
+      #pragma omp parallel for private(outvals)
       for (int ix=0; ix<pnx; ix++) {
          for (int iy=0; iy<pny; iy++) {
             const float px = ix / (float)(pnx-1);
@@ -265,6 +267,8 @@ void draw_particles (struct Particles *p, float yf,
       const float npy = p->x[2*i+1] * (float)(pny-1) / yf;
       const float opx = p->oldx[2*i+0] * (float)(pnx-1);
       const float opy = p->oldx[2*i+1] * (float)(pny-1) / yf;
+
+      // for parallelization, use the npx and opx to determine if this thread should work
 
       // how many segments will we need?
       const int nseg = (int)(1.0 + 1.2 * sqrtf(powf(npx-opx,2)+powf(npy-opy,2)));
@@ -344,6 +348,7 @@ void mult_part_by_mask (float magnitude, float yf, int nx, int ny, float** mask,
    float outvals[1];
 
    // copy the in colors to the out array, and scale both
+   #pragma omp parallel for private(outvals)
    for (int ix=0; ix<pnx; ix++) {
       for (int iy=0; iy<pny; iy++) {
          const float px = ix / (float)(pnx-1);
