@@ -323,6 +323,7 @@ int main(int argc,char **argv) {
          td = atof(argv[++i]);
       } else if (strncmp(argv[i], "-tprint", 3) == 0) {
          print_temp = TRUE;
+         use_TEMP = TRUE;
       } else if (strncmp(argv[i], "-t", 2) == 0) {
          use_TEMP = TRUE;
       } else if (strncmp(argv[i], "-b", 2) == 0) {
