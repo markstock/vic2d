@@ -2526,20 +2526,26 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
 
    // prevent advecting colors
    if (!moveColors) {
+      if (out[RR] && in[RR]) {
       for (i=0;i<nx;i++) {
          for (j=0;j<ny;j++) {
             out[RR][i][j] = in[RR][i][j];
          }
       }
+      }
+      if (out[GG] && in[GG]) {
       for (i=0;i<nx;i++) {
          for (j=0;j<ny;j++) {
             out[GG][i][j] = in[GG][i][j];
          }
       }
+      }
+      if (out[BB] && in[BB]) {
       for (i=0;i<nx;i++) {
          for (j=0;j<ny;j++) {
             out[BB][i][j] = in[BB][i][j];
          }
+      }
       }
    }
 
