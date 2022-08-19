@@ -33,6 +33,10 @@ This code uses a vortex method solver, which means that pressure doesn't enter i
 
 The first implementation of a semi-Lagrangian vorticity-based solver is in Sawyer & Portnall (1963) A semi-Lagrangian method of solving the vorticity advection equation, Tellus, 15:4, 336-342, DOI: 10.3402/tellusa.v15i4.8862 [link](https://doi.org/10.3402/tellusa.v15i4.8862).
 
+## Notes
+
+This program can create digital output very similar to that made by the traditional technique of ebru, or paper marbling. [Here](http://digital-marbling.de/) is an excellent web site about this art-making method.
+
 ## Thanks
 
 This code uses [libpng](https://github.com/glennrp/libpng) and [mudpack](https://www2.cisl.ucar.edu/resources/legacy/mudpack), a multigrid solver. All the rest of this ugly, ugly code is mine.
