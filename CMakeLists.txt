@@ -1,11 +1,10 @@
 #
 # vic2d CMake config file
 #
-CMAKE_MINIMUM_REQUIRED ( VERSION 2.6 )
 PROJECT ( vic2d )
+CMAKE_MINIMUM_REQUIRED ( VERSION 2.6 )
 ENABLE_LANGUAGE (Fortran)
 
-# User-serviceable variables here
 SET_PROPERTY(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo")
 IF (NOT CMAKE_BUILD_TYPE)
   SET (CMAKE_BUILD_TYPE "Release")
@@ -15,6 +14,10 @@ SET (CMAKE_INSTALL_PREFIX CACHE PATH "Installation location for binaries, sample
 SET (USE_OMP FALSE CACHE BOOL "Use OpenMP multithreading")
 SET (CMAKE_VERBOSE_MAKEFILE on)
 SET (CMAKE_EXPORT_COMPILE_COMMANDS on)
+
+IF( NOT CMAKE_BUILD_TYPE )
+  SET( CMAKE_BUILD_TYPE "Release" )
+ENDIF()
 
 IF (CMAKE_COMPILER_IS_GNUCXX)
   SET (CMAKE_C_FLAGS "-Wall -Wformat -std=c99")
@@ -39,6 +42,12 @@ ENDIF ()
 
 # suppress the FindOpenMP warnings
 cmake_policy(SET CMP0054 NEW)
+
+# allow -flto with static libraries
+# https://stackoverflow.com/questions/39236917/using-gccs-link-time-optimization-with-static-linked-libraries
+#SET(CMAKE_AR  "gcc-ar")
+#SET(CMAKE_C_ARCHIVE_CREATE "<CMAKE_AR> qcs <TARGET> <LINK_FLAGS> <OBJECTS>")
+#SET(CMAKE_C_ARCHIVE_FINISH   true)
 
 IF ( WIN32 )
 
