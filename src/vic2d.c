@@ -452,6 +452,11 @@ int main(int argc,char **argv) {
          freestream[0] = atof(argv[++i]);
          freestream[1] = atof(argv[++i]);
       } else if (strncmp(argv[i], "-grav", 2) == 0) {
+         gravtype = 0;
+         gravity[0] = atof(argv[++i]);
+         gravity[1] = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-rgrav", 6) == 0) {
+         gravtype = 1;
          gravity[0] = atof(argv[++i]);
          gravity[1] = atof(argv[++i]);
 
