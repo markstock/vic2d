@@ -1,5 +1,7 @@
 vic2d - TODO
 
+Add a "-restart num" option to read existing temp, vort, etc. files and restart the sim
+
 Add an option to advect the color at a fraction of the local velocity,
   or give each "pixel" a momentum/ballistic coefficient, and have the
   local velocity create a "force" on the pixel.
