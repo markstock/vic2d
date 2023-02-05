@@ -64,6 +64,8 @@ IF ( WIN32 )
     ENDIF ()
   ENDIF()
 
+  SET( EXTERNAL_LIBS png z )
+
 ELSEIF ( APPLE )
 
   INCLUDE_DIRECTORIES ( /System/Library/Frameworks )

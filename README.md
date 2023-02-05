@@ -9,11 +9,19 @@ We are now using CMake to build the code, though you can still use the unmaintai
     git clone https://github.com/markstock/vic2d.git
     cd vic2d
     mkdir build
-    cd build
-    cmake -DCMAKE_BUILD_TYPE=Release ..
+    cd buil
+    cmake -DCMAKE_BUILD_TYPE=Release -DUSE_OMP=ON ..
     make
 
 Or, Windows users can run the cross-compiled binary included in this distribution (`vic2d.exe`).
+
+To build this Windows binary on a Linux machine, the following should work.
+
+    sudo dnf install mingw64-libpng-static.noarch mingw64-gcc-gfortran.x86_64 mingw64-gcc-c++.x86_64 mingw64-gcc.x86_64 mingw64-zlib-static.noarch mingw64-zlib.noarch mingw64-libpng.noarch mingw64-libgomp.x86_64
+    mkdir build_win
+    cd build_win
+    cmake -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++ -DCMAKE_Fortran_COMPILER=x86_64-w64-mingw32-gfortran -DCMAKE_BUILD_TYPE=RelWithDebInfo -DUSE_OMP=ON ..
+    make
 
 ## Running vic2d
 
