@@ -30,18 +30,18 @@ int write_output(char *outfileroot,int nx,int ny,
    int i,j,ii,jj,printval;
    char outfile1[MAXCHARS];
    char outfile2[MAXCHARS];
-   char command[MAXCHARS];
+   char command[3*MAXCHARS];
    float vortval,top,bottom,left,right;
    int autorange = FALSE;
-   float newminrange,newmaxrange,newrange;
+   float newrange = 0.0;
+   float newminrange = 9.9e+5;
    FILE *outfile;
 
    if (scale > 1) use_scale = TRUE;
 
-   // reset the ranges, if desired
-   newminrange = 9.9e+5;
-   newmaxrange = -9.9e+5;
    if (autorange) {
+      // reset the ranges, if desired
+      float newmaxrange = -9.9e+5;
 
       // calculate an appropriate range
       for (i=0; i<nx; i++) {
@@ -610,12 +610,10 @@ int read_png (char *infile, int nx, int ny,
    float **grn, float grnmin, float grnrange,
    float **blu, float blumin, float blurange) {
 
-   int autorange = FALSE;
    int high_depth;
    int three_channel;
-   int i,j,printval; //,bit_depth,color_type,interlace_type;
-   float newminrange,newmaxrange;
-   float overlay_divisor;
+   int i,j;
+   float overlay_divisor = 1.0;
    FILE *fp;
    unsigned char header[8];
    png_uint_32 height,width;
@@ -629,9 +627,6 @@ int read_png (char *infile, int nx, int ny,
    if (overlay == TRUE) {
       // set divisor to blend original and incoming
       overlay_divisor = 1.0 + overlay_frac;
-   } else if (overlay == 2) {
-      // set divisor to add original and incoming
-      overlay_divisor = 1.0;
    }
 
    // check the file
