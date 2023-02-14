@@ -33,16 +33,16 @@ int Usage(char[MAXCHARS],int);
 int main(int argc,char **argv) {
 
    static int first_time = TRUE;
-   int isStam;
-   int i,j;
-   int nx,ny;
+   int isStam = FALSE;
+   int nx = 513;
+   int ny = 513;
    int cnx,cny,cmn = 0;
-   int xbdry,ybdry;
-   int ix,iy;
+   int xbdry = WALL;
+   int ybdry = WALL;
    int step = -1;
-   int maxstep = 0;
-   int writeevery;
-   int outscale;
+   int maxstep = 99999;
+   int writeevery = 1;
+   int outscale = 1;
    int use_16bpp = FALSE;
    int silent = FALSE;
 
@@ -72,31 +72,39 @@ int main(int argc,char **argv) {
    int print_mu = FALSE;
    int print_mask = FALSE;
 
-   float md,mdlow,mdhigh;		// dimensional momentum diffusivity
-   float vd;				// dimensional viscosity diffusivity
-   float td,tdlow,tdhigh;		// dimensional density diffusivity
-   float cd,cdlow,cdhigh;		// dimensional color diffusivity
-   float bn;				// Boussinesq coefficient
-   float dens_ratio;			// ratio of max to min density
-   float heat_coeff;			// coefficient on the heat term
-   float dt;
-   float courant,courantconst;		// non-dim time step size
+   float md = 1.e-3;			// dimensional momentum diffusivity
+   float mdlow = -1.0;
+   float mdhigh = -1.0;
+   float vd = 1.e-3;			// dimensional viscosity diffusivity
+   float td = 1.e-3;			// dimensional density diffusivity
+   float tdlow = -1.0;
+   float tdhigh = -1.0;
+   float cd = 1.e-3;			// dimensional color diffusivity
+   float cdlow = -1.0;
+   float cdhigh = -1.0;
+   float bn = 1.0;				// Boussinesq coefficient
+   float dens_ratio = 1.0;		// ratio of max to min density
+   float heat_coeff = 1.0;		// coefficient on the heat term
+   float dt = -1.0;				// time step size
+   float courant = 10.;			// fixed non-dim time step size
+   float courantconst = -1.;	// target non-dim time step size
    float freestream[2] = {0.0, 0.0};
    int dynamic_freestream = FALSE;
    float fs_start[2] = {0.0, 0.0};
    int fs_start_step = 0;
    float fs_end[2] = {0.0, 0.0};
    int fs_end_step = 100000;
-   float *wallvel;
-   int recalc_vel;
-   int move_colors;
-   int gravtype;
+   float wallvel[4] = {0., 0., 0., 0.};	// left, right, bottom, top
+   int recalc_vel = TRUE;
+   int move_colors = TRUE;
    int ccnidx = 0;
-   float *gravity;
-   float coeff,yf,thickness;
+   int gravtype = 0;
+   float gravity[2] = {0.0, 1.0};
+   float yf;
    float effective_re;
    float px,py,cx,cy,rad,temp,temp2,maxval,minval,scale;
-   float vortscale,velscale,vmax,velsq;
+   float vortscale = 10.;
+   float velscale = 1.0;
    float ccnvmax[VMAXAVG];
    float randvortscale = -1;
    float vort_suppress_factor = -1;
@@ -106,8 +114,11 @@ int main(int argc,char **argv) {
    float avgcputime = 0.;
    float simtime = 0.;
    float thisc[3];
-   float maskerr;
-   float **color_left, **color_right, **color_top, **color_bottom;
+   float maskerr = 5.e-3;
+   float **color_left = NULL;
+   float **color_right = NULL;
+   float **color_top = NULL;
+   float **color_bottom = NULL;
 
    int vort_add_rand = FALSE;
    float vort_add_factor = -1;
@@ -179,55 +190,16 @@ int main(int argc,char **argv) {
    char tdfilename[MAXCHARS];
    char cdfilename[MAXCHARS];
 
-
-   // set default simulation properties
-   nx = 513;
-   ny = 513;
-   xbdry = WALL;
-   ybdry = WALL;
-   isStam = FALSE;
-   courant = 10.0;
-   courantconst = -1.0;
-   dt = -1.0;
-   md = 1.e-3;
-   mdlow = -1.;
-   mdhigh = -1.;
-   vd = 1.e-3;
-   cd = 1.e-3;
-   cdlow = -1.;
-   cdhigh = -1.;
-   heat_coeff = 1.;
-   outscale = 1;
-   writeevery = 1;
-   maxstep = 99999;
-   bn = 1.;
-   dens_ratio = 1.;
-   for (i=0; i<MAX_SCALARS; i++) sc_diffus[i] = 1.e-3;
-   for (i=0; i<MAX_SCALARS; i++) a[i] = NULL;
-   for (i=0; i<MAX_SCALARS; i++) t[i] = NULL;
-   writeOutput = TRUE;
-   freestream[0] = 0.0;
-   freestream[1] = 0.0;
-   wallvel = allocate_1d_array_f(4);
-   wallvel[0] = 0.0;	// left
-   wallvel[1] = 0.0;	// right
-   wallvel[2] = 0.0;	// bottom
-   wallvel[3] = 0.0;	// top
-   recalc_vel = TRUE;
-   move_colors = TRUE;
-   gravtype = 0;
-   gravity = allocate_1d_array_f(2);
-   gravity[0] = 0.0;
-   gravity[1] = 1.0;
-   vortscale = 10.;
-   velscale = 1.;
-   maskerr = 5.e-3;
+   // Initialize arrays and particles
+   for (int i=0; i<MAX_SCALARS; i++) sc_diffus[i] = 1.e-3;
+   for (int i=0; i<MAX_SCALARS; i++) a[i] = NULL;
+   for (int i=0; i<MAX_SCALARS; i++) t[i] = NULL;
    (void) init_particles(&pts, 10000);
 
    // read command-line
    (void) strcpy(progname,argv[0]);
    if (argc < 1) (void) Usage(progname,0);
-   for (i=1; i<argc; i++) {
+   for (int i=1; i<argc; i++) {
 
       if (strncmp(argv[i], "-x", 2) == 0) {
          nx = atoi(argv[++i]) + 1;
@@ -589,7 +561,7 @@ int main(int argc,char **argv) {
    }
 
    // allocate space for temporary arrays
-   for (i=0; i<MAX_SCALARS; i++) {
+   for (int i=0; i<MAX_SCALARS; i++) {
       if (a[i] != NULL) {
          t[i] = allocate_2d_array_f(nx,ny);
          if (!silent) fprintf(stdout,"Array %d has diffusivity %g\n",i,sc_diffus[i]);
@@ -602,17 +574,17 @@ int main(int argc,char **argv) {
    // Set vorticity ----------------------------------
 
    // first, zero it
-   for (ix=0; ix<nx; ix++) {
-      for (iy=0; iy<ny; iy++) {
+   for (int ix=0; ix<nx; ix++) {
+      for (int iy=0; iy<ny; iy++) {
          a[W2][ix][iy] = 0.0;
       }
    }
 
    if (FALSE) {
       // create a wavy shear layer of positive vorticity
-      for (ix=0; ix<nx; ix++) {
+      for (int ix=0; ix<nx; ix++) {
          px = (float)ix/(float)(nx-1);
-         for (iy=0; iy<ny; iy++) {
+         for (int iy=0; iy<ny; iy++) {
             py = (float)iy/(float)(nx-1);
             a[W2][ix][iy] = 10.0 - 20.0*fabs((yf/2.0) - py - 0.05*sin(px*2.0*M_PI));
             if (a[W2][ix][iy] < 0.0) a[W2][ix][iy] = 0.0;
@@ -633,8 +605,8 @@ int main(int argc,char **argv) {
       // create a random field of vorticity
       //scale = 20.;
       scale = 100.;
-      for (ix=0; ix<nx; ix++) {
-         for (iy=0; iy<ny; iy++) {
+      for (int ix=0; ix<nx; ix++) {
+         for (int iy=0; iy<ny; iy++) {
             a[W2][ix][iy] = scale*rand()/RAND_MAX - scale*0.5;
          }
       }
@@ -646,9 +618,9 @@ int main(int argc,char **argv) {
       add_smooth_circular_blob(nx,ny,xbdry,ybdry,a[W2],0.41,0.34,0.05,-50.0);
    } else if (FALSE) {
       // make the vorticity defined in Minion and Brown, JCP 138
-      for (ix=0; ix<nx; ix++) {
+      for (int ix=0; ix<nx; ix++) {
          px = (float)ix/(float)(nx-1);
-         for (iy=0; iy<ny; iy++) {
+         for (int iy=0; iy<ny; iy++) {
             py = (float)iy/(float)(nx-1);
             if (py > 0.5) {
                a[W2][ix][iy] = 2.*M_PI*0.05*cos(2.*M_PI*(px+0.25))
@@ -661,9 +633,9 @@ int main(int argc,char **argv) {
       }
    } else if (FALSE) {
       // make the vorticity defined in Koumoutsakos, JCP, 1997, type I
-      for (ix=0; ix<nx; ix++) {
+      for (int ix=0; ix<nx; ix++) {
          px = (float)ix/(float)(nx-1);
-         for (iy=0; iy<ny; iy++) {
+         for (int iy=0; iy<ny; iy++) {
             py = (float)iy/(float)(nx-1);
             temp = sqrt(pow(px-0.5,2)+0.25*pow(py-0.5,2))/0.1;
             temp2 = 20.*(1.-exp(-exp(1./(temp-1.))*2.56085/temp));
@@ -676,12 +648,12 @@ int main(int argc,char **argv) {
       }
    } else if (FALSE) {
       // create a sinusoidal interface
-      //thickness = 0.001;
-      thickness = 2.0/(float)nx;
-      for (ix=0; ix<nx; ix++) {
+      //float thickness = 0.001;
+      float thickness = 2.0/(float)nx;
+      for (int ix=0; ix<nx; ix++) {
          px = (ix - (float)nx/2.)/(float)nx;
          yf = 0.02*sin(px*9.*M_PI);
-         for (iy=0; iy<ny; iy++) {
+         for (int iy=0; iy<ny; iy++) {
             py = (iy - (float)ny/2.)/(float)ny;
             // now, px,py is [-0.5,0.5]
             if (fabs(yf-py) < thickness) {
@@ -709,8 +681,8 @@ int main(int argc,char **argv) {
    }
    if (randvortscale > 0.0) {
       // create a random field of vorticity
-      for (ix=0; ix<nx; ix++) {
-         for (iy=0; iy<ny; iy++) {
+      for (int ix=0; ix<nx; ix++) {
+         for (int iy=0; iy<ny; iy++) {
             a[W2][ix][iy] += 2.0*randvortscale*(rand()/(float)RAND_MAX - 0.5);
          }
       }
@@ -726,8 +698,8 @@ int main(int argc,char **argv) {
    if (use_MASK) {
       // define a mask manually
       // blank the mask
-      for (ix=0; ix<nx; ix++) {
-         for (iy=0; iy<ny; iy++) {
+      for (int ix=0; ix<nx; ix++) {
+         for (int iy=0; iy<ny; iy++) {
             // use 0.0 for all solid
             mask[ix][iy] = 1.0;
          }
@@ -740,9 +712,9 @@ int main(int argc,char **argv) {
          //temp2 = 0.0025;
          temp2 = 2.0/(float)nx;
          rad -= temp2/2.;
-         for (ix=0; ix<nx; ix++) {
+         for (int ix=0; ix<nx; ix++) {
             px = (float)ix/(float)(nx-1);
-            for (iy=0; iy<ny; iy++) {
+            for (int iy=0; iy<ny; iy++) {
                py = (float)iy/(float)(nx-1);
                temp = sqrt(pow(px-cx,2)+pow(py-cy,2));
                if (temp < rad) {
@@ -765,10 +737,10 @@ int main(int argc,char **argv) {
          maxval = 0.06; // outer surface
          temp2 = 0.002;	// thickness
          scale = 0.3;	// length
-         for (ix=0; ix<nx; ix++) {
+         for (int ix=0; ix<nx; ix++) {
            px = fabs((float)ix/(float)(nx-1) - cx);
            if (px < scale) {
-            for (iy=0; iy<ny; iy++) {
+            for (int iy=0; iy<ny; iy++) {
               py = (float)iy/(float)(nx-1) - cy;
               if (py > 0. && py < scale) {
               //fprintf(stderr,"%d %d %g %g %g\n",ix,iy,px,py,px*py);
@@ -797,16 +769,16 @@ int main(int argc,char **argv) {
       // normalize mask, and set 1.0=solid, 0.0=open (input is opposite)
       maxval = -9.9e+9;
       minval = 9.9e+9;
-      for (ix=0; ix<nx; ix++) {
-         for (iy=0; iy<ny; iy++) {
+      for (int ix=0; ix<nx; ix++) {
+         for (int iy=0; iy<ny; iy++) {
             if (mask[ix][iy] > maxval) maxval = mask[ix][iy];
             if (mask[ix][iy] < minval) minval = mask[ix][iy];
          }
       }
       temp = maxval-minval;
       if (temp > 1.e-5) {
-      for (ix=0; ix<nx; ix++) {
-         for (iy=0; iy<ny; iy++) {
+      for (int ix=0; ix<nx; ix++) {
+         for (int iy=0; iy<ny; iy++) {
             mask[ix][iy] = (maxval-mask[ix][iy])/temp;
             if (mask[ix][iy] < 0.0) mask[ix][iy] = 0.0;
             if (mask[ix][iy] > 1.0) mask[ix][iy] = 1.0;
@@ -847,17 +819,17 @@ int main(int argc,char **argv) {
    find_vels_2d (silent,step,isStam,nx,ny,xbdry,ybdry,freestream,wallvel,u[XV],u[YV],a[W2],use_MASK,mask,maskerr);
 
    // find vmax (might need this)
-   vmax = 0.;
-   for (i=0; i<nx; i++) {
-      for (j=0; j<ny; j++) {
-         velsq = u[XV][i][j]*u[XV][i][j] + u[YV][i][j]*u[YV][i][j];
+   float vmax = 0.;
+   for (int i=0; i<nx; i++) {
+      for (int j=0; j<ny; j++) {
+         float velsq = u[XV][i][j]*u[XV][i][j] + u[YV][i][j]*u[YV][i][j];
          if (velsq > vmax) vmax = velsq;
       }
    }
    vmax = sqrt(vmax);
    // initialize the vmax averaging array
    vmax = courantconst / (dt*(nx+1));
-   for (i=0; i<VMAXAVG; i++) ccnvmax[i] = vmax;
+   for (int i=0; i<VMAXAVG; i++) ccnvmax[i] = vmax;
 
 
    // set color ---------------------------------------
@@ -870,15 +842,15 @@ int main(int argc,char **argv) {
    // first, find what index the scalar uses
    if (use_COLOR) {
       // zero the arrays
-      for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[RR][ix][iy] = 0.0;
-      for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[GG][ix][iy] = 0.0;
-      for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[BB][ix][iy] = 0.0;
-      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[RR][ix][iy] = 1.0;
-      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[GG][ix][iy] = 1.0;
-      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[BB][ix][iy] = 1.0;
-      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[RR][ix][iy] = 0.10546875;
-      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[GG][ix][iy] = 0.15234375;
-      //for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[BB][ix][iy] = 0.05859375;
+      for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) a[RR][ix][iy] = 0.0;
+      for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) a[GG][ix][iy] = 0.0;
+      for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) a[BB][ix][iy] = 0.0;
+      //for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) a[RR][ix][iy] = 1.0;
+      //for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) a[GG][ix][iy] = 1.0;
+      //for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) a[BB][ix][iy] = 1.0;
+      //for (ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) a[RR][ix][iy] = 0.10546875;
+      //for (ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) a[GG][ix][iy] = 0.15234375;
+      //for (ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) a[BB][ix][iy] = 0.05859375;
       if (use_color_img) {
          // read color PNG of exactly nx by ny resolution into
          //   the given fields
@@ -889,15 +861,15 @@ int main(int argc,char **argv) {
       }
       if (FALSE) {
          // left is red, right is green
-         for (ix=0; ix<nx/2; ix++) {
-            for (iy=0; iy<ny; iy++) {
+         for (int ix=0; ix<nx/2; ix++) {
+            for (int iy=0; iy<ny; iy++) {
                a[RR][ix][iy] = 1.0;
                a[GG][ix][iy] = 0.91372549;
                a[BB][ix][iy] = 0.168627451;
             }
          }
-         for (ix=nx/2; ix<nx; ix++) {
-            for (iy=0; iy<ny; iy++) {
+         for (int ix=nx/2; ix<nx; ix++) {
+            for (int iy=0; iy<ny; iy++) {
                a[RR][ix][iy] = 0.1171875;
                a[GG][ix][iy] = 0.0546875;
                a[BB][ix][iy] = 0.7265625;
@@ -906,9 +878,9 @@ int main(int argc,char **argv) {
       }
       if (FALSE) {
          // first, force background to one color
-         for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[RR][ix][iy] = 235./256.;
-         for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[GG][ix][iy] = 245./256.;
-         for (ix=0; ix<nx; ix++) for (iy=0; iy<ny; iy++) a[BB][ix][iy] = 253./256.;
+         for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) a[RR][ix][iy] = 235./256.;
+         for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) a[GG][ix][iy] = 245./256.;
+         for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) a[BB][ix][iy] = 253./256.;
          // make splotches of colored spots
          // startx,starty, endx,endy, radius,cutoff, r,g,b, numspots, nx,ny,ra,ga,ba
          // blue splat
@@ -931,8 +903,8 @@ int main(int argc,char **argv) {
       }
       if (FALSE) {
          // scale input vorticity by pixel brightness
-         for (ix=0; ix<nx; ix++) {
-            for (iy=0; iy<ny; iy++) {
+         for (int ix=0; ix<nx; ix++) {
+            for (int iy=0; iy<ny; iy++) {
                float brite = 0.3*a[RR][ix][iy] + 0.6*a[GG][ix][iy] + 0.1*a[BB][ix][iy];
                //a[W2][ix][iy] *= 1.0-brite;
                a[W2][ix][iy] *= MAX(0.0, brite-0.1);
@@ -941,7 +913,7 @@ int main(int argc,char **argv) {
       }
 
       // save the edge colors
-      for (ix=0; ix<nx; ix++) {
+      for (int ix=0; ix<nx; ix++) {
          color_bottom[0][ix] = a[RR][ix][0];
          color_bottom[1][ix] = a[GG][ix][0];
          color_bottom[2][ix] = a[BB][ix][0];
@@ -949,7 +921,7 @@ int main(int argc,char **argv) {
          color_top[1][ix] = a[GG][ix][ny-1];
          color_top[2][ix] = a[BB][ix][ny-1];
       }
-      for (iy=0; iy<ny; iy++) {
+      for (int iy=0; iy<ny; iy++) {
          color_left[0][iy] = a[RR][0][iy];
          color_left[1][iy] = a[GG][0][iy];
          color_left[2][iy] = a[BB][0][iy];
@@ -965,8 +937,8 @@ int main(int argc,char **argv) {
    if (use_TEMP) {
 
       // zero the array
-      for (ix=0; ix<nx; ix++) {
-         for (iy=0; iy<ny; iy++) {
+      for (int ix=0; ix<nx; ix++) {
+         for (int iy=0; iy<ny; iy++) {
             a[SF][ix][iy] = 0.0;
          }
       }
@@ -983,8 +955,8 @@ int main(int argc,char **argv) {
          read_png(heatfilename,nx,ny,FALSE,FALSE,1.0,FALSE,
             heat,-1.0,2.0,NULL,0.0,1.0,NULL,0.0,1.0);
 
-         for (ix=0; ix<nx; ix++) {
-            for (iy=0; iy<ny; iy++) {
+         for (int ix=0; ix<nx; ix++) {
+            for (int iy=0; iy<ny; iy++) {
                a[SF][ix][iy] += heat[ix][iy];
                if (a[SF][ix][iy] > 1.0) a[SF][ix][iy] = 1.0;
                if (a[SF][ix][iy] < -1.0) a[SF][ix][iy] = -1.0;
@@ -994,9 +966,9 @@ int main(int argc,char **argv) {
 
       if (FALSE) {
          // create a sharp blob of scalar
-         for (ix=0; ix<nx; ix++) {
+         for (int ix=0; ix<nx; ix++) {
             px = (float)ix/(float)(nx-1);
-            for (iy=0; iy<ny; iy++) {
+            for (int iy=0; iy<ny; iy++) {
                py = (float)iy/(float)(nx-1);
                if (sqrt(pow(px-0.4,2)+pow(py-0.15,2)) < 0.1)
                   a[SF][ix][iy] = 10.0;
@@ -1010,8 +982,8 @@ int main(int argc,char **argv) {
       }
       if (FALSE) {
          // create bands of scalar
-         for (ix=0; ix<nx; ix++) {
-            for (iy=0; iy<ny; iy++) {
+         for (int ix=0; ix<nx; ix++) {
+            for (int iy=0; iy<ny; iy++) {
                //a[SF][ix][iy] = sin((double)(ix*0.2)) +
                //                 0.2*rand()/RAND_MAX - 0.1;
                //a[SF][ix][iy] = 5.*sin((double)(ix*0.2));
@@ -1024,8 +996,8 @@ int main(int argc,char **argv) {
       }
       if (FALSE) {
          // create square bands of scalar
-         for (ix=0; ix<nx; ix++) {
-            for (iy=0; iy<ny; iy++) {
+         for (int ix=0; ix<nx; ix++) {
+            for (int iy=0; iy<ny; iy++) {
                //a[SF][ix][iy] = sin((double)(ix*0.2)) +
                //                 0.2*rand()/RAND_MAX - 0.1;
                px = fabs(ix - (float)nx/2.);
@@ -1040,14 +1012,14 @@ int main(int argc,char **argv) {
       }
       if (FALSE) {
          // create a RTI with a sinusoidal interface
-         //thickness = 0.001;
-         thickness = 2.0/(float)nx;
-         //thickness = 1.0/(float)nx;
-         for (ix=0; ix<nx; ix++) {
+         //float thickness = 0.001;
+         float thickness = 2.0/(float)nx;
+         //float thickness = 1.0/(float)nx;
+         for (int ix=0; ix<nx; ix++) {
             px = (ix - (float)nx/2.)/(float)nx;
             //yf = 0.02*sin(px*9.*M_PI);
             yf = 0.02*sin(px*8.*M_PI);
-            for (iy=0; iy<ny; iy++) {
+            for (int iy=0; iy<ny; iy++) {
                //a[SF][ix][iy] = sin((double)(ix*0.2)) +
                //                 0.2*rand()/RAND_MAX - 0.1;
                py = (iy - (float)ny/2.)/(float)ny;
@@ -1070,12 +1042,12 @@ int main(int argc,char **argv) {
       }
       if (FALSE) {
          // create another sinusoidal interface (bottom one)
-         //thickness = 0.001;
-         thickness = 2.0/(float)nx;
-         for (ix=0; ix<nx; ix++) {
+         //float thickness = 0.001;
+         float thickness = 2.0/(float)nx;
+         for (int ix=0; ix<nx; ix++) {
             px = (ix - (float)nx/2.)/(float)nx;
             yf = 0.02*sin(px*9.*M_PI) - 0.02;
-            for (iy=0; iy<ny; iy++) {
+            for (int iy=0; iy<ny; iy++) {
                //a[SF][ix][iy] = sin((double)(ix*0.2)) +
                //                 0.2*rand()/RAND_MAX - 0.1;
                py = (iy - (float)ny/2.)/(float)ny;
@@ -1099,16 +1071,16 @@ int main(int argc,char **argv) {
       if (FALSE) {
         // create a random field of scalar
         scale = 10.;
-        for (ix=0; ix<nx; ix++) {
-          for (iy=0; iy<ny; iy++) {
+        for (int ix=0; ix<nx; ix++) {
+          for (int iy=0; iy<ny; iy++) {
             a[SF][ix][iy] += scale*rand()/RAND_MAX - 0.5*scale + 0.5;
           }
         }
       }
       if (FALSE && use_COLOR) {
          // use the brightness component to indicate density!
-         for (ix=0; ix<nx; ix++) {
-            for (iy=0; iy<ny; iy++) {
+         for (int ix=0; ix<nx; ix++) {
+            for (int iy=0; iy<ny; iy++) {
                a[SF][ix][iy] = 1.0 - 0.6*a[GG][ix][iy] -
                                 0.3*a[RR][ix][iy] -
                                 0.1*a[BB][ix][iy];
@@ -1144,7 +1116,7 @@ int main(int argc,char **argv) {
          cml[1] = allocate_1d_array_f(cnx);
          cml[2] = allocate_1d_array_f(cnx);
          float factor = 1.0;
-         for (ix=0; ix<cnx; ix++) {
+         for (int ix=0; ix<cnx; ix++) {
             //factor = 1.2 - 2.0*pow(0.6 - (float)ix/(float)(cnx-1), 2);
             //factor = 1.4 - 3.0*pow(0.6 - (float)ix/(float)(cnx-1), 2);
             factor = 1.6 - 3.5*pow(0.65 - (float)ix/(float)(cnx-1), 2);
@@ -1158,7 +1130,7 @@ int main(int argc,char **argv) {
          cml[1] = allocate_1d_array_f(cny);
          cml[2] = allocate_1d_array_f(cny);
          float factor = 1.0;
-         for (iy=0; iy<cny; iy++) {
+         for (int iy=0; iy<cny; iy++) {
             //factor = 1.4 - 3.0*pow(0.6 - (float)iy/(float)(cny-1), 2);
             cml[0][iy] = factor*cmi[0][0][iy];
             cml[1][iy] = factor*cmi[1][0][iy];
@@ -1186,8 +1158,8 @@ int main(int argc,char **argv) {
          pc[1] = allocate_2d_array_f(pnx,pny);
          pc[2] = allocate_2d_array_f(pnx,pny);
          // make sure to zero this
-         for (ix=0; ix<pnx; ix++) {
-            for (iy=0; iy<pny; iy++) {
+         for (int ix=0; ix<pnx; ix++) {
+            for (int iy=0; iy<pny; iy++) {
                pc[0][ix][iy] = 0.0;
                pc[1][ix][iy] = 0.0;
                pc[2][ix][iy] = 0.0;
@@ -1227,7 +1199,7 @@ int main(int argc,char **argv) {
             // add as many as needed to hit the number
             float thiscol[3];
             const int nadd = npart - pts.n;
-            for (i=0; i<nadd; ++i) {
+            for (int i=0; i<nadd; ++i) {
                if (use_color_linear || use_color_area) {
                   (void) get_color (cmi, cnx, cny, rand()/(float)RAND_MAX, rand()/(float)RAND_MAX, thiscol);
                } else {
@@ -1276,8 +1248,8 @@ int main(int argc,char **argv) {
                //float tempramp = 60.0;
                float mult = 1.0;
                // map temp to colors
-               for (ix=0; ix<nx; ix++) {
-                  for (iy=0; iy<ny; iy++) {
+               for (int ix=0; ix<nx; ix++) {
+                  for (int iy=0; iy<ny; iy++) {
                      float fval = 0.5 * (a[SF][ix][iy] + 1.0);
                      if (fval < 0.0) fval = 0.0;
                      if (fval > 1.0) fval = 1.0;
@@ -1360,7 +1332,7 @@ int main(int argc,char **argv) {
 
       // adjust diffusion coefficients - decay past step 300
       if (FALSE && step > 300) {
-        for (i=0; i<MAX_SCALARS; i++) {
+        for (int i=0; i<MAX_SCALARS; i++) {
           // this will work for the negative diffusivity trigger, too
           sc_diffus[i] *= 1.1;
         }
@@ -1388,10 +1360,10 @@ int main(int argc,char **argv) {
          ccnidx = (ccnidx+1)%VMAXAVG;
          ccnvmax[ccnidx] = vmax;
          // if any were zero, reset them
-         for (i=0; i<VMAXAVG; i++) if (ccnvmax[i] < 1.e-6) ccnvmax[i] = vmax;
+         for (int i=0; i<VMAXAVG; i++) if (ccnvmax[i] < 1.e-6) ccnvmax[i] = vmax;
          // find new thing
          float vavg = 0.0;
-         for (i=0; i<VMAXAVG; i++) vavg += ccnvmax[i];
+         for (int i=0; i<VMAXAVG; i++) vavg += ccnvmax[i];
          vavg /= (float)VMAXAVG;
          // recalculate dt
          float newdt = (courantconst/vavg)/(nx+1);
@@ -1461,8 +1433,8 @@ int main(int argc,char **argv) {
                      TRUE,overlay_fraction,darkenonly,
                      a[RR],0.0,1.0,a[GG],0.0,1.0,a[BB],0.0,1.0);
             // use the brightness component to indicate density!
-            //for (ix=0; ix<nx; ix++) {
-            //   for (iy=0; iy<ny; iy++) {
+            //for (int ix=0; ix<nx; ix++) {
+            //   for (int iy=0; iy<ny; iy++) {
             //      a[SF][ix][iy] = 1.0 - 0.6*a[GG][ix][iy] -
             //                       0.3*a[RR][ix][iy] -
             //                       0.1*a[BB][ix][iy];
@@ -1508,8 +1480,8 @@ int main(int argc,char **argv) {
                              thisc[0],thisc[1],thisc[2], 1000,
                              nx,ny,a[RR],a[GG],a[BB]);
          // reset scalar temperature
-         for (ix=0; ix<nx; ix++) {
-            for (iy=0; iy<ny; iy++) {
+         for (int ix=0; ix<nx; ix++) {
+            for (int iy=0; iy<ny; iy++) {
                a[SF][ix][iy] = 1.0 - 0.6*a[GG][ix][iy] -
                                 0.3*a[RR][ix][iy] -
                                 0.1*a[BB][ix][iy];
@@ -1531,8 +1503,8 @@ int main(int argc,char **argv) {
          float meanshear = 0.0;
 
          //#pragma omp parallel for private() reduce()
-         for (ix=0; ix<nx; ix++) {
-            for (iy=0; iy<ny; iy++) {
+         for (int ix=0; ix<nx; ix++) {
+            for (int iy=0; iy<ny; iy++) {
                if (shear[ix][iy] < minshear) minshear = shear[ix][iy];
                if (shear[ix][iy] > maxshear) maxshear = shear[ix][iy];
 
@@ -1592,8 +1564,8 @@ int main(int argc,char **argv) {
          }
          if (doit) {
             #pragma omp parallel for
-            for (ix=0; ix<nx; ix++) {
-               for (iy=0; iy<ny; iy++) {
+            for (int ix=0; ix<nx; ix++) {
+               for (int iy=0; iy<ny; iy++) {
                   a[W2][ix][iy] += factor * (rand()/(float)RAND_MAX - 0.5);
                }
             }
@@ -1605,8 +1577,8 @@ int main(int argc,char **argv) {
          // multiply entire field by a decay factor
          const float factor = vort_suppress_factor * dt;
          #pragma omp parallel for
-         for (ix=0; ix<nx; ix++) {
-            for (iy=0; iy<ny; iy++) {
+         for (int ix=0; ix<nx; ix++) {
+            for (int iy=0; iy<ny; iy++) {
                a[W2][ix][iy] *= exp(-factor*a[W2][ix][iy]*a[W2][ix][iy]);
             }
          }
@@ -1615,8 +1587,8 @@ int main(int argc,char **argv) {
       // clamp the temperature field
       if (use_TEMP && TRUE) {
          #pragma omp parallel for
-         for (ix=0; ix<nx; ix++) {
-            for (iy=0; iy<ny; iy++) {
+         for (int ix=0; ix<nx; ix++) {
+            for (int iy=0; iy<ny; iy++) {
                if (a[SF][ix][iy] > 1.0) a[SF][ix][iy] = 1.0;
                if (a[SF][ix][iy] < -1.0) a[SF][ix][iy] = -1.0;
             }
@@ -1626,8 +1598,8 @@ int main(int argc,char **argv) {
       // overlay the heat map
       if (use_heat_img) {
          #pragma omp parallel for
-         for (ix=0; ix<nx; ix++) {
-            for (iy=0; iy<ny; iy++) {
+         for (int ix=0; ix<nx; ix++) {
+            for (int iy=0; iy<ny; iy++) {
                a[SF][ix][iy] += dt * heat_coeff * heat[ix][iy];
                if (a[SF][ix][iy] > 1.0) a[SF][ix][iy] = 1.0;
                if (a[SF][ix][iy] < -1.0) a[SF][ix][iy] = -1.0;
@@ -1638,9 +1610,9 @@ int main(int argc,char **argv) {
       // overlay the edge color input
       if (use_COLOR && overlay_color_tb) {
          int nthick = 6;
-         for (iy=0; iy<nthick; iy++) {
+         for (int iy=0; iy<nthick; iy++) {
             float tfac = 1.0 / (float)(iy+1);
-            for (ix=0; ix<nx; ix++) {
+            for (int ix=0; ix<nx; ix++) {
                a[RR][ix][iy] = tfac*color_bottom[0][ix] + (1.0-tfac)*a[RR][ix][iy];
                a[GG][ix][iy] = tfac*color_bottom[1][ix] + (1.0-tfac)*a[GG][ix][iy];
                a[BB][ix][iy] = tfac*color_bottom[2][ix] + (1.0-tfac)*a[BB][ix][iy];
@@ -1652,9 +1624,9 @@ int main(int argc,char **argv) {
       }
       if (use_COLOR && overlay_color_lr) {
          int nthick = 6;
-         for (ix=0; ix<nthick; ix++) {
+         for (int ix=0; ix<nthick; ix++) {
             float tfac = 1.0 / (float)(ix+1);
-            for (iy=0; iy<ny; iy++) {
+            for (int iy=0; iy<ny; iy++) {
                a[RR][ix][iy] = tfac*color_left[0][iy] + (1.0-tfac)*a[RR][ix][iy];
                a[GG][ix][iy] = tfac*color_left[1][iy] + (1.0-tfac)*a[GG][ix][iy];
                a[BB][ix][iy] = tfac*color_left[2][iy] + (1.0-tfac)*a[BB][ix][iy];
@@ -1669,8 +1641,8 @@ int main(int argc,char **argv) {
       if (use_COLOR && use_color_area && FALSE) {
          const float tfac = 0.1;
          float thiscol[3];
-         for (ix=0; ix<nx; ix++) {
-            for (iy=0; iy<ny; iy++) {
+         for (int ix=0; ix<nx; ix++) {
+            for (int iy=0; iy<ny; iy++) {
                // use current vel to select color
                const float thisvel = sqrt(pow(u[XV][ix][iy],2) + pow(u[YV][ix][iy],2));
                (void) get_color (cmi, cnx, cny, 0.02*simtime, MIN(1.0,5.0*thisvel), thiscol);
@@ -1720,8 +1692,7 @@ int main(int argc,char **argv) {
 float compute_and_write_stats(int silent, int step, float dt, float simtime, float cputime,
       int nx, int ny, int xbdry, int ybdry, float ***u) {
 
-   int i,j;
-   float ke,base_mult,multx,multy,velsq,vmax,cn;
+   float ke,base_mult,multx,multy,vmax,cn;
    static char outfile[MAXCHARS];
    static int initialized = FALSE;
    static FILE *outp;
@@ -1747,10 +1718,10 @@ float compute_and_write_stats(int silent, int step, float dt, float simtime, flo
    // find kinetic energy
    ke = 0.;
    base_mult = 1.0 / ((nx-1) * (ny-1));
-   for (i=0; i<nx; i++) {
+   for (int i=0; i<nx; i++) {
       if (i==0 || i==nx-1) multx = base_mult*0.5;
          else multx = base_mult;
-      for (j=0; j<ny; j++) {
+      for (int j=0; j<ny; j++) {
          if (j==0 || j==ny-1) multy = multx*0.5;
             else multy = multx;
          ke += multy*(u[XV][i][j]*u[XV][i][j] + u[YV][i][j]*u[YV][i][j]);
@@ -1761,9 +1732,9 @@ float compute_and_write_stats(int silent, int step, float dt, float simtime, flo
 
    // find vmax
    vmax = 0.;
-   for (i=0; i<nx; i++) {
-      for (j=0; j<ny; j++) {
-         velsq = u[XV][i][j]*u[XV][i][j] + u[YV][i][j]*u[YV][i][j];
+   for (int i=0; i<nx; i++) {
+      for (int j=0; j<ny; j++) {
+         float velsq = u[XV][i][j]*u[XV][i][j] + u[YV][i][j]*u[YV][i][j];
          if (velsq > vmax) vmax = velsq;
       }
    }
@@ -1789,14 +1760,13 @@ void paint_splat (float sx,float sy, float ex,float ey, float rad,float thresh,
                   float r,float g,float b, int nspots,
                   int nx,int ny, float **red,float **grn,float **blu) {
 
-   int i,ix,iy;
    float cx,cy,px,py,temp;
    float **spot;
 
    // must use isosurface of Gaussian-splattered spots
    // first, create x,y,z locations and strengths of blobs
    spot = allocate_2d_array_f(nspots,3);
-   for (i=0; i<nspots; i++) {
+   for (int i=0; i<nspots; i++) {
       cx = i/(float)nspots;
       // create two Gaussian random numbers for the spot location
       px = (float)(rand())/(float)(RAND_MAX);
@@ -1809,14 +1779,14 @@ void paint_splat (float sx,float sy, float ex,float ey, float rad,float thresh,
    }
    // now, loop over all pixels, perform a summation to see if the
    //   pixel is "inside" or "outside" of the isosurface
-   for (ix=0; ix<nx; ix++) {
-      for (iy=0; iy<ny; iy++) {
+   for (int ix=0; ix<nx; ix++) {
+      for (int iy=0; iy<ny; iy++) {
          // pixel position
          px = ix/(float)nx;
          py = iy/(float)ny;
          // scalar potential
          temp = 0.;
-         for (i=0; i<nspots; i++) {
+         for (int i=0; i<nspots; i++) {
             cx = spot[i][0] - px;
             cy = spot[i][1] - py;
             temp += spot[i][2]/(cx*cx+cy*cy);
@@ -1842,11 +1812,9 @@ void paint_splat (float sx,float sy, float ex,float ey, float rad,float thresh,
  */
 void get_random_color (float ***cmi, int nx, int ny, float *thisc) {
 
-   int ix,iy;
-
    // choose random coordinate
-   ix = nx*(float)rand()/(float)RAND_MAX;
-   iy = ny*(float)rand()/(float)RAND_MAX;
+   int ix = nx*(float)rand()/(float)RAND_MAX;
+   int iy = ny*(float)rand()/(float)RAND_MAX;
 
    thisc[0] = cmi[0][ix][iy];
    thisc[1] = cmi[1][ix][iy];
@@ -1858,10 +1826,8 @@ void get_random_color (float ***cmi, int nx, int ny, float *thisc) {
  */
 void get_color (float ***cmi, int imx, int imy, float x, float y, float *thisc) {
 
-   int ix,iy;
-
-   ix = x * imx;
-   iy = y * imy;
+   const int ix = x * imx;
+   const int iy = y * imy;
 
    if (ix>-1 && iy>-1 && ix<imx && iy<imy) {
      thisc[0] = cmi[0][ix][iy];
