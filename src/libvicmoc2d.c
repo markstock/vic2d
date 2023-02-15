@@ -1008,7 +1008,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
 
          iparm[11] = 0;	// no initial guess for psi is provided
 			// why can't we provide psi from the last step?
-         iparm[12] = 10;	// max # multigrid cycles at finest res
+         iparm[12] = 4;	// max # multigrid cycles at finest res
          iparm[13] = 0;	// method of relaxation (0=point, 3=line x and y)
          iparm[14] = iworksize;	// size of workspace
 
