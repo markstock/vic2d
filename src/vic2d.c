@@ -24,7 +24,7 @@
 #include "particles.h"
 #include "vicmoc.h"
 
-float compute_and_write_stats(int, int, float, float, float, int, int, int, int, float***);
+float compute_and_write_stats(int, int, float, float, float, int, int, int, int, float***,float**);
 void paint_splat (float,float,float,float,float,float,float,float,float,int,int,int,float**,float**,float**);
 void get_random_color (float***,int,int,float*);
 void get_color (float***,int,int,float,float,float*);
@@ -1666,7 +1666,7 @@ int main(int argc,char **argv) {
 
       // write statistics
       if (writeOutput) {
-         vmax = compute_and_write_stats(silent,step,dt,simtime,cputime,nx,ny,xbdry,ybdry,u);
+         vmax = compute_and_write_stats(silent,step,dt,simtime,cputime,nx,ny,xbdry,ybdry,u,a[W2]);
       }
 
       if (first_time) first_time = FALSE;
@@ -1678,7 +1678,7 @@ int main(int argc,char **argv) {
 
    // close out the stats file properly
    if (writeOutput && maxstep > 0) {
-      compute_and_write_stats(silent,-1,dt,simtime,cputime,nx,ny,xbdry,ybdry,u);
+      compute_and_write_stats(silent,-1,dt,simtime,cputime,nx,ny,xbdry,ybdry,u,a[W2]);
    }
 
    if (!silent) fprintf(stderr,"\nDone.\n");
@@ -1690,9 +1690,9 @@ int main(int argc,char **argv) {
  * Do just what it says
  */
 float compute_and_write_stats(int silent, int step, float dt, float simtime, float cputime,
-      int nx, int ny, int xbdry, int ybdry, float ***u) {
+      int nx, int ny, int xbdry, int ybdry, float ***u, float **w) {
 
-   float ke,base_mult,multx,multy,vmax,cn;
+   float ke,base_mult,multx,multy,vmax,wmax,cn;
    static char outfile[MAXCHARS];
    static int initialized = FALSE;
    static FILE *outp;
@@ -1713,6 +1713,8 @@ float compute_and_write_stats(int silent, int step, float dt, float simtime, flo
          exit(0);
       }
       initialized = TRUE;
+      fprintf(outp,"# step, simtime, KE, vort max, vel max, CN, cputime\n");
+      fflush(outp);
    }
 
    // find kinetic energy
@@ -1730,6 +1732,14 @@ float compute_and_write_stats(int silent, int step, float dt, float simtime, flo
    ke /= 2.;
    //fprintf(stdout,"ke is %g\n",ke);
 
+   // find vort max
+   wmax = 0.;
+   for (int i=0; i<nx; i++) {
+      for (int j=0; j<ny; j++) {
+         if (fabs(w[i][j]) > wmax) wmax = w[i][j];
+      }
+   }
+
    // find vmax
    vmax = 0.;
    for (int i=0; i<nx; i++) {
@@ -1743,10 +1753,11 @@ float compute_and_write_stats(int silent, int step, float dt, float simtime, flo
 
    // write the stats here
    if (!silent) {
-      fprintf(stdout,"%d %g %g %g %g %g\n",step,simtime,ke,vmax,cn,cputime);
+      if (step%10 == 0) fprintf(stdout,"# step, simtime, KE, vort max, vel max, CN, cputime\n");
+      fprintf(stdout,"%d %g %g %g %g %g %g\n",step,simtime,ke,wmax,vmax,cn,cputime);
       fflush(stdout);
    }
-   fprintf(outp,"%d %g %g %g %g %g\n",step,simtime,ke,vmax,cn,cputime);
+   fprintf(outp,"%d %g %g %g %g %g %g\n",step,simtime,ke,wmax,vmax,cn,cputime);
    fflush(outp);
 
    return(vmax);
