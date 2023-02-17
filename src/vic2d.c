@@ -1,9 +1,9 @@
 /*
  * vic2d.c - driver file for two-dimensional vortex-in-cell method-of-characteristics
  *
- * Copyright 2004-20 Mark J. Stock <mstock@umich.edu>
+ * Copyright 2004-23 Mark J. Stock <mstock@umich.edu>
  *
- * a 2D vortex method which uses the method of characteristics for the
+ * a 2D vortex-in-cell method which uses the method of characteristics for the
  * convection step, and a single explicit step for diffusion and vorticity
  * creation from walls
  *
@@ -14,17 +14,19 @@
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
-#include <time.h>
+#include <sys/time.h>
+
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+
 #include "utility.h"
 #include "maskops.h"
 #include "inout.h"
 #include "particles.h"
 #include "vicmoc.h"
 
-float compute_and_write_stats(int, int, float, float, float, int, int, int, int, float***,float**);
+float compute_and_write_stats(int, int, float, float, double, int, int, int, int, float***,float**);
 void paint_splat (float,float,float,float,float,float,float,float,float,int,int,int,float**,float**,float**);
 void get_random_color (float***,int,int,float*);
 void get_color (float***,int,int,float,float,float*);
@@ -109,9 +111,7 @@ int main(int argc,char **argv) {
    float randvortscale = -1;
    float vort_suppress_factor = -1;
    float overlay_fraction = 0.01;
-   float cputime = 0.;
-   float totcputime = 0.;
-   float avgcputime = 0.;
+   double walltime = 0.;
    float simtime = 0.;
    float thisc[3];
    float maskerr = 5.e-3;
@@ -169,6 +169,7 @@ int main(int argc,char **argv) {
 
    // bookkeeping
    unsigned long int tics,last_tics;
+   struct timeval t_curr, t_last;
    char progname[MAXCHARS];
    char outfileroot[MAXCHARS];
    int use_vort_img = FALSE;
@@ -1172,8 +1173,6 @@ int main(int argc,char **argv) {
    // Iterate through time
 
    step = 0;
-   simtime = 0.0;
-   totcputime = 0.0;
    while (TRUE) {
 
       // fprintf(stdout,"\nBegin step %d\n",step);
@@ -1378,7 +1377,7 @@ int main(int argc,char **argv) {
       }
 
       // set the timer
-      last_tics = clock();
+      gettimeofday(&t_last, 0);
 
       // should we test for freeze?
       if (freeze_flow) {
@@ -1654,19 +1653,12 @@ int main(int argc,char **argv) {
       }
 
       // calculate the total time elapsed, and the time for this last step
-      tics = clock();
-      cputime = ((float)tics-(float)last_tics)/CLOCKS_PER_SEC;
-      if (cputime < 0.0) cputime += 4.2949673e+09/(float)CLOCKS_PER_SEC;
-      totcputime += cputime;
-      avgcputime = totcputime/(step+1);
-      //fprintf(stdout,"  took %g sec\n",cputime);
-      //fprintf(stdout,"  total %g and mean %g sec\n",totcputime,avgcputime);
-      //fprintf(stdout,"mean step time: %.3g sec, effective Re %g\n",
-      //   avgcputime,effective_re);
+      gettimeofday(&t_curr, 0);
+      walltime = (t_curr.tv_sec - t_last.tv_sec) + (t_curr.tv_usec - t_last.tv_usec)*1e-6;
 
       // write statistics
       if (writeOutput) {
-         vmax = compute_and_write_stats(silent,step,dt,simtime,cputime,nx,ny,xbdry,ybdry,u,a[W2]);
+         vmax = compute_and_write_stats(silent,step,dt,simtime,walltime,nx,ny,xbdry,ybdry,u,a[W2]);
       }
 
       if (first_time) first_time = FALSE;
@@ -1678,7 +1670,7 @@ int main(int argc,char **argv) {
 
    // close out the stats file properly
    if (writeOutput && maxstep > 0) {
-      compute_and_write_stats(silent,-1,dt,simtime,cputime,nx,ny,xbdry,ybdry,u,a[W2]);
+      compute_and_write_stats(silent,-1,dt,simtime,walltime,nx,ny,xbdry,ybdry,u,a[W2]);
    }
 
    if (!silent) fprintf(stderr,"\nDone.\n");
@@ -1689,10 +1681,11 @@ int main(int argc,char **argv) {
 /*
  * Do just what it says
  */
-float compute_and_write_stats(int silent, int step, float dt, float simtime, float cputime,
+float compute_and_write_stats(int silent, int step, float dt, float simtime, double walltime,
       int nx, int ny, int xbdry, int ybdry, float ***u, float **w) {
 
    float ke,base_mult,multx,multy,vmax,wmax,cn;
+   static double total_time = 0.0;
    static char outfile[MAXCHARS];
    static int initialized = FALSE;
    static FILE *outp;
@@ -1713,7 +1706,7 @@ float compute_and_write_stats(int silent, int step, float dt, float simtime, flo
          exit(0);
       }
       initialized = TRUE;
-      fprintf(outp,"# step, simtime, KE, vort max, vel max, CN, cputime\n");
+      fprintf(outp,"# step, sim time, KE, vort max, vel max, CN, cpu time step, cpu time total\n");
       fflush(outp);
    }
 
@@ -1751,13 +1744,16 @@ float compute_and_write_stats(int silent, int step, float dt, float simtime, flo
    vmax = sqrt(vmax);
    cn = vmax*(nx+1)*dt;
 
+   // and time
+   total_time += walltime;
+
    // write the stats here
    if (!silent) {
-      if (step%10 == 0) fprintf(stdout,"# step, simtime, KE, vort max, vel max, CN, cputime\n");
-      fprintf(stdout,"%d %g %g %g %g %g %g\n",step,simtime,ke,wmax,vmax,cn,cputime);
+      if (step%10 == 0) fprintf(stdout,"# step, sim time, KE, vort max, vel max, CN, cpu step time, cpu total time\n");
+      fprintf(stdout,"%d %g %g %g %g %g %g %g\n",step,simtime,ke,wmax,vmax,cn,walltime,total_time);
       fflush(stdout);
    }
-   fprintf(outp,"%d %g %g %g %g %g %g\n",step,simtime,ke,wmax,vmax,cn,cputime);
+   fprintf(outp,"%d %g %g %g %g %g %g %g\n",step,simtime,ke,wmax,vmax,cn,walltime,total_time);
    fflush(outp);
 
    return(vmax);
