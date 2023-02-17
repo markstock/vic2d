@@ -2,6 +2,8 @@
 
 A command-line two-dimensional fluid simulator using a novel semi-Lagrangian advection technique
 
+![vorticies in a flow](media/sampleA.png?raw=true "vic2d simulation of vorticity rings")
+
 ## Building vic2d
 
 We are now using CMake to build the code, though you can still use the unmaintained unix `Makefile`.
