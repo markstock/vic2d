@@ -44,6 +44,7 @@ int main(int argc,char **argv) {
    int step = -1;
    int maxstep = 99999;
    int writeevery = 1;
+   int checkpointevery = -1;
    int outscale = 1;
    int use_16bpp = FALSE;
    int silent = FALSE;
@@ -276,6 +277,9 @@ int main(int argc,char **argv) {
          }
       } else if (strncmp(argv[i], "-constcn", 8) == 0) {
          courantconst = atof(argv[++i]);
+      } else if (strncmp(argv[i], "-checkpoint", 4) == 0) {
+         checkpointevery = atoi(argv[++i]);
+         if (checkpointevery < 1) checkpointevery = -1;
 
       } else if (strncmp(argv[i], "-tf", 3) == 0) {
          strcpy (tempfilename,argv[++i]);
@@ -1324,6 +1328,56 @@ int main(int argc,char **argv) {
       } // OMP sections
       } // if writeOutput && step%writeevery == 0
 
+      // compute wmax and write checkpoint files
+      if (checkpointevery > 0 && step > 0 && step%checkpointevery == 0) {
+         fprintf(stderr,"  writing checkpoint files for restart...\n");
+
+         // find vort max
+         float wmax = 1.e-20;
+         for (int i=0; i<nx; i++) {
+            for (int j=0; j<ny; j++) {
+               if (fabs(a[W2][i][j]) > wmax) wmax = a[W2][i][j];
+            }
+         }
+
+         // write vorticity (always 16bpp to keep precision)
+         strcpy(outfileroot,"restart_vort");
+         write_png (outfileroot,nx,ny,FALSE,use_16bpp,
+                    a[W2],-wmax,2.*wmax,
+                    NULL,0.0,1.0,
+                    NULL,0.0,1.0);
+
+         // write temperature
+         if (use_TEMP) {
+            strcpy(outfileroot,"restart_temp");
+            write_png (outfileroot,nx,ny,FALSE,use_16bpp,
+                       a[SF],-1.0,2.0,
+                       NULL,0.0,1.0,
+                       NULL,0.0,1.0);
+         }
+
+         // write color
+         if (use_COLOR) {
+            strcpy(outfileroot,"restart_color");
+            write_png (outfileroot,nx,ny,TRUE,use_16bpp,
+                       a[RR],0.0,1.0,
+                       a[GG],0.0,1.0,
+                       a[BB],0.0,1.0);
+         }
+
+         // echo restart command line
+         fprintf(stderr,"  restart from this point with:\n");
+         fprintf(stderr,"%s",argv[0]);
+         for (int i=1; i<argc; i++) {
+            fprintf(stderr," %s",argv[i]);
+         }
+         fprintf(stderr," -vf restart_vort.png");
+         fprintf(stderr," -vscale %g",wmax);
+         if (use_TEMP) fprintf(stderr," -tf restart_temp.png");
+         if (use_COLOR) fprintf(stderr," -cf restart_color.png");
+         fprintf(stderr,"\n");
+      }
+
       // check end conditions
       if (step >= maxstep) break;
 
@@ -1932,6 +1986,8 @@ int Usage(char progname[MAXCHARS],int status) {
    "               default=1                                                   ",
    "                                                                           ",
    "   -every [int] write only every so many steps, default=1 (every step)     ",
+   "   -checkpoint [int] write checkpoint files every so many steps,           ",
+   "               default=-1 (no checkpointing)                               ",
    "   -noout      suppress all file output                                    ",
    "   -step [int] run a fixed number of steps; default=99999                  ",
    "                                                                           ",
