@@ -1128,9 +1128,11 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
       //   fprintf(stdout,"\n");
       //}
 
-      // catch a runtime error
-      if (ierr < 0) {
-         fprintf(stderr,"WARNING (mud2sp_): ierr = %d\n",ierr);
+      // catch a runtime error (see mud2sp.d:952)
+      if (ierr == -1) {
+         fprintf(stderr,"  warning (mud2sp_): error after %d cycles is %g, desired is %g\n",iparm[12],fparm[5],fparm[4]);
+      } else if (ierr < 0) {
+         fprintf(stderr,"  warning (mud2sp_): ierr = %d\n",ierr);
       } else if (ierr > 0) {
          fprintf(stderr,"ERROR (mud2sp_): ierr = %d\n",ierr);
          fprintf(stderr,"Quitting.\n");
