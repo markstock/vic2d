@@ -1,10 +1,12 @@
 /*
  * VIC-MOC - vicmoc.h - structures and defines for both codes
  *
- * Copyright 2004-7,20 Mark J. Stock <mstock@umich.edu>
+ * Copyright 2004-7,20,23 Mark J. Stock <mstock@umich.edu>
  */
 
 #pragma once
+
+#include <stdbool.h>
 
 #define M_PI 3.14159265358979323846
 #define MAXCHARS 255
@@ -34,10 +36,10 @@
  			// be set to "float" because the gr2.c routines require it
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
-#define TRUE 1
-#define FALSE 0
 #define EPSILON 1.0e-6
-#define WALL 0		// these are for boundary conditions
+
+// these are for boundary conditions - move these to an enum
+#define WALL 0
 #define OPEN 1
 #define PERIODIC 2
 

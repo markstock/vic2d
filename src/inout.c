@@ -1,16 +1,17 @@
 /*
  * VIC-MOC - inout.c - routines for input and output
  *
- * Copyright 2004-7,20 Mark J. Stock <mstock@umich.edu>
+ * Copyright 2004-7,20,23 Mark J. Stock <mstock@umich.edu>
  */
 
-#include <stdlib.h>
 #include "inout.h"
 #include "utility.h"
 #include "vicmoc.h"
 #define png_infopp_NULL (png_infopp)NULL
 #define int_p_NULL (int*)NULL
 #include "png.h"
+
+#include <stdlib.h>
 
 // local functions
 png_byte** allocate_2d_array_pb (int,int,int);
@@ -24,20 +25,20 @@ int free_2d_array_pb (png_byte**);
 int write_output(char *outfileroot,int nx,int ny,
    float **vort,float minrange,float range,int scale) {
 
-   int use_scale = FALSE;
-   int low_depth = TRUE;
-   int make_pngs = FALSE;
+   bool use_scale = false;
+   bool low_depth = true;
+   bool make_pngs = false;
    int i,j,ii,jj,printval;
    char outfile1[MAXCHARS];
    char outfile2[MAXCHARS];
    char command[3*MAXCHARS];
    float vortval,top,bottom,left,right;
-   int autorange = FALSE;
+   bool autorange = false;
    float newrange = 0.0;
    float newminrange = 9.9e+5;
    FILE *outfile;
 
-   if (scale > 1) use_scale = TRUE;
+   if (scale > 1) use_scale = true;
 
    if (autorange) {
       // reset the ranges, if desired
@@ -234,12 +235,12 @@ int write_output(char *outfileroot,int nx,int ny,
  * print a frame using 3 channels to png - 2D
  */
 int write_png (char *outfileroot, int nx, int ny,
-   int three_channel, int high_depth,
+   const bool three_channel, const bool high_depth,
    float **red, float redmin, float redrange,
    float **grn, float grnmin, float grnrange,
    float **blu, float blumin, float blurange) {
 
-   int autorange = FALSE;
+   bool autorange = false;
    int i,j,printval,bit_depth;
    char outfile[MAXCHARS];
    float newminrange,newmaxrange;
@@ -252,9 +253,9 @@ int write_png (char *outfileroot, int nx, int ny,
    png_structp png_ptr;
    png_infop info_ptr;
    static png_byte **img;
-   static int is_allocated = FALSE;
+   static bool is_allocated = false;
    static png_byte **imgrgb;
-   static int rgb_is_allocated = FALSE;
+   static bool rgb_is_allocated = false;
 
    // set specific bit depth
    if (high_depth) bit_depth = 16;
@@ -263,11 +264,11 @@ int write_png (char *outfileroot, int nx, int ny,
    // allocate the space for the special array
    if (!is_allocated && !three_channel) {
       img = allocate_2d_array_pb(nx,ny,bit_depth);
-      is_allocated = TRUE;
+      is_allocated = true;
    }
    if (!rgb_is_allocated && three_channel) {
       imgrgb = allocate_2d_rgb_array_pb(nx,ny,bit_depth);
-      rgb_is_allocated = TRUE;
+      rgb_is_allocated = true;
    }
 
    // set the sizes in png-understandable format
@@ -604,14 +605,14 @@ int read_png_res (char *infile, int *hgt, int *wdt) {
  * read a PNG, write it to 1 or 3 channels
  */
 int read_png (char *infile, int nx, int ny,
-   int expect_three_channel,
-   int overlay, float overlay_frac, int darkenonly,
+   const bool expect_three_channel,
+   int overlay, float overlay_frac, const bool darkenonly,
    float **red, float redmin, float redrange,
    float **grn, float grnmin, float grnrange,
    float **blu, float blumin, float blurange) {
 
-   int high_depth;
-   int three_channel;
+   bool high_depth = false;
+   bool three_channel = false;
    int i,j;
    float overlay_divisor = 1.0;
    FILE *fp;
@@ -624,7 +625,7 @@ int read_png (char *infile, int nx, int ny,
 
 
    // set up overlay divisor
-   if (overlay == TRUE) {
+   if (overlay == true) {
       // set divisor to blend original and incoming
       overlay_divisor = 1.0 + overlay_frac;
    }
@@ -728,8 +729,8 @@ int read_png (char *infile, int nx, int ny,
    }
 
    // set channels
-   if (color_type == PNG_COLOR_TYPE_GRAY) three_channel = FALSE;
-   else three_channel = TRUE;
+   if (color_type == PNG_COLOR_TYPE_GRAY) three_channel = false;
+   else three_channel = true;
 
    if (expect_three_channel && !three_channel) {
      fprintf(stderr,"ERROR: expecting 3-channel PNG, but input is 1-channel\n");
@@ -746,8 +747,8 @@ int read_png (char *infile, int nx, int ny,
    }
 
    // set specific bit depth
-   if (bit_depth == 16) high_depth = TRUE;
-   else high_depth = FALSE;
+   if (bit_depth == 16) high_depth = true;
+   else high_depth = false;
 
    // make sure pixel sizes match exactly!
    if (ny != height || nx != width) {
@@ -894,17 +895,18 @@ int read_png (char *infile, int nx, int ny,
 /*
  * print a frame - 3D
  */
-int write_output_3d(char *outfileroot,int nx,int ny,int nz,float ***in,
-   float minrange,float range,int outscale,int integrated) {
+int write_output_3d(char *outfileroot, int nx, int ny, int nz,
+   float ***in, float minrange, float range,
+   int outscale, const bool integrated) {
 
    int i,j,k;
    static float **plane;
-   static int set_plane = FALSE;
+   static bool set_plane = false;
 
    // allocate the memory
    if (!set_plane) {
       plane = allocate_2d_array_f(nx,nz);
-      set_plane = TRUE;
+      set_plane = true;
    }
 
    if (integrated) {

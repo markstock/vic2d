@@ -1,15 +1,17 @@
 /*
  * VIC-MOC - libvicmoc2d.c - the library for the 2D routines
  *
- * Copyright 2004-20 Mark J. Stock <mstock@umich.edu>
+ * Copyright 2004-23 Mark J. Stock <mstock@umich.edu>
  */
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+
 #include "utility.h"
 #include "inout.h"
 #include "vicmoc.h"
@@ -33,7 +35,7 @@ int find_shear_magnitude (int, int, int, int, float**, float, float**, float, fl
 int find_curl_of_vel_2d (int,int,int,int,float**,float**,float**);
 int moc_advect_2d (int,int,int,int,float**,float**,float**,float*,float***,float***,float,int,int);
 int find_open_boundary_psi (int,int,float**,float,float*,float**);
-int find_biot_savart (int,float,float,int,int,float,float,float**,float*);
+int find_biot_savart (const bool,const float,const float,const int,const int,const float,const float,float**,float*);
 void recursive_biot_savart (const float, const float, const int, const int, const int, const float, const float, float***, float*);
 
 // interpolation routines
@@ -181,7 +183,7 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
     // first, do the arrays exist?
     if (a[k] != NULL && t[k] != NULL) {
       // next, do we even diffuse them?
-      if (TRUE) {
+      if (true) {
         // finally, is the diffusivity uniform or variable?
         if (sc_diffus[k] < 0.0) {
           // run the variable viscosity routine (always use MD for now)
@@ -290,7 +292,7 @@ int create_baroclinic_vorticity_2d (int nx,int ny,int xbdry,int ybdry,
    int i,j;
    //float g[2] = {0.0,-1.0};
    static float **grad[2];
-   static int set_grad = FALSE;
+   static bool set_grad = false;
    const float fac = dt;
 
    // fprintf(stderr,"in create_baroclinic_vorticity_2d\n"); fflush(stderr);
@@ -302,7 +304,7 @@ int create_baroclinic_vorticity_2d (int nx,int ny,int xbdry,int ybdry,
    if (!set_grad) {
       grad[0] = allocate_2d_array_f(nx,ny);
       grad[1] = allocate_2d_array_f(nx,ny);
-      set_grad = TRUE;
+      set_grad = true;
    }
 
    // first, find the scalar gradient
@@ -351,7 +353,7 @@ int create_baroclinic_vorticity_2d (int nx,int ny,int xbdry,int ybdry,
 int create_boundary_vorticity_2d (int nx,int ny,int xbdry,int ybdry,
       float **u,float **v,float **vort,float dt) {
 
-   int skip_it = FALSE;
+   bool skip_it = false;
    int i,j;
    int nxm1 = nx-1;
    int nym1 = ny-1;
@@ -484,7 +486,7 @@ float diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,
    for (istep=0; istep<numsteps; istep++) {
 
    // do the middle part of the field, regardless of the BCs
-   if (FALSE && use_MASK) {
+   if (false && use_MASK) {
      if (vartype == W2) {
        // this is vorticity, allow it to diffuse from masks
        #pragma omp parallel for private(i,j)
@@ -680,7 +682,7 @@ float variable_diffuse_scalar_2d (int nx,int ny,int xbdry,int ybdry,
    for (istep=0; istep<numsteps; istep++) {
 
    // do the middle part of the field, regardless of the BCs
-   if (FALSE && use_MASK) {
+   if (false && use_MASK) {
      #pragma omp parallel for private(i,j)
      for (i=1;i<nxm1;i++) {
        for (j=1;j<nym1;j++) {
@@ -813,8 +815,8 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
       float **u,float **v,float **vort,
       const int use_MASK,float **mask,const float maskerr) {
 
-   int use_multigrid = TRUE;	// use MUDPACK solver mud2sp.f
-   //int use_multigrid = FALSE;	// use FISHPAK solver gr2.c
+   bool use_multigrid = true;	// use MUDPACK solver mud2sp.f
+   //bool use_multigrid = false;	// use FISHPAK solver gr2.c
    int i,j;
    // these are for hwscrt, FISHPAK
    int nxm1 = nx-1;
@@ -833,7 +835,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    static float fparm[6];
    static float **rhs;
    static int mgopt[4];
-   static int must_initialize = TRUE;
+   static bool must_initialize = true;
    float muderr = 1.e-5;
    // these are for both
    int ierr;
@@ -841,7 +843,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    static float *work;	// increasing this does not fix hwscrt's problem
    float xs,xf,ys,yf;
    static float **psi;
-   static int allocated_arrays = FALSE;
+   static bool allocated_arrays = false;
    int istep,maxstep;
    float maxvort,temp,maxcorr,tempscale;
    static float **cu;
@@ -850,7 +852,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    static float **cw_sum;
    static float **cw_old;
    char outfileroot[MAXCHARS];
-   static int mask_grad_not_set = TRUE;
+   static bool mask_grad_not_set = true;
    static float **maskgrad;
    static float **mg;
 
@@ -875,7 +877,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
          cw_old = allocate_2d_array_f(nx,ny);
       }
 
-      allocated_arrays = TRUE;
+      allocated_arrays = true;
    }
 
    // set domain dimensions
@@ -1008,7 +1010,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
 
          iparm[11] = 0;	// no initial guess for psi is provided
 			// why can't we provide psi from the last step?
-         iparm[12] = 4;	// max # multigrid cycles at finest res
+         iparm[12] = 10;	// max # multigrid cycles at finest res
          iparm[13] = 0;	// method of relaxation (0=point, 3=line x and y)
          iparm[14] = iworksize;	// size of workspace
 
@@ -1025,6 +1027,11 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
          //iparm[12] = 10;
 
          mgopt[0] = 0;	// use default multigrid options
+         // these are the defaults
+         //mgopt[0] = 2;	// use w-cycling
+         //mgopt[1] = 2;	// pre-relaxation sweeps
+         //mgopt[2] = 1;	// post-relaxation sweeps
+         //mgopt[3] = 3;	// multi-cubic prolongation
 
          // initialize psi
          for (i=0;i<nx;i++) {
@@ -1060,7 +1067,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
          }
 
          // don't do this again
-         must_initialize = FALSE;
+         must_initialize = false;
 
          // reset the intl parameter
          iparm[0] = 1;
@@ -1216,7 +1223,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
 
    // write some debug stuff
    //sprintf(outfileroot,"psi_%05d",step);
-   //write_png (outfileroot,nx,ny,FALSE,FALSE,
+   //write_png (outfileroot,nx,ny,false,false,
    //                    psi,-0.1,0.2,
    //                    NULL,0.0,1.0,
    //                    NULL,0.0,1.0);
@@ -1264,7 +1271,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    if (use_MASK) {
 
       // allocate space for the mask gradient magnitude
-      if (FALSE && mask_grad_not_set) {
+      if (false && mask_grad_not_set) {
          maskgrad = allocate_2d_array_f(nx,ny);
          mg = allocate_2d_array_f(nx,ny);
          find_gradient_of_scalar_2nd_2d (nx,ny,xbdry,ybdry,mask,NULL,maskgrad,1.0,mg,1.0);
@@ -1283,10 +1290,10 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
          }
 
          free_2d_array_f(mg);
-         mask_grad_not_set = FALSE;
+         mask_grad_not_set = false;
 
          // test print this new mask
-         //write_png ("maskgrad",nx,ny,FALSE,FALSE,maskgrad,0.0,0.5,NULL,0.0,1.0,NULL,0.0,1.0);
+         //write_png ("maskgrad",nx,ny,false,false,maskgrad,0.0,0.5,NULL,0.0,1.0,NULL,0.0,1.0);
       }
 
       // first, find counter-velocity
@@ -1299,10 +1306,10 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
 
       // test-print counter-velocity
       //sprintf(outfileroot,"cu_%05d",istep);
-      //write_png (outfileroot,nx,ny,FALSE,FALSE,cu,-0.1,0.2,
+      //write_png (outfileroot,nx,ny,false,false,cu,-0.1,0.2,
       //           NULL,0.0,1.0,NULL,0.0,1.0);
       //sprintf(outfileroot,"cv_%05d",istep);
-      //write_png (outfileroot,nx,ny,FALSE,FALSE,cv,-0.1,0.2,
+      //write_png (outfileroot,nx,ny,false,false,cv,-0.1,0.2,
       //           NULL,0.0,1.0,NULL,0.0,1.0);
 
       // compute counter-vorticity
@@ -1310,7 +1317,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
 
       // test-print counter-vorticity
       //sprintf(outfileroot,"cw_%05d",istep);
-      //write_png (outfileroot,nx,ny,FALSE,FALSE,cw,-10.0,20.0,
+      //write_png (outfileroot,nx,ny,false,false,cw,-10.0,20.0,
       //           NULL,0.0,1.0,NULL,0.0,1.0);
 
       // add counter-vorticity to vorticity field and iterate!
@@ -1445,7 +1452,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
       for (int icnt=0; icnt<ncnt; ++icnt) {
          // diffuse cw_sum into cw
          (void) diffuse_scalar_2d (nx,ny,xbdry,ybdry,W2,cw_sum,cw,
-                                   diffus,FALSE,NULL,1.0);
+                                   diffus,false,NULL,1.0);
 
          // copy cw back into cw_sum
          for (i=0;i<nx;i++) {
@@ -1490,12 +1497,12 @@ int find_open_boundary_psi (int nx,int ny,float **vort,
    else vel = allocate_1d_array_f((long int)ny);
 
    // initialize the static variables
-   find_biot_savart (TRUE,0.,0.,nx,ny,dx,dy,vort,thisvel);
+   find_biot_savart (true,0.,0.,nx,ny,dx,dy,vort,thisvel);
 
    // first, march across bottom row (j=0, y=0)
    #pragma omp parallel for private(i,thisvel)
    for (i=0;i<nx;i++) {
-     find_biot_savart (FALSE,i*dx,0.,nx,ny,dx,dy,vort,thisvel);
+     find_biot_savart (false,i*dx,0.,nx,ny,dx,dy,vort,thisvel);
      vel[i] = freestream[1] + thisvel[1];
    }
    //exit(0);
@@ -1508,7 +1515,7 @@ int find_open_boundary_psi (int nx,int ny,float **vort,
    // then march up left side
    #pragma omp parallel for private(j,thisvel)
    for (j=0;j<ny;j++) {
-     find_biot_savart (FALSE,0.,j*dy,nx,ny,dx,dy,vort,thisvel);
+     find_biot_savart (false,0.,j*dy,nx,ny,dx,dy,vort,thisvel);
      vel[j] = freestream[0] + thisvel[0];
    }
    for (j=1;j<ny;j++) {
@@ -1519,7 +1526,7 @@ int find_open_boundary_psi (int nx,int ny,float **vort,
    // then march up right side
    #pragma omp parallel for private(j,thisvel)
    for (j=0;j<ny;j++) {
-     find_biot_savart (FALSE,1.,j*dy,nx,ny,dx,dy,vort,thisvel);
+     find_biot_savart (false,1.,j*dy,nx,ny,dx,dy,vort,thisvel);
      vel[j] = freestream[0] + thisvel[0];
    }
    for (j=1;j<ny;j++) {
@@ -1530,7 +1537,7 @@ int find_open_boundary_psi (int nx,int ny,float **vort,
    // finally, march across top row (j=ny-1, y=yf)
    #pragma omp parallel for private(i,thisvel)
    for (i=0;i<nx;i++) {
-     find_biot_savart (FALSE,i*dx,yf,nx,ny,dx,dy,vort,thisvel);
+     find_biot_savart (false,i*dx,yf,nx,ny,dx,dy,vort,thisvel);
      vel[i] = freestream[1] + thisvel[1];
    }
    for (i=1;i<nx;i++) {
@@ -1543,13 +1550,13 @@ int find_open_boundary_psi (int nx,int ny,float **vort,
    return(0);
 }
 
-int find_biot_savart (const int initialize,
+int find_biot_savart (const bool initialize,
                       const float xp,const float yp,
                       const int nx,const int ny,
                       const float dx,const float dy,
                       float **vort,float *vel) {
 
-  const int treecode = FALSE;
+  const bool treecode = false;
   static int istart = 100000;
   static int iend = -1;
   static int jstart = 100000;
@@ -1557,7 +1564,7 @@ int find_biot_savart (const int initialize,
   float xdist,ydist,distsq;
   static int nlevels = -1;
   static float** va[20];
-  static int firsttime = TRUE;
+  static bool firsttime = true;
 
   // initialize some arrays
   if (initialize) {
@@ -1606,7 +1613,7 @@ int find_biot_savart (const int initialize,
     }
 
     // never alloc again
-    if (firsttime) firsttime = FALSE;
+    if (firsttime) firsttime = false;
     //fprintf(stderr,"%d %d  %d %d\n",istart,iend,jstart,jend);
   }
 
@@ -2276,22 +2283,22 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
          py = (float)j * dx;
 
 
-         int do_this_pixel = TRUE;
+         bool do_this_pixel = true;
          float velmult = 1.;
          if (mask != NULL) {
             // if we're fully inside of the mask, there's no need to advect
-            if (mask[i][j] < 1.e-5) do_this_pixel = FALSE;
+            if (mask[i][j] < 1.e-5) do_this_pixel = false;
             else velmult = mask[i][j];
          }
 
          // if this cell is on an inflow boundary, do not try to interpolate
          if (xbdry == OPEN) {
-            if (i==0 && fs[0] > 0.0) do_this_pixel = FALSE;
-            if (i==nx-1 && fs[0] < 0.0) do_this_pixel = FALSE;
+            if (i==0 && fs[0] > 0.0) do_this_pixel = false;
+            if (i==nx-1 && fs[0] < 0.0) do_this_pixel = false;
          }
          if (ybdry == OPEN) {
-            if (j==0 && fs[1] > 0.0) do_this_pixel = FALSE;
-            if (j==ny-1 && fs[1] < 0.0) do_this_pixel = FALSE;
+            if (j==0 && fs[1] > 0.0) do_this_pixel = false;
+            if (j==ny-1 && fs[1] < 0.0) do_this_pixel = false;
          }
 
          if (do_this_pixel) {
@@ -2312,7 +2319,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
             // should we subsample?
             int snx = 1;
             int sny = 1;
-            if (FALSE) {
+            if (false) {
                snx = 4;
                sny = 4;
             }
@@ -2775,7 +2782,7 @@ float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
    float mf;
    float mfsum = 0.;
    //const int debug = (px < 0.0 && py > 0.1 && py < 0.102);
-   const int debug = FALSE;
+   const bool debug = false;
 
    for (k=0; k<numout; k++) out[k] = 0.0;
 

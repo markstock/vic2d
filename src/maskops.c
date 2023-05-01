@@ -1,12 +1,13 @@
 /*
  * VIC-MOC - maskops.c - operations on dynamic masks
  *
- * Copyright 2014,20 Mark J. Stock <mstock@umich.edu>
+ * Copyright 2014,20,23 Mark J. Stock <mstock@umich.edu>
  */
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+
 #include "maskops.h"
 #include "inout.h"
 #include "utility.h"
@@ -36,7 +37,7 @@ int nblocks = 0;
 //
 void overlay_mask (int nx, int ny, float** mask) {
 
-   static int first_time = TRUE;
+   static bool first_time = true;
    static float** overlay = NULL;
    //char maskfilename[MAXCHARS] = "burn_it_down_edges5_1025.png";
    char maskfilename[MAXCHARS] = "burn_it_down_edges3_2049.png";
@@ -49,11 +50,11 @@ void overlay_mask (int nx, int ny, float** mask) {
       overlay = allocate_2d_array_f(nx,ny);
       // read grayscale PNG of exactly nx by ny resolution
       // 0.0 = black = masked, 1.0 = white = open
-      read_png(maskfilename,nx,ny,FALSE,FALSE,1.0,FALSE,
+      read_png(maskfilename,nx,ny,false,false,1.0,false,
          overlay,0.0,1.0,NULL,0.0,1.0,NULL,0.0,1.0);
       // do not normalize mask
       // never re-load or reallocate
-      first_time = FALSE;
+      first_time = false;
    }
 
    // lay it over the existing mask
@@ -70,7 +71,7 @@ void set_mask_from_temporal (int step, int nx, int ny,
                    int send, float vend,
                    float width, float power) {
 
-   static int first_time = TRUE;
+   static bool first_time = true;
    static float** mastermask = NULL;
 
    // if we're not using a mask, just ignore this
@@ -87,7 +88,7 @@ void set_mask_from_temporal (int step, int nx, int ny,
 
       // read grayscale PNG of exactly nx by ny resolution
       // 0.0 = black = masked, 1.0 = white = open
-      read_png(masterfn,nx,ny,FALSE,FALSE,1.0,FALSE,
+      read_png(masterfn,nx,ny,false,false,1.0,false,
          mastermask,0.0,1.0,NULL,0.0,1.0,NULL,0.0,1.0);
 
       // do not normalize mask
@@ -97,7 +98,7 @@ void set_mask_from_temporal (int step, int nx, int ny,
          mastermask[ix][iy] = expf(power*logf(mastermask[ix][iy]));
 
       // never re-load or reallocate
-      first_time = FALSE;
+      first_time = false;
    }
 
    // how many time steps steps is the half-width of the sliding function?
@@ -274,7 +275,7 @@ void populate_block_array (int nx, int ny) {
    c[0] = allocate_2d_array_f(cnx,cny);
    c[1] = allocate_2d_array_f(cnx,cny);
    c[2] = allocate_2d_array_f(cnx,cny);
-   read_png (colorsrcfilename,cnx,cny,TRUE,FALSE,1.0,FALSE,
+   read_png (colorsrcfilename,cnx,cny,true,false,1.0,false,
              c[0],0.0,1.0,c[1],0.0,1.0,c[2],0.0,1.0);
 
    // later on, grab colors with
@@ -283,7 +284,7 @@ void populate_block_array (int nx, int ny) {
    // allocate space for mask queries
    int **masked;
    masked = allocate_2d_array_i(nx,ny);
-   for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) masked[ix][iy] = TRUE;
+   for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) masked[ix][iy] = true;
 
    // then, generate the blocks
    int icnt = 0;
@@ -318,7 +319,7 @@ void populate_block_array (int nx, int ny) {
          // timing
          block[icnt].tstart = (float)i + rand()/(float)RAND_MAX;
          block[icnt].tlen = 0.7 + 0.5*rand()/(float)RAND_MAX;
-         block[icnt].mask = FALSE;
+         block[icnt].mask = false;
 
          // color
          (void) get_random_color (c,cnx,cny,thisc);
@@ -332,7 +333,7 @@ void populate_block_array (int nx, int ny) {
          frac_masked = (float)num_masked / (float)(nx*ny);
 
          // iterate until we uncover unique space
-         int keepgoing = TRUE;
+         int keepgoing = true;
          int numtries = 0;
          while (keepgoing) {
 
@@ -349,70 +350,70 @@ void populate_block_array (int nx, int ny) {
             // grow by 1 pixel if this leaves any 1-pixel mask walls
 
             // check bottom row
-            int keeptrying = TRUE;
+            int keeptrying = true;
             while (keeptrying && (block[icnt].starty > 1)) {
-               int isbad = FALSE;
+               bool isbad = false;
                for (int ix=block[icnt].startx; ix<block[icnt].endx; ix++) {
-                  if (masked[ix][block[icnt].starty-1] == TRUE &&
-                      masked[ix][block[icnt].starty-2] == FALSE) {
-                     isbad = TRUE;
+                  if (masked[ix][block[icnt].starty-1] == true &&
+                      masked[ix][block[icnt].starty-2] == false) {
+                     isbad = true;
                   }
                }
                if (isbad) {
                   block[icnt].starty--;
                } else {
-                  keeptrying = FALSE;
+                  keeptrying = false;
                }
             }
 
             // check top row
-            keeptrying = TRUE;
+            keeptrying = true;
             while (keeptrying && (block[icnt].endy < ny-1)) {
-               int isbad = FALSE;
+               bool isbad = false;
                for (int ix=block[icnt].startx; ix<block[icnt].endx; ix++) {
-                  if (masked[ix][block[icnt].endy] == TRUE &&
-                      masked[ix][block[icnt].endy+1] == FALSE) {
-                     isbad = TRUE;
+                  if (masked[ix][block[icnt].endy] == true &&
+                      masked[ix][block[icnt].endy+1] == false) {
+                     isbad = true;
                   }
                }
                if (isbad) {
                   block[icnt].endy++;
                } else {
-                  keeptrying = FALSE;
+                  keeptrying = false;
                }
             }
 
             // check leftmost side
-            keeptrying = TRUE;
+            keeptrying = true;
             while (keeptrying && (block[icnt].startx > 1)) {
-               int isbad = FALSE;
+               bool isbad = false;
                for (int iy=block[icnt].starty; iy<block[icnt].endy; iy++) {
-                  if (masked[block[icnt].startx-1][iy] == TRUE &&
-                      masked[block[icnt].startx-2][iy] == FALSE) {
-                     isbad = TRUE;
+                  if (masked[block[icnt].startx-1][iy] == true &&
+                      masked[block[icnt].startx-2][iy] == false) {
+                     isbad = true;
                   }
                }
                if (isbad) {
                   block[icnt].startx--;
                } else {
-                  keeptrying = FALSE;
+                  keeptrying = false;
                }
             }
 
             // check rightmost side
-            keeptrying = TRUE;
+            keeptrying = true;
             while (keeptrying && (block[icnt].endx < nx-1)) {
-               int isbad = FALSE;
+               bool isbad = false;
                for (int iy=block[icnt].starty; iy<block[icnt].endy; iy++) {
-                  if (masked[block[icnt].endx][iy] == TRUE &&
-                      masked[block[icnt].endx+1][iy] == FALSE) {
-                     isbad = TRUE;
+                  if (masked[block[icnt].endx][iy] == true &&
+                      masked[block[icnt].endx+1][iy] == false) {
+                     isbad = true;
                   }
                }
                if (isbad) {
                   block[icnt].endx++;
                } else {
-                  keeptrying = FALSE;
+                  keeptrying = false;
                }
             }
 
@@ -430,20 +431,20 @@ void populate_block_array (int nx, int ny) {
             numtries++;
 
             // when we get near the end, make sure we always open masked pixels
-            if (frac_opened > frac_masked*frac_masked) keepgoing = FALSE;
+            if (frac_opened > frac_masked*frac_masked) keepgoing = false;
 
             // but early on, try to adjoin existing open areas
-            if (num_opened == num_pixels && rand()/(float)RAND_MAX < (float)icnt/30.) keepgoing = TRUE;
+            if (num_opened == num_pixels && rand()/(float)RAND_MAX < (float)icnt/30.) keepgoing = true;
 
             // and don't try too hard
-            if (numtries > 1000) keepgoing = FALSE;
+            if (numtries > 1000) keepgoing = false;
          }
          globnumtries += numtries;
 
          // unmask those pixels
          for (int ix=block[icnt].startx; ix<block[icnt].endx; ix++) {
             for (int iy=block[icnt].starty; iy<block[icnt].endy; iy++) {
-               masked[ix][iy] = FALSE;
+               masked[ix][iy] = false;
             }
          }
 
@@ -470,7 +471,7 @@ void populate_block_array (int nx, int ny) {
          // timing
          block[icnt].tstart = (float)i + rand()/(float)RAND_MAX;
          block[icnt].tlen = 0.5 + 0.4*rand()/(float)RAND_MAX;
-         block[icnt].mask = TRUE;
+         block[icnt].mask = true;
 
          // color
          block[icnt].r = 0.;
@@ -483,7 +484,7 @@ void populate_block_array (int nx, int ny) {
          frac_masked = (float)num_masked / (float)(nx*ny);
 
          // iterate until we *cover* most unique unmasked space
-         int keepgoing = TRUE;
+         bool keepgoing = true;
          int numtries = 0;
          while (keepgoing) {
 
@@ -511,20 +512,20 @@ void populate_block_array (int nx, int ny) {
             numtries++;
 
             // make sure we continue to mask off open areas
-            if (frac_closed > (1.-frac_masked)*(1.-frac_masked)) keepgoing = FALSE;
+            if (frac_closed > (1.-frac_masked)*(1.-frac_masked)) keepgoing = false;
 
             // but try to adjoin existing masked areas
-            if (num_closed == num_pixels && rand()/(float)RAND_MAX < (float)(icnt-iopened)/30.) keepgoing = TRUE;
+            if (num_closed == num_pixels && rand()/(float)RAND_MAX < (float)(icnt-iopened)/30.) keepgoing = true;
 
             // and don't try too hard
-            if (numtries > 1000) keepgoing = FALSE;
+            if (numtries > 1000) keepgoing = false;
          }
          globnumtries += numtries;
 
          // remask those pixels
          for (int ix=block[icnt].startx; ix<block[icnt].endx; ix++) {
             for (int iy=block[icnt].starty; iy<block[icnt].endy; iy++) {
-               masked[ix][iy] = TRUE;
+               masked[ix][iy] = true;
             }
          }
 

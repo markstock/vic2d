@@ -5,12 +5,13 @@
  *
  * a 2D vortex-in-cell method which uses the method of characteristics for the
  * convection step, and a single explicit step for diffusion and vorticity
- * creation from walls
+ * creation from walls and masks
  *
  */
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
@@ -34,8 +35,8 @@ int Usage(char[MAXCHARS],int);
 
 int main(int argc,char **argv) {
 
-   static int first_time = TRUE;
-   int isStam = FALSE;
+   static bool first_time = true;
+   bool isStam = false;
    int nx = 513;
    int ny = 513;
    int cnx,cny,cmn = 0;
@@ -46,34 +47,34 @@ int main(int argc,char **argv) {
    int writeevery = 1;
    int checkpointevery = -1;
    int outscale = 1;
-   int use_16bpp = FALSE;
-   int silent = FALSE;
+   bool use_16bpp = false;
+   bool silent = false;
 
    float sc_diffus[MAX_SCALARS];
-   int use_TEMP = FALSE;
-   int use_DF = FALSE;
-   int use_COLOR = FALSE;
-   int reread_color = FALSE;
-   int darkenonly = TRUE;
-   int freeze_flow = FALSE;
+   bool use_TEMP = false;
+   bool use_DF = false;
+   bool use_COLOR = false;
+   bool reread_color = false;
+   bool darkenonly = true;
+   bool freeze_flow = false;
    int freeze_at = -1;
-   int stop_flow = FALSE;
+   bool stop_flow = false;
    int stop_at = -1;
-   int use_MASK = FALSE;
-   int use_image = FALSE;
-   int use_strong_strat = FALSE;
-   int overlay_color_lr = FALSE;
-   int overlay_color_tb = FALSE;
-   int vort_reread = FALSE;
-   int vort_suppress = FALSE;
-   int adaptive_mask = FALSE;
+   bool use_MASK = false;
+   bool use_image = false;
+   bool use_strong_strat = false;
+   bool overlay_color_lr = false;
+   bool overlay_color_tb = false;
+   bool vort_reread = false;
+   bool vort_suppress = false;
+   bool adaptive_mask = false;
 
-   int writeOutput = TRUE;
-   int print_vort = FALSE;
-   int print_vel = FALSE;
-   int print_temp = FALSE;
-   int print_mu = FALSE;
-   int print_mask = FALSE;
+   bool writeOutput = true;
+   bool print_vort = false;
+   bool print_vel = false;
+   bool print_temp = false;
+   bool print_mu = false;
+   bool print_mask = false;
 
    float md = 1.e-3;			// dimensional momentum diffusivity
    float mdlow = -1.0;
@@ -92,14 +93,14 @@ int main(int argc,char **argv) {
    float courant = 10.;			// fixed non-dim time step size
    float courantconst = -1.;	// target non-dim time step size
    float freestream[2] = {0.0, 0.0};
-   int dynamic_freestream = FALSE;
+   bool dynamic_freestream = false;
    float fs_start[2] = {0.0, 0.0};
    int fs_start_step = 0;
    float fs_end[2] = {0.0, 0.0};
    int fs_end_step = 100000;
    float wallvel[4] = {0., 0., 0., 0.};	// left, right, bottom, top
-   int recalc_vel = TRUE;
-   int move_colors = TRUE;
+   bool recalc_vel = true;
+   bool move_colors = true;
    int ccnidx = 0;
    int gravtype = 0;
    float gravity[2] = {0.0, 1.0};
@@ -121,14 +122,14 @@ int main(int argc,char **argv) {
    float **color_top = NULL;
    float **color_bottom = NULL;
 
-   int vort_add_rand = FALSE;
+   bool vort_add_rand = false;
    float vort_add_factor = -1;
    int vort_add_start = -1;
    int vort_add_peak = -1;
    int vort_add_down = -1;
    int vort_add_end = -1;
 
-   int use_PARTICLES = FALSE;
+   bool use_PARTICLES = false;
    int pnx = -1;
    int pny = -1;
    int part_draw_fade_frames = 100;
@@ -145,7 +146,7 @@ int main(int argc,char **argv) {
    float part_draw_vel_pow = 1.0;
    float part_img_diffus = -1.0;
 
-   int dynamic_mask = FALSE;
+   bool dynamic_mask = false;
    int dmask_step_start = 0;
    int dmask_step_end = 1000;
    float dmask_val_start = 0.5;
@@ -173,20 +174,20 @@ int main(int argc,char **argv) {
    struct timeval t_curr, t_last;
    char progname[MAXCHARS];
    char outfileroot[MAXCHARS];
-   int use_vort_img = FALSE;
+   bool use_vort_img = false;
    char vortfilename[MAXCHARS];
-   int use_temp_img = FALSE;
+   bool use_temp_img = false;
    char tempfilename[MAXCHARS];
-   int use_heat_img = FALSE;
+   bool use_heat_img = false;
    char heatfilename[MAXCHARS];
-   int use_color_img = FALSE;
+   bool use_color_img = false;
    char colorfilename[MAXCHARS];
-   int use_div_img = FALSE;
+   bool use_div_img = false;
    char divfilename[MAXCHARS];
-   int use_mask_img = FALSE;
+   bool use_mask_img = false;
    char maskfilename[MAXCHARS];
-   int use_color_linear = FALSE;
-   int use_color_area = FALSE;
+   bool use_color_linear = false;
+   bool use_color_area = false;
    char colorsrcfilename[MAXCHARS];
    char mdfilename[MAXCHARS];
    char tdfilename[MAXCHARS];
@@ -227,16 +228,16 @@ int main(int argc,char **argv) {
 
       } else if (strncmp(argv[i], "-vf", 3) == 0) {
          strcpy (vortfilename,argv[++i]);
-         use_vort_img = TRUE;
+         use_vort_img = true;
       } else if (strncmp(argv[i], "-vrr", 4) == 0) {
-         vort_reread = TRUE;
+         vort_reread = true;
       } else if (strncmp(argv[i], "-vdf", 4) == 0) {
          strcpy (mdfilename,argv[++i]);
          mdlow = atof(argv[++i]);
          mdhigh = atof(argv[++i]);
          vd = atof(argv[++i]);
       } else if (strncmp(argv[i], "-muprint", 3) == 0) {
-         print_mu = TRUE;
+         print_mu = true;
       } else if (strncmp(argv[i], "-vd", 3) == 0) {
          md = atof(argv[++i]);
       } else if (strncmp(argv[i], "-vas", 4) == 0) {
@@ -245,22 +246,22 @@ int main(int argc,char **argv) {
          vort_add_down = atoi(argv[++i]);
          vort_add_end = atoi(argv[++i]);
       } else if (strncmp(argv[i], "-va", 3) == 0) {
-         vort_add_rand = TRUE;
+         vort_add_rand = true;
          vort_add_factor = atof(argv[++i]);
       } else if (strncmp(argv[i], "-vr", 3) == 0) {
-         vort_suppress = TRUE;
+         vort_suppress = true;
          vort_suppress_factor = atof(argv[++i]);
       } else if (strncmp(argv[i], "-vprint", 3) == 0) {
-         print_vort = TRUE;
+         print_vort = true;
       } else if (strncmp(argv[i], "-vscale", 3) == 0) {
          vortscale = atof(argv[++i]);
 
       } else if (strncmp(argv[i], "-uscale", 3) == 0) {
          velscale = atof(argv[++i]);
       } else if (strncmp(argv[i], "-uprint", 3) == 0) {
-         print_vel = TRUE;
+         print_vel = true;
       } else if (strncmp(argv[i], "-freeze", 3) == 0) {
-         freeze_flow = TRUE;
+         freeze_flow = true;
          if (argc > i+1) {
             if (isdigit((int)argv[i+1][0]) || isdigit((int)argv[i+1][1])) {
                // first number after keyword is frame at which to freeze
@@ -268,7 +269,7 @@ int main(int argc,char **argv) {
             }
          }
       } else if (strncmp(argv[i], "-stop", 4) == 0) {
-         stop_flow = TRUE;
+         stop_flow = true;
          if (argc > i+1) {
             if (isdigit((int)argv[i+1][0]) || isdigit((int)argv[i+1][1])) {
                // first number after keyword is frame at which to stop
@@ -283,15 +284,15 @@ int main(int argc,char **argv) {
 
       } else if (strncmp(argv[i], "-tf", 3) == 0) {
          strcpy (tempfilename,argv[++i]);
-         use_temp_img = TRUE;
-         use_TEMP = TRUE;
+         use_temp_img = true;
+         use_TEMP = true;
       } else if (strncmp(argv[i], "-qf", 3) == 0) {
          strcpy (heatfilename,argv[++i]);
-         use_heat_img = TRUE;
-         use_TEMP = TRUE;
+         use_heat_img = true;
+         use_TEMP = true;
       } else if (strncmp(argv[i], "-qc", 3) == 0) {
          heat_coeff = atof(argv[++i]);
-         use_TEMP = TRUE;
+         use_TEMP = true;
       } else if (strncmp(argv[i], "-tdf", 4) == 0) {
          strcpy (tdfilename,argv[++i]);
          tdlow = atof(argv[++i]);
@@ -299,27 +300,27 @@ int main(int argc,char **argv) {
       } else if (strncmp(argv[i], "-td", 3) == 0) {
          td = atof(argv[++i]);
       } else if (strncmp(argv[i], "-tprint", 3) == 0) {
-         print_temp = TRUE;
-         use_TEMP = TRUE;
+         print_temp = true;
+         use_TEMP = true;
       } else if (strncmp(argv[i], "-t", 2) == 0) {
-         use_TEMP = TRUE;
+         use_TEMP = true;
       } else if (strncmp(argv[i], "-b", 2) == 0) {
          bn = atof(argv[++i]);
-         use_strong_strat = FALSE;
+         use_strong_strat = false;
       } else if (strncmp(argv[i], "-dr", 3) == 0) {
          dens_ratio = atof(argv[++i]);
-         use_strong_strat = TRUE;
+         use_strong_strat = true;
 
       } else if (strncmp(argv[i], "-cf", 3) == 0) {
          strcpy (colorfilename,argv[++i]);
-         use_color_img = TRUE;
-         use_COLOR = TRUE;
+         use_color_img = true;
+         use_COLOR = true;
       } else if (strncmp(argv[i], "-cdf", 4) == 0) {
          strcpy (cdfilename,argv[++i]);
          cdlow = atof(argv[++i]);
          cdhigh = atof(argv[++i]);
       } else if (strncmp(argv[i], "-cr", 3) == 0) {
-         reread_color = TRUE;
+         reread_color = true;
          //fprintf(stderr,"i is %d and argc is %d\n",i,argc);
          //fprintf(stderr,"argv[i] is (%s)\n",argv[i]);
          //fprintf(stderr,"argv[i+1] is (%s)\n",argv[i+1]);
@@ -331,7 +332,7 @@ int main(int argc,char **argv) {
             if (isdigit(argv[i+1][0]) || isdigit(argv[i+1][1])) {
                overlay_fraction = atof(argv[++i]);
                //if (overlay_fraction < 0.0) {
-               //   darkenonly = TRUE;
+               //   darkenonly = true;
                //   overlay_fraction *= -1.;
                //}
             }
@@ -340,30 +341,30 @@ int main(int argc,char **argv) {
          cd = atof(argv[++i]);
       } else if (strncmp(argv[i], "-cl", 3) == 0) {
          strcpy (colorsrcfilename,argv[++i]);
-         use_color_linear = TRUE;
+         use_color_linear = true;
       } else if (strncmp(argv[i], "-ca", 3) == 0) {
          strcpy (colorsrcfilename,argv[++i]);
-         use_color_area = TRUE;
+         use_color_area = true;
       } else if (strncmp(argv[i], "-c", 2) == 0) {
-         use_COLOR = TRUE;
+         use_COLOR = true;
 
       } else if (strncmp(argv[i], "-df", 3) == 0) {
          strcpy (divfilename,argv[++i]);
-         use_div_img = TRUE;
+         use_div_img = true;
       } else if (strncmp(argv[i], "-div", 3) == 0) {
-         use_DF = TRUE;
+         use_DF = true;
 
       } else if (strncmp(argv[i], "-mf", 3) == 0) {
          strcpy (maskfilename,argv[++i]);
-         use_mask_img = TRUE;
-         use_MASK = TRUE;
+         use_mask_img = true;
+         use_MASK = true;
       } else if (strncmp(argv[i], "-me", 3) == 0) {
          maskerr = atof(argv[++i]);
       } else if (strncmp(argv[i], "-mprint", 4) == 0) {
-         print_mask = TRUE;
+         print_mask = true;
       } else if (strncmp(argv[i], "-mdyn", 3) == 0) {
-         use_MASK = TRUE;
-         dynamic_mask = TRUE;
+         use_MASK = true;
+         dynamic_mask = true;
          strcpy (maskfilename,argv[++i]);
          dmask_step_start = atoi(argv[++i]);
          dmask_val_start = atof(argv[++i]);
@@ -373,14 +374,14 @@ int main(int argc,char **argv) {
       } else if (strncmp(argv[i], "-mpow", 4) == 0) {
          dmask_power = atof(argv[++i]);
       } else if (strncmp(argv[i], "-madaptu", 3) == 0) {
-         adaptive_mask = TRUE;
+         adaptive_mask = true;
       } else if (strncmp(argv[i], "-mcm", 3) == 0) {
          mask_color_mult = atof(argv[++i]);
       } else if (strncmp(argv[i], "-m", 2) == 0) {
-         use_MASK = TRUE;
+         use_MASK = true;
 
       } else if (strncmp(argv[i], "-pa", 3) == 0) {
-         use_PARTICLES = TRUE;
+         use_PARTICLES = true;
          part_add_step_start = atoi(argv[++i]);
          part_add_step_end = atoi(argv[++i]);
          part_add_count_end = atoi(argv[++i]);
@@ -416,9 +417,9 @@ int main(int argc,char **argv) {
       } else if (strncmp(argv[i], "-step", 5) == 0) {
          maxstep = atoi(argv[++i]);
       } else if (strncmp(argv[i], "-stam", 5) == 0) {
-         isStam = TRUE;
+         isStam = true;
       } else if (strncmp(argv[i], "-fsdyn", 4) == 0) {
-         dynamic_freestream = TRUE;
+         dynamic_freestream = true;
          fs_start_step = atoi(argv[++i]);
          fs_start[0] = atof(argv[++i]);
          fs_start[1] = atof(argv[++i]);
@@ -442,13 +443,13 @@ int main(int argc,char **argv) {
          randvortscale = atof(argv[++i]);
 
       } else if (strncmp(argv[i], "-noout", 6) == 0) {
-         writeOutput = FALSE;
+         writeOutput = false;
       } else if (strncmp(argv[i], "-q", 2) == 0) {
-         silent = TRUE;
+         silent = true;
       } else if (strncmp(argv[i], "-8", 2) == 0) {
-         use_16bpp = FALSE;
+         use_16bpp = false;
       } else if (strncmp(argv[i], "-16", 3) == 0) {
-         use_16bpp = TRUE;
+         use_16bpp = true;
       } else {
          fprintf(stderr,"Unknown option (%s)\n",argv[i]);
          (void) Usage(progname,0);
@@ -536,7 +537,7 @@ int main(int argc,char **argv) {
       sc_diffus[MD] = vd;
       a[MD] = allocate_2d_array_f(nx,ny);
       // read grayscale PNG of exactly nx by ny resolution
-      read_png(mdfilename,nx,ny,FALSE,FALSE,1.0,FALSE,
+      read_png(mdfilename,nx,ny,false,false,1.0,false,
          a[MD],mdlow,mdhigh-mdlow,NULL,-1.0,2.0,NULL,-1.0,2.0);
       // and flag the vorticity to use this variable viscosity!
       sc_diffus[W2] = -1.0;
@@ -585,7 +586,7 @@ int main(int argc,char **argv) {
       }
    }
 
-   if (FALSE) {
+   if (false) {
       // create a wavy shear layer of positive vorticity
       for (int ix=0; ix<nx; ix++) {
          px = (float)ix/(float)(nx-1);
@@ -595,7 +596,7 @@ int main(int argc,char **argv) {
             if (a[W2][ix][iy] < 0.0) a[W2][ix][iy] = 0.0;
          }
       }
-   } else if (FALSE) {
+   } else if (false) {
       // create three blobs of vorticity (run109/06)
       //add_smooth_circular_blob(nx,ny,xbdry,ybdry,a[W2],0.6,0.2,0.1,10.0);
       //add_smooth_circular_blob(nx,ny,xbdry,ybdry,a[W2],0.4,0.16,0.1,-10.0);
@@ -606,7 +607,7 @@ int main(int argc,char **argv) {
       add_smooth_circular_blob(nx,ny,xbdry,ybdry,a[W2],0.38,0.33,0.1,-10.0);
       add_smooth_circular_blob(nx,ny,xbdry,ybdry,a[W2],0.53,0.6,0.1,-10.0);
       add_smooth_circular_blob(nx,ny,xbdry,ybdry,a[W2],0.42,0.72,0.1,10.0);
-   } else if (FALSE) {
+   } else if (false) {
       // create a random field of vorticity
       //scale = 20.;
       scale = 100.;
@@ -615,13 +616,13 @@ int main(int argc,char **argv) {
             a[W2][ix][iy] = scale*rand()/RAND_MAX - scale*0.5;
          }
       }
-   } else if (FALSE) {
+   } else if (false) {
       add_smooth_circular_blob(nx,ny,xbdry,ybdry,a[W2],0.6,0.2,0.1,10.0);
       add_smooth_circular_blob(nx,ny,xbdry,ybdry,a[W2],0.4,0.16,0.1,-10.0);
-   } else if (FALSE) {
+   } else if (false) {
       add_smooth_circular_blob(nx,ny,xbdry,ybdry,a[W2],0.57,0.37,0.05,50.0);
       add_smooth_circular_blob(nx,ny,xbdry,ybdry,a[W2],0.41,0.34,0.05,-50.0);
-   } else if (FALSE) {
+   } else if (false) {
       // make the vorticity defined in Minion and Brown, JCP 138
       for (int ix=0; ix<nx; ix++) {
          px = (float)ix/(float)(nx-1);
@@ -636,7 +637,7 @@ int main(int argc,char **argv) {
             }
          }
       }
-   } else if (FALSE) {
+   } else if (false) {
       // make the vorticity defined in Koumoutsakos, JCP, 1997, type I
       for (int ix=0; ix<nx; ix++) {
          px = (float)ix/(float)(nx-1);
@@ -651,7 +652,7 @@ int main(int argc,char **argv) {
             //if (isnan(temp2)) fprintf(stderr,"%d %d %g\n",ix,iy,temp2);
          }
       }
-   } else if (FALSE) {
+   } else if (false) {
       // create a sinusoidal interface
       //float thickness = 0.001;
       float thickness = 2.0/(float)nx;
@@ -678,8 +679,8 @@ int main(int argc,char **argv) {
    if (use_vort_img) {
       // read grayscale PNG of exactly nx by ny resolution
       // inside read_png we set 127 or 32767 to be 0.0
-      read_png(vortfilename,nx,ny,FALSE,
-               FALSE,1.0,FALSE,
+      read_png(vortfilename,nx,ny,false,
+               false,1.0,false,
                a[W2],-vortscale,2.0*vortscale,
                NULL, -vortscale,2.0*vortscale,
                NULL, -vortscale,2.0*vortscale);
@@ -709,7 +710,7 @@ int main(int argc,char **argv) {
             mask[ix][iy] = 1.0;
          }
       }
-      if (FALSE) {
+      if (false) {
          // create a circular mask at cx,cy
          cx = 0.3;
          cy = 0.5;
@@ -734,7 +735,7 @@ int main(int argc,char **argv) {
             }
          }
       }
-      if (FALSE) {
+      if (false) {
          // create a solar tower
          cx = 0.5;	// x center
          cy = 0.0;	// y center
@@ -768,7 +769,7 @@ int main(int argc,char **argv) {
       // read in the mask file
       if (use_mask_img) {
          // read grayscale PNG of exactly nx by ny resolution
-         read_png(maskfilename,nx,ny,FALSE,FALSE,1.0,FALSE,
+         read_png(maskfilename,nx,ny,false,false,1.0,false,
             mask,0.0,1.0,NULL,0.0,1.0,NULL,0.0,1.0);
       }
       // normalize mask, and set 1.0=solid, 0.0=open (input is opposite)
@@ -840,7 +841,7 @@ int main(int argc,char **argv) {
    // set color ---------------------------------------
 
    // initialize an array of blocks to add during the run
-   if (FALSE) {
+   if (false) {
       populate_block_array(nx,ny);
    }
 
@@ -859,12 +860,12 @@ int main(int argc,char **argv) {
       if (use_color_img) {
          // read color PNG of exactly nx by ny resolution into
          //   the given fields
-         read_png (colorfilename,nx,ny,TRUE,FALSE,1.0,FALSE,
+         read_png (colorfilename,nx,ny,true,false,1.0,false,
             a[RR],0.0,1.0,a[GG],0.0,1.0,a[BB],0.0,1.0);
-         //read_png (colorfilename,nx,ny,TRUE,FALSE,1.0,FALSE,
+         //read_png (colorfilename,nx,ny,true,false,1.0,false,
          //   a[RR],-3.0,4.0,a[GG],-3.0,4.0,a[BB],-3.0,4.0);
       }
-      if (FALSE) {
+      if (false) {
          // left is red, right is green
          for (int ix=0; ix<nx/2; ix++) {
             for (int iy=0; iy<ny; iy++) {
@@ -881,7 +882,7 @@ int main(int argc,char **argv) {
             }
          }
       }
-      if (FALSE) {
+      if (false) {
          // first, force background to one color
          for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) a[RR][ix][iy] = 235./256.;
          for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) a[GG][ix][iy] = 245./256.;
@@ -906,7 +907,7 @@ int main(int argc,char **argv) {
                              124./256.,155./256.,193./256., 1000,
                              nx,ny,a[RR],a[GG],a[BB]);
       }
-      if (FALSE) {
+      if (false) {
          // scale input vorticity by pixel brightness
          for (int ix=0; ix<nx; ix++) {
             for (int iy=0; iy<ny; iy++) {
@@ -950,14 +951,14 @@ int main(int argc,char **argv) {
 
       if (use_temp_img) {
          // read grayscale PNG of exactly nx by ny resolution
-         //read_png(tempfilename,nx,ny,FALSE,TRUE,1.0,FALSE,
-         read_png(tempfilename,nx,ny,FALSE,FALSE,1.0,FALSE,
+         //read_png(tempfilename,nx,ny,false,true,1.0,false,
+         read_png(tempfilename,nx,ny,false,false,1.0,false,
             a[SF],-1.0,2.0,NULL,0.0,1.0,NULL,0.0,1.0);
       }
 
       if (use_heat_img) {
          // read grayscale PNG of exactly nx by ny resolution
-         read_png(heatfilename,nx,ny,FALSE,FALSE,1.0,FALSE,
+         read_png(heatfilename,nx,ny,false,false,1.0,false,
             heat,-1.0,2.0,NULL,0.0,1.0,NULL,0.0,1.0);
 
          for (int ix=0; ix<nx; ix++) {
@@ -969,7 +970,7 @@ int main(int argc,char **argv) {
          }
       }
 
-      if (FALSE) {
+      if (false) {
          // create a sharp blob of scalar
          for (int ix=0; ix<nx; ix++) {
             px = (float)ix/(float)(nx-1);
@@ -980,12 +981,12 @@ int main(int argc,char **argv) {
             }
          }
       }
-      if (FALSE) {
+      if (false) {
          // create a smooth blob of scalar
          // add_smooth_circular_blob(nx,ny,xbdry,ybdry,a[SF],0.7,0.15,0.1,1.0);
          add_smooth_circular_blob(nx,ny,xbdry,ybdry,a[SF],0.4,0.0,0.07,-1.0);
       }
-      if (FALSE) {
+      if (false) {
          // create bands of scalar
          for (int ix=0; ix<nx; ix++) {
             for (int iy=0; iy<ny; iy++) {
@@ -999,7 +1000,7 @@ int main(int argc,char **argv) {
             }
          }
       }
-      if (FALSE) {
+      if (false) {
          // create square bands of scalar
          for (int ix=0; ix<nx; ix++) {
             for (int iy=0; iy<ny; iy++) {
@@ -1015,7 +1016,7 @@ int main(int argc,char **argv) {
             }
          }
       }
-      if (FALSE) {
+      if (false) {
          // create a RTI with a sinusoidal interface
          //float thickness = 0.001;
          float thickness = 2.0/(float)nx;
@@ -1045,7 +1046,7 @@ int main(int argc,char **argv) {
             }
          }
       }
-      if (FALSE) {
+      if (false) {
          // create another sinusoidal interface (bottom one)
          //float thickness = 0.001;
          float thickness = 2.0/(float)nx;
@@ -1073,7 +1074,7 @@ int main(int argc,char **argv) {
             }
          }
       }
-      if (FALSE) {
+      if (false) {
         // create a random field of scalar
         scale = 10.;
         for (int ix=0; ix<nx; ix++) {
@@ -1082,7 +1083,7 @@ int main(int argc,char **argv) {
           }
         }
       }
-      if (FALSE && use_COLOR) {
+      if (false && use_COLOR) {
          // use the brightness component to indicate density!
          for (int ix=0; ix<nx; ix++) {
             for (int iy=0; iy<ny; iy++) {
@@ -1106,7 +1107,7 @@ int main(int argc,char **argv) {
       cmi[0] = allocate_2d_array_f(cnx,cny);
       cmi[1] = allocate_2d_array_f(cnx,cny);
       cmi[2] = allocate_2d_array_f(cnx,cny);
-      read_png (colorsrcfilename,cnx,cny,TRUE,FALSE,1.0,FALSE,
+      read_png (colorsrcfilename,cnx,cny,true,false,1.0,false,
                 cmi[0],0.0,1.0,cmi[1],0.0,1.0,cmi[2],0.0,1.0);
 
       // later on, grab colors with
@@ -1177,7 +1178,7 @@ int main(int argc,char **argv) {
    // Iterate through time
 
    step = 0;
-   while (TRUE) {
+   while (true) {
 
       // fprintf(stdout,"\nBegin step %d\n",step);
 
@@ -1231,7 +1232,7 @@ int main(int argc,char **argv) {
          //#pragma omp section
          if (print_vort) {
             sprintf(outfileroot,"vort_%06d",step);
-            write_png (outfileroot,nx,ny,FALSE,use_16bpp,
+            write_png (outfileroot,nx,ny,false,use_16bpp,
                        a[W2],-vortscale,2.*vortscale,
                        NULL,0.0,1.0,
                        NULL,0.0,1.0);
@@ -1239,7 +1240,7 @@ int main(int argc,char **argv) {
          //#pragma omp section
          if (print_mask && use_MASK) {
             sprintf(outfileroot,"mask_%06d",step);
-            write_png (outfileroot,nx,ny,FALSE,FALSE,
+            write_png (outfileroot,nx,ny,false,false,
                        mask,0.0,1.0,
                        NULL,0.0,1.0,
                        NULL,0.0,1.0);
@@ -1266,12 +1267,12 @@ int main(int argc,char **argv) {
                   }
                }
                // and write the image
-               write_png (outfileroot,nx,ny,TRUE,use_16bpp,
+               write_png (outfileroot,nx,ny,true,use_16bpp,
                           c[0],0.0,1.0,
                           c[1],0.0,1.0,
                           c[2],0.0,1.0);
             } else {
-               write_png (outfileroot,nx,ny,FALSE,FALSE,
+               write_png (outfileroot,nx,ny,false,false,
                           a[SF],-1.0,2.0,
                           NULL,0.0,1.0,
                           NULL,0.0,1.0);
@@ -1293,7 +1294,7 @@ int main(int argc,char **argv) {
                }
                // and write the png
                sprintf(outfileroot,"out_%06d",step);
-               write_png (outfileroot,pnx,pny,TRUE,use_16bpp,
+               write_png (outfileroot,pnx,pny,true,use_16bpp,
                           pc[0],0.0,1.0,
                           pc[1],0.0,1.0,
                           pc[2],0.0,1.0);
@@ -1303,7 +1304,7 @@ int main(int argc,char **argv) {
                }
             } else {
                sprintf(outfileroot,"out_%06d",step);
-               write_png (outfileroot,nx,ny,TRUE,use_16bpp,
+               write_png (outfileroot,nx,ny,true,use_16bpp,
                           a[RR],0.0,1.0,
                           a[GG],0.0,1.0,
                           a[BB],0.0,1.0);
@@ -1312,7 +1313,7 @@ int main(int argc,char **argv) {
          //#pragma omp section
          if (print_vel) {
             sprintf(outfileroot,"vel_%06d",step);
-            write_png (outfileroot,nx,ny,TRUE,use_16bpp,
+            write_png (outfileroot,nx,ny,true,use_16bpp,
                        u[XV],-velscale,2.*velscale,
                        u[YV],-velscale,2.*velscale,
                        a[W2],-vortscale,2.*vortscale);
@@ -1320,7 +1321,7 @@ int main(int argc,char **argv) {
          //#pragma omp section
          if (print_mu) {
             sprintf(outfileroot,"mu_%06d",step);
-            write_png (outfileroot,nx,ny,FALSE,use_16bpp,
+            write_png (outfileroot,nx,ny,false,use_16bpp,
                        a[MD],mdlow,mdhigh-mdlow,
                        NULL,0.0,1.0,
                        NULL,0.0,1.0);
@@ -1342,7 +1343,7 @@ int main(int argc,char **argv) {
 
          // write vorticity (always 16bpp to keep precision)
          strcpy(outfileroot,"restart_vort");
-         write_png (outfileroot,nx,ny,FALSE,use_16bpp,
+         write_png (outfileroot,nx,ny,false,use_16bpp,
                     a[W2],-wmax,2.*wmax,
                     NULL,0.0,1.0,
                     NULL,0.0,1.0);
@@ -1350,7 +1351,7 @@ int main(int argc,char **argv) {
          // write temperature
          if (use_TEMP) {
             strcpy(outfileroot,"restart_temp");
-            write_png (outfileroot,nx,ny,FALSE,use_16bpp,
+            write_png (outfileroot,nx,ny,false,use_16bpp,
                        a[SF],-1.0,2.0,
                        NULL,0.0,1.0,
                        NULL,0.0,1.0);
@@ -1359,7 +1360,7 @@ int main(int argc,char **argv) {
          // write color
          if (use_COLOR) {
             strcpy(outfileroot,"restart_color");
-            write_png (outfileroot,nx,ny,TRUE,use_16bpp,
+            write_png (outfileroot,nx,ny,true,use_16bpp,
                        a[RR],0.0,1.0,
                        a[GG],0.0,1.0,
                        a[BB],0.0,1.0);
@@ -1384,7 +1385,7 @@ int main(int argc,char **argv) {
       // accept input (only if interactive scheme)
 
       // adjust diffusion coefficients - decay past step 300
-      if (FALSE && step > 300) {
+      if (false && step > 300) {
         for (int i=0; i<MAX_SCALARS; i++) {
           // this will work for the negative diffusivity trigger, too
           sc_diffus[i] *= 1.1;
@@ -1436,22 +1437,22 @@ int main(int argc,char **argv) {
       // should we test for freeze?
       if (freeze_flow) {
          if (step > freeze_at) {
-            recalc_vel = FALSE;
-            move_colors = TRUE;
+            recalc_vel = false;
+            move_colors = true;
          } else {
-            recalc_vel = TRUE;
-            move_colors = FALSE;
+            recalc_vel = true;
+            move_colors = false;
          }
       }
 
       // should we test for stop?
       if (stop_flow) {
          if (step > stop_at) {
-            recalc_vel = FALSE;
-            move_colors = FALSE;
+            recalc_vel = false;
+            move_colors = false;
          } else {
-            recalc_vel = TRUE;
-            move_colors = TRUE;
+            recalc_vel = true;
+            move_colors = true;
          }
       }
 
@@ -1480,10 +1481,10 @@ int main(int argc,char **argv) {
          // read color PNG of exactly nx by ny resolution into
          //   the given fields and overlay it!
          if (use_color_img && reread_color) {
-            //read_png(colorfilename,nx,ny,TRUE,TRUE,0.01,TRUE,
+            //read_png(colorfilename,nx,ny,true,true,0.01,true,
             //   a[RR],0.0,1.0,a[GG],0.0,1.0,a[BB],0.0,1.0);
-            read_png(colorfilename,nx,ny,TRUE,
-                     TRUE,overlay_fraction,darkenonly,
+            read_png(colorfilename,nx,ny,true,
+                     true,overlay_fraction,darkenonly,
                      a[RR],0.0,1.0,a[GG],0.0,1.0,a[BB],0.0,1.0);
             // use the brightness component to indicate density!
             //for (int ix=0; ix<nx; ix++) {
@@ -1501,14 +1502,14 @@ int main(int argc,char **argv) {
          // read grayscale PNG of exactly nx by ny resolution
          // the 2 is to force the new data to be simply added to the old
          // the funny min bounds are to allow value of 127 to become 0.0
-         read_png(vortfilename,nx,ny,FALSE,
-                  2,1.0,FALSE,
+         read_png(vortfilename,nx,ny,false,
+                  2,1.0,false,
                   a[W2],-254.*vortscale/255.,2.0*vortscale,
                   NULL, -254.*vortscale/255.,2.0*vortscale,
                   NULL, -254.*vortscale/255.,2.0*vortscale);
       }
 
-      if (FALSE) {
+      if (false) {
          // open or close blocks in the mask
          (void) update_mask_with_blocks_2 (mask, a, nx, ny, simtime, dt);
          // optionally generate repeatedly-overlaid mask
@@ -1522,7 +1523,7 @@ int main(int argc,char **argv) {
                                         dmask_width, dmask_power);
       }
 
-      if (FALSE && step%50 == 0 && step < 1001) {
+      if (false && step%50 == 0 && step < 1001) {
          printf("Adding splotch %d\n",step);
          // grab a color and splat the paint
          (void) get_random_color (c,cnx,cny,thisc);
@@ -1542,7 +1543,7 @@ int main(int argc,char **argv) {
          }
       }
 
-      if (FALSE && use_MASK) {
+      if (false && use_MASK) {
          // allocate space
          if (first_time) {
             shear = allocate_2d_array_f(nx,ny);
@@ -1575,9 +1576,9 @@ int main(int argc,char **argv) {
          }
          printf("  shear range: %g to %g, mean abs is %g\n", minshear, maxshear, meanshear/(float)(nx*ny));
 
-         if (TRUE) {
+         if (true) {
             sprintf(outfileroot,"shear_%06d",step);
-            write_png (outfileroot,nx,ny,FALSE,FALSE,
+            write_png (outfileroot,nx,ny,false,false,
                        shear,-100.0,200.0,
                        NULL,0.0,1.0,
                        NULL,0.0,1.0);
@@ -1585,12 +1586,12 @@ int main(int argc,char **argv) {
       }
 
       // use vorticity and mask to modify mask
-      if (FALSE && use_MASK) {
+      if (false && use_MASK) {
          (void) mod_mask_with_vort(nx,ny,dt,mask,a[W2]);
       }
 
       // use velocity and mask to modify mask
-      if (FALSE && use_MASK) {
+      if (false && use_MASK) {
          (void) mod_mask_with_vel(nx,ny,dt,mask,u[XV],u[YV]);
       }
 
@@ -1598,22 +1599,22 @@ int main(int argc,char **argv) {
       if (vort_add_rand) {
          // add a random field of vorticity over the existing vorticity
          float factor = 2.0 * vort_add_factor * dt;
-         int doit = FALSE;
+         bool doit = false;
          if (step < vort_add_start) {
-            doit = FALSE;
+            doit = false;
          } else if (step < vort_add_peak) {
-            doit = TRUE;
+            doit = true;
             // lerp magnitude
             factor *= (float)(step-vort_add_start)/(float)(vort_add_peak-vort_add_start);
          } else if (step < vort_add_down) {
-            doit = TRUE;
+            doit = true;
             // constant peak magnitude
          } else if (step < vort_add_end) {
-            doit = TRUE;
+            doit = true;
             // lerp magnitude
             factor *= (float)(vort_add_end-step)/(float)(vort_add_end-vort_add_down);
          } else {
-            doit = FALSE;
+            doit = false;
          }
          if (doit) {
             #pragma omp parallel for
@@ -1638,7 +1639,7 @@ int main(int argc,char **argv) {
       }
 
       // clamp the temperature field
-      if (use_TEMP && TRUE) {
+      if (use_TEMP && true) {
          #pragma omp parallel for
          for (int ix=0; ix<nx; ix++) {
             for (int iy=0; iy<ny; iy++) {
@@ -1691,7 +1692,7 @@ int main(int argc,char **argv) {
       }
 
       // nudge colors toward a given color
-      if (use_COLOR && use_color_area && FALSE) {
+      if (use_COLOR && use_color_area && false) {
          const float tfac = 0.1;
          float thiscol[3];
          for (int ix=0; ix<nx; ix++) {
@@ -1715,7 +1716,7 @@ int main(int argc,char **argv) {
          vmax = compute_and_write_stats(silent,step,dt,simtime,walltime,nx,ny,xbdry,ybdry,u,a[W2]);
       }
 
-      if (first_time) first_time = FALSE;
+      if (first_time) first_time = false;
 
       // ----------------------------
       step++;
@@ -1741,7 +1742,7 @@ float compute_and_write_stats(int silent, int step, float dt, float simtime, dou
    float ke,base_mult,multx,multy,vmax,wmax,cn;
    static double total_time = 0.0;
    static char outfile[MAXCHARS];
-   static int initialized = FALSE;
+   static bool initialized = false;
    static FILE *outp;
 
    // if last time through, close file pointer and RETURN
@@ -1759,7 +1760,7 @@ float compute_and_write_stats(int silent, int step, float dt, float simtime, dou
          fflush(stderr);
          exit(0);
       }
-      initialized = TRUE;
+      initialized = true;
       fprintf(outp,"# step, sim time, KE, vort max, vel max, CN, cpu time step, cpu time total\n");
       fflush(outp);
    }

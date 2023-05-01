@@ -1,16 +1,17 @@
 /*
  * VIC-MOC - particles.c - create, move, draw particles
  *
- * Copyright 2018-20 Mark J. Stock <mstock@umich.edu>
+ * Copyright 2018-20,23 Mark J. Stock <mstock@umich.edu>
  */
+
+#include "vicmoc.h"
+#include "particles.h"
+#include "utility.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
 #include <signal.h>
-#include "vicmoc.h"
-#include "particles.h"
-#include "utility.h"
 
 // external functions
 //extern float interpolate_using_M4p_2d(int,int,int,int,float**,float,float);
@@ -373,13 +374,13 @@ void diffuse_color_img (float diffus, int nx, int ny,
                         int xbdry, int ybdry,
                         float **red, float **grn, float **blu) {
 
-   static int first_time = TRUE;
+   static bool first_time = true;
    static float** temp;
 
    // first time in: make a temporary array
    if (first_time) {
      temp = allocate_2d_array_f(nx,ny);
-     first_time = FALSE;
+     first_time = false;
    }
 
    // set the diffusivity to 0.124 (just under stability limit) for each 1.0 of input diffusivity
@@ -387,13 +388,13 @@ void diffuse_color_img (float diffus, int nx, int ny,
    const float D = diffus * 0.124 * pow((float)(nx-1), -2);
 
    // call the diffusion routine in libvicmoc2d
-   (void) diffuse_scalar_2d(nx, ny, xbdry, ybdry, 0, red, temp, D, FALSE, NULL, 1.0);
+   (void) diffuse_scalar_2d(nx, ny, xbdry, ybdry, 0, red, temp, D, false, NULL, 1.0);
    for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) red[ix][iy] = temp[ix][iy];
 
    // continue for green and blue
-   (void) diffuse_scalar_2d(nx, ny, xbdry, ybdry, 0, grn, temp, D, FALSE, NULL, 1.0);
+   (void) diffuse_scalar_2d(nx, ny, xbdry, ybdry, 0, grn, temp, D, false, NULL, 1.0);
    for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) grn[ix][iy] = temp[ix][iy];
-   (void) diffuse_scalar_2d(nx, ny, xbdry, ybdry, 0, blu, temp, D, FALSE, NULL, 1.0);
+   (void) diffuse_scalar_2d(nx, ny, xbdry, ybdry, 0, blu, temp, D, false, NULL, 1.0);
    for (int ix=0; ix<nx; ix++) for (int iy=0; iy<ny; iy++) blu[ix][iy] = temp[ix][iy];
 
    return;

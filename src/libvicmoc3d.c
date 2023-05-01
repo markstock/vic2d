@@ -1,7 +1,7 @@
 /*
  * VIC-MOC - libvicmoc3d.c - the library for the 2D and 3D routines
  *
- * Copyright 2004-8,20 Mark J. Stock <mstock@umich.edu>
+ * Copyright 2004-8,20,23 Mark J. Stock <mstock@umich.edu>
  */
 
 #include <stdlib.h>
@@ -364,7 +364,7 @@ float step_forward_3d (int step,int isStam,
    int sfi = -1;
    float Re,coeff;
    //static float ***t[MAX_SCALARS];
-   static int set_temp = FALSE;
+   static bool set_temp = false;
 
    // die if isStam
    if (isStam) {
@@ -377,7 +377,7 @@ float step_forward_3d (int step,int isStam,
    //   for (i=0; i<sc_cnt; i++) {
    //      t[i] = allocate_3d_array_f(nx,ny,nz);
    //   }
-   //   set_temp = TRUE;
+   //   set_temp = true;
    //}
 
    // ----------------------------
@@ -418,7 +418,7 @@ float step_forward_3d (int step,int isStam,
 
    // diffuse each scalar individually (t[] becomes a[] again)
    for (l=0; l<sc_cnt; l++) {
-      if (TRUE) {
+      if (true) {
          coeff = diffuse_scalar_3d(nx,ny,nz,xbdry,ybdry,zbdry,t[l],a[l],sc_diffus[l],dt);
       } else {
          // if we don't diffuse it, we still need to copy the values
@@ -460,7 +460,7 @@ int create_baroclinic_vorticity_3d (int nx,int ny,int nz,
    int i,j,k;
    float g[3] = {0.0,0.0,-1.0};
    static float ***grad[3];
-   static int set_grad = FALSE;
+   static bool set_grad = false;
 
    fprintf(stderr,"  in create_baroclinic_vorticity_3d\n"); fflush(stderr);
 
@@ -474,7 +474,7 @@ int create_baroclinic_vorticity_3d (int nx,int ny,int nz,
       grad[0] = allocate_3d_array_f(nx,ny,nz);
       grad[1] = allocate_3d_array_f(nx,ny,nz);
       grad[2] = allocate_3d_array_f(nx,ny,nz);
-      set_grad = TRUE;
+      set_grad = true;
    }
 
    // first, find the scalar gradient
@@ -512,7 +512,7 @@ int create_vorticity_stretch_3d(int nx,int ny,int nz,
    int i,j,k;
    float wcgu[3];
    static float ***grad[3][3];
-   static int set_grad = FALSE;
+   static bool set_grad = false;
 
    fprintf(stderr,"  in create_vorticity_stretch_3d\n"); fflush(stderr);
 
@@ -527,7 +527,7 @@ int create_vorticity_stretch_3d(int nx,int ny,int nz,
       grad[2][0] = allocate_3d_array_f(nx,ny,nz);
       grad[2][1] = allocate_3d_array_f(nx,ny,nz);
       grad[2][2] = allocate_3d_array_f(nx,ny,nz);
-      set_grad = TRUE;
+      set_grad = true;
    }
 
    // first, find the scalar gradient of the velocity
@@ -586,7 +586,7 @@ int create_boundary_vorticity_3d (int nx,int ny,int nz,
    float mult = 1.0*nxm1*dt;	// 1.0 seems to be correct
 
    // new way, from CottetVM - OOOOooooh, I was using slip walls!
-   if (TRUE) {
+   if (true) {
    hxi = dt*0.5*(float)(nxm1);
    if (xbdry == WALL) {
       for (j=0; j<ny; j++) {
@@ -625,7 +625,7 @@ int create_boundary_vorticity_3d (int nx,int ny,int nz,
    // my new way (2006) just replace boundary vort with calculated vals
    //   this assumed slip walls, and this routine should be run *before*
    //   the vicmoc advection? (or at least before diffusion)
-   if (FALSE) {
+   if (false) {
    hxi = dt*0.5*(float)(nxm1);
    if (xbdry == WALL) {
      for (j=1; j<nym1; j++) {
@@ -992,9 +992,9 @@ float diffuse_scalar_3d(int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
 float find_vels_3d (int step,int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    float ***u,float ***v,float ***w,float ***wx,float ***wy,float ***wz) {
 
-   int use_multigrid = FALSE;
-   int slip_wall = FALSE;
-   int driven_cavity = FALSE;
+   bool use_multigrid = false;
+   bool slip_wall = false;
+   bool driven_cavity = false;
    int i,j,k;
    int nxm1 = nx-1;
    int nym1 = ny-1;
@@ -1017,8 +1017,8 @@ float find_vels_3d (int step,int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    int ierr;
    static int iworksize = 4000000;
    static float *work;	// increasing this does not fix hwscrt's problem
-   static int allocated_arrays = FALSE;
-   static int must_initialize = TRUE;
+   static bool allocated_arrays = false;
+   static bool must_initialize = true;
    float pert,vmax;
    float xs = 0.0;
    float ys = 0.0;
@@ -1026,7 +1026,7 @@ float find_vels_3d (int step,int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    float xf = 1.0;
    float yf = (float)((float)(ny-1)/(float)(nx-1));
    float zf = (float)((float)(nz-1)/(float)(nx-1));
-   static int malloced_yet = FALSE;
+   static bool malloced_yet = false;
    static float **bduxs,**bduxf,**bduys,**bduyf,**bduzs,**bduzf;
    static float **bdvxs,**bdvxf,**bdvys,**bdvyf,**bdvzs,**bdvzf;
    static float **bdwxs,**bdwxf,**bdwys,**bdwyf,**bdwzs,**bdwzf;
@@ -1036,7 +1036,7 @@ float find_vels_3d (int step,int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    static float ***grad[3][3];
    //static float ***div;
    float div,maxdiv;
-   static int set_grad = TRUE;		// FALSE if you need it
+   static bool set_grad = true;		// false if you need it
    char outfileroot[MAXCHARS];
 
    fprintf(stderr,"  in find_vels_3d\n"); fflush(stderr);
@@ -1052,7 +1052,7 @@ float find_vels_3d (int step,int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
       if (use_multigrid)
          rhs = allocate_3d_array_f(nx,ny,nz);
 
-      allocated_arrays = TRUE;
+      allocated_arrays = true;
    }
 
    if (!use_multigrid) {
@@ -1083,7 +1083,7 @@ float find_vels_3d (int step,int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
       bdwyf = allocate_2d_array_f(nx,nz);
       bdwzs = allocate_2d_array_f(nx,ny);
       bdwzf = allocate_2d_array_f(nx,ny);
-      malloced_yet = TRUE;
+      malloced_yet = true;
 
       xswx = allocate_2d_array_f(ny,nz);
       xswy = allocate_2d_array_f(ny,nz);
@@ -1119,11 +1119,11 @@ float find_vels_3d (int step,int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
       grad[2][1] = allocate_3d_array_f(nx,ny,nz);
       grad[2][2] = allocate_3d_array_f(nx,ny,nz);
       //div = allocate_3d_array_f(nx,ny,nz);
-      set_grad = TRUE;
+      set_grad = true;
    }
 
    // if a boundary is periodic, make sure that both ends have the same value
-   if (TRUE) {
+   if (true) {
       if (xbdry == PERIODIC) {
          for (j=0;j<ny;j++) {
             for (k=0;k<nz;k++) {
@@ -1176,7 +1176,7 @@ float find_vels_3d (int step,int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    // THIS WORKS
    // whether slip or no-slip walls, do this:
 
-   if (FALSE) {
+   if (false) {
       if (xbdry == WALL) {
          for (j=0;j<ny;j++) {
             for (k=0;k<nz;k++) {
@@ -1260,7 +1260,7 @@ float find_vels_3d (int step,int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    //}
    //printf("  max div %g\n",maxdiv);
    // sprintf(outfileroot,"div_vort_%04d",step);
-   // write_output_3d(outfileroot,nx,ny,nz,div,-0.01,0.02,2,FALSE);
+   // write_output_3d(outfileroot,nx,ny,nz,div,-0.01,0.02,2,false);
 
 
    // and make sure that its negative
@@ -1438,7 +1438,7 @@ float find_vels_3d (int step,int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
 
 
          // don't do this again
-         must_initialize = FALSE;
+         must_initialize = false;
       }
 
       // now call the subroutine for real
@@ -1588,11 +1588,11 @@ float find_vels_3d (int step,int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
 
    // write out RHS
    // sprintf(outfileroot,"dcvx_%04d",step);
-   // write_output_3d(outfileroot,nx,ny,nz,u,-500,1000,2,FALSE);
+   // write_output_3d(outfileroot,nx,ny,nz,u,-500,1000,2,false);
    // sprintf(outfileroot,"dcvy_%04d",step);
-   // write_output_3d(outfileroot,nx,ny,nz,v,-500,1000,2,FALSE);
+   // write_output_3d(outfileroot,nx,ny,nz,v,-500,1000,2,false);
    // sprintf(outfileroot,"dcvz_%04d",step);
-   // write_output_3d(outfileroot,nx,ny,nz,w,-500,1000,2,FALSE);
+   // write_output_3d(outfileroot,nx,ny,nz,w,-500,1000,2,false);
 
    // set bc[uvw][xyz] flag boundary conditions
    // for '1' (value specified at boundary), the value is in u/v/w,
@@ -1688,7 +1688,7 @@ float find_vels_3d (int step,int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
       // div[i][j][k] = grad[0][0][i][j][k]+grad[1][1][i][j][k]+grad[2][2][i][j][k];
    // }
    // sprintf(outfileroot,"div_vel_%04d",step);
-   // write_output_3d(outfileroot,nx,ny,nz,div,-1.,2.,2,FALSE);
+   // write_output_3d(outfileroot,nx,ny,nz,div,-1.,2.,2,false);
 
    // and what is wy?
    // for (i=0; i<nx; i++)
@@ -1697,10 +1697,10 @@ float find_vels_3d (int step,int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
       // div[i][j][k] = grad[0][2][i][j][k]-grad[2][0][i][j][k];
    // }
    // sprintf(outfileroot,"wy_after_%04d",step);
-   // write_output_3d(outfileroot,nx,ny,nz,div,-10.,20.,2,FALSE);
+   // write_output_3d(outfileroot,nx,ny,nz,div,-10.,20.,2,false);
 
    // put the vorticity that we removed back
-   if (FALSE) {
+   if (false) {
       if (xbdry == WALL) {
          for (j=0;j<ny;j++) {
             for (k=0;k<nz;k++) {
@@ -1956,8 +1956,8 @@ int make_solenoidal_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    float zf = (float)((float)(nz-1)/(float)(nx-1));
    static int iworksize;
    static float *work;	// increasing this does not fix hwscrt's problem
-   static int allocated_arrays = FALSE;
-   static int must_initialize = TRUE;
+   static bool allocated_arrays = false;
+   static bool must_initialize = true;
    static float ***rhs;
    //static float ***phi;
    static float ***gradphi[3];
@@ -2040,7 +2040,7 @@ int make_solenoidal_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
       zfwy = allocate_2d_array_f(nx,ny);
       zfwz = allocate_2d_array_f(nx,ny);
 
-      allocated_arrays = TRUE;
+      allocated_arrays = true;
    }
 
    // test the divergence right now---it might be good enough
@@ -2061,7 +2061,7 @@ int make_solenoidal_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
 
    // for all wall boundaries, set zero thru-flow and derivative
    //if (slip_wall) {
-   if (TRUE) {
+   if (true) {
       // allow slip at walls (LES-like)
       if (xbdry == WALL) {
          for (j=0;j<ny;j++) {
@@ -2144,11 +2144,11 @@ int make_solenoidal_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
 
    // write out RHS
    // sprintf(outfileroot,"dcvx_%04d",step);
-   // write_output_3d(outfileroot,nx,ny,nz,u,-500,1000,2,FALSE);
+   // write_output_3d(outfileroot,nx,ny,nz,u,-500,1000,2,false);
    // sprintf(outfileroot,"dcvy_%04d",step);
-   // write_output_3d(outfileroot,nx,ny,nz,v,-500,1000,2,FALSE);
+   // write_output_3d(outfileroot,nx,ny,nz,v,-500,1000,2,false);
    // sprintf(outfileroot,"dcvz_%04d",step);
-   // write_output_3d(outfileroot,nx,ny,nz,w,-500,1000,2,FALSE);
+   // write_output_3d(outfileroot,nx,ny,nz,w,-500,1000,2,false);
 
    // set bc[uvw][xyz] flag boundary conditions
    // for '1' (value specified at boundary), the value is in u/v/w,
@@ -2162,7 +2162,7 @@ int make_solenoidal_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    } else if (xbdry == WALL) {
       /* both sides are walls */
       //if (slip_wall) {
-      if (TRUE) {
+      if (true) {
          bcux = 1;
          bcvx = 3;
          bcwx = 3;
@@ -2183,7 +2183,7 @@ int make_solenoidal_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    } else if (ybdry == WALL) {
       /* both sides are walls */
       //if (slip_wall) {
-      if (TRUE) {
+      if (true) {
          bcuy = 3;
          bcvy = 1;
          bcwy = 3;
@@ -2204,7 +2204,7 @@ int make_solenoidal_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    } else if (zbdry == WALL) {
       /* both sides are walls */
       //if (slip_wall) {
-      if (TRUE) {
+      if (true) {
          bcuz = 3;
          bcvz = 3;
          bcwz = 1;
@@ -2476,7 +2476,7 @@ int explicit_particle_move_3d(int nx,int ny,int nz,int xbdry,int ybdry,int zbdry
    float dr,len,rvec[3];
 
    // first, apply some random motion, scaled by sqrt(dt) and 1/Re
-   if (TRUE) {
+   if (true) {
       for (i=0; i<pnum; i++) {
          // find a random direction
          len = 2.;
@@ -2509,7 +2509,7 @@ int explicit_particle_move_3d(int nx,int ny,int nz,int xbdry,int ybdry,int zbdry
       }
    }
 
-   if (FALSE) {
+   if (false) {
       // find new particle velocities and locations, Euler-style
       for (i=0; i<pnum; i++) {
          //interpolate_array_using_M4p_3d(nx,ny,nz,xbdry,ybdry,zbdry,u,
