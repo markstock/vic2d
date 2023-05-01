@@ -34,8 +34,22 @@
 // these don't need to be modified
 #define FLOAT float	// use 4-byte floats or 8-byte doubles; actually, this must
  			// be set to "float" because the gr2.c routines require it
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+
+// see https://stackoverflow.com/questions/3437404/min-and-max-in-c for a discussion of this
+#define MAX(a,b)             \
+({                           \
+    __typeof__ (a) _a = (a); \
+    __typeof__ (b) _b = (b); \
+    _a > _b ? _a : _b;       \
+})
+
+#define MIN(a,b)             \
+({                           \
+    __typeof__ (a) _a = (a); \
+    __typeof__ (b) _b = (b); \
+    _a < _b ? _a : _b;       \
+})
+
 #define EPSILON 1.0e-6
 
 // these are for boundary conditions - move these to an enum
