@@ -1,6 +1,15 @@
 vic2d - TODO
 
-Add a "-restart num" option to read existing temp, vort, etc. files and restart the sim
+Do something with this new knowledge of how viscosity and time step size interact to 
+prevent or allow energy growth. Can we find some way to test for increasing energy
+and apply a filter to prevent it? Or, is there a SGS dissipation scheme that we can
+use to get energy to monotonically decrease?
+
+Use const and restrict on important multi-dim arrays, such as replacing
+  float*** arry
+  with
+  float* const* const* const arry
+  in this way, the floats in the 3D array can be changed, but the pointers can't
 
 Add an option to advect the color at a fraction of the local velocity,
   or give each "pixel" a momentum/ballistic coefficient, and have the
