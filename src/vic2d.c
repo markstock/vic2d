@@ -55,6 +55,8 @@ int main(int argc,char **argv) {
    bool use_DF = false;
    bool use_COLOR = false;
    bool reread_color = false;
+   bool use_cint = false;
+   int cint_interval = 100;
    bool darkenonly = true;
    bool freeze_flow = false;
    int freeze_at = -1;
@@ -161,6 +163,7 @@ int main(int argc,char **argv) {
    float **mask;			// flow mask
    float **heat;			// constant heat source map
    float **c[3];			// color image storage for temp field
+   float **cint[3];			// integrated color image storage
    float **pc[3];			// particle color image
    float *cml[3];			// linear color map storage
    float **cmi[3];			// 2D color input storage
@@ -189,6 +192,7 @@ int main(int argc,char **argv) {
    bool use_color_linear = false;
    bool use_color_area = false;
    char colorsrcfilename[MAXCHARS];
+   char cintfileroot[MAXCHARS];
    char mdfilename[MAXCHARS];
    char tdfilename[MAXCHARS];
    char cdfilename[MAXCHARS];
@@ -345,6 +349,10 @@ int main(int argc,char **argv) {
       } else if (strncmp(argv[i], "-ca", 3) == 0) {
          strcpy (colorsrcfilename,argv[++i]);
          use_color_area = true;
+      } else if (strncmp(argv[i], "-cint", 5) == 0) {
+         use_cint = true;
+         cint_interval = atoi(argv[++i]);
+         if (cint_interval < 2) cint_interval = 2;
       } else if (strncmp(argv[i], "-c", 2) == 0) {
          use_COLOR = true;
 
@@ -526,6 +534,18 @@ int main(int argc,char **argv) {
       color_right = allocate_2d_array_f(3,ny);
       color_top = allocate_2d_array_f(3,nx);
       color_bottom = allocate_2d_array_f(3,nx);
+   }
+
+   // save integrated color field?
+   if (use_cint && use_COLOR) {
+      cint[0] = allocate_2d_array_f(nx,ny);
+      cint[1] = allocate_2d_array_f(nx,ny);
+      cint[2] = allocate_2d_array_f(nx,ny);
+      for (int ix=0; ix<nx; ix++) { for (int iy=0; iy<ny; iy++) { cint[0][ix][iy] = 0.0f; } }
+      for (int ix=0; ix<nx; ix++) { for (int iy=0; iy<ny; iy++) { cint[1][ix][iy] = 0.0f; } }
+      for (int ix=0; ix<nx; ix++) { for (int iy=0; iy<ny; iy++) { cint[2][ix][iy] = 0.0f; } }
+   } else {
+      use_cint = false;
    }
 
    // variable viscosities
@@ -1706,6 +1726,30 @@ int main(int argc,char **argv) {
             }
          }
       }
+      if (use_COLOR && use_cint) {
+         if (step%cint_interval == cint_interval-1) {
+            // scale the colors
+            float factor = 1.0f / (float)cint_interval;
+            for (int ix=0; ix<nx; ix++) { for (int iy=0; iy<ny; iy++) { cint[0][ix][iy] *= factor; } }
+            for (int ix=0; ix<nx; ix++) { for (int iy=0; iy<ny; iy++) { cint[1][ix][iy] *= factor; } }
+            for (int ix=0; ix<nx; ix++) { for (int iy=0; iy<ny; iy++) { cint[2][ix][iy] *= factor; } }
+            // write the colors
+            sprintf(cintfileroot,"cint_%06d",step+1);
+            write_png (cintfileroot,nx,ny,true,use_16bpp,
+                       cint[0],0.0,1.0,
+                       cint[1],0.0,1.0,
+                       cint[2],0.0,1.0);
+            // and zero them again
+            for (int ix=0; ix<nx; ix++) { for (int iy=0; iy<ny; iy++) { cint[0][ix][iy] = 0.0f; } }
+            for (int ix=0; ix<nx; ix++) { for (int iy=0; iy<ny; iy++) { cint[1][ix][iy] = 0.0f; } }
+            for (int ix=0; ix<nx; ix++) { for (int iy=0; iy<ny; iy++) { cint[2][ix][iy] = 0.0f; } }
+         } else {
+            // accumulate the color
+            for (int ix=0; ix<nx; ix++) { for (int iy=0; iy<ny; iy++) { cint[0][ix][iy] += a[RR][ix][iy]; } }
+            for (int ix=0; ix<nx; ix++) { for (int iy=0; iy<ny; iy++) { cint[1][ix][iy] += a[GG][ix][iy]; } }
+            for (int ix=0; ix<nx; ix++) { for (int iy=0; iy<ny; iy++) { cint[2][ix][iy] += a[BB][ix][iy]; } }
+         }
+      }
 
       // calculate the total time elapsed, and the time for this last step
       gettimeofday(&t_curr, 0);
@@ -1989,6 +2033,7 @@ int Usage(char progname[MAXCHARS],int status) {
    "   -every [int] write only every so many steps, default=1 (every step)     ",
    "   -checkpoint [int] write checkpoint files every so many steps,           ",
    "               default=-1 (no checkpointing)                               ",
+   "   -cint [int] integrate colors over a number of steps, default=off        ",
    "   -noout      suppress all file output                                    ",
    "   -step [int] run a fixed number of steps; default=99999                  ",
    "                                                                           ",
