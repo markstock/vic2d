@@ -1351,7 +1351,7 @@ int main(int argc,char **argv) {
 
       // compute wmax and write checkpoint files
       if (checkpointevery > 0 && step > 0 && step%checkpointevery == 0) {
-         fprintf(stderr,"  writing checkpoint files for restart...\n");
+         fprintf(stderr,"writing checkpoint files for restart...\n");
 
          // find vort max
          float wmax = 1.e-20;
@@ -1361,42 +1361,65 @@ int main(int argc,char **argv) {
             }
          }
 
+         // build restart command line
+         char cline[1024] = "";
+         strcat(cline, argv[0]);
+         for (int i=1; i<argc; i++) {
+            strcat(cline, " ");
+            strcat(cline, argv[i]);
+         }
+
          // write vorticity (always 16bpp to keep precision)
-         strcpy(outfileroot,"restart_vort");
+         sprintf(outfileroot,"restart_vort_%06d",step);
          write_png (outfileroot,nx,ny,false,use_16bpp,
                     a[W2],-wmax,2.*wmax,
                     NULL,0.0,1.0,
                     NULL,0.0,1.0);
+         strcat(cline, " -vf ");
+         strcat(cline, outfileroot);
+         strcat(cline, ".png");
+         sprintf(outfileroot," -vscale %g",wmax);
+         strcat(cline, outfileroot);
 
          // write temperature
          if (use_TEMP) {
-            strcpy(outfileroot,"restart_temp");
+            sprintf(outfileroot,"restart_temp_%06d",step);
             write_png (outfileroot,nx,ny,false,use_16bpp,
                        a[SF],-1.0,2.0,
                        NULL,0.0,1.0,
                        NULL,0.0,1.0);
+            strcat(cline, " -tf ");
+            strcat(cline, outfileroot);
+            strcat(cline, ".png");
          }
 
          // write color
          if (use_COLOR) {
-            strcpy(outfileroot,"restart_color");
+            sprintf(outfileroot,"restart_color_%06d",step);
             write_png (outfileroot,nx,ny,true,use_16bpp,
                        a[RR],0.0,1.0,
                        a[GG],0.0,1.0,
                        a[BB],0.0,1.0);
+            strcat(cline, " -cf ");
+            strcat(cline, outfileroot);
+            strcat(cline, ".png");
          }
 
          // echo restart command line
          fprintf(stderr,"  restart from this point with:\n");
-         fprintf(stderr,"%s",argv[0]);
-         for (int i=1; i<argc; i++) {
-            fprintf(stderr," %s",argv[i]);
+         fprintf(stderr,"%s\n",cline);
+
+         // and write it to a file, too
+         char outfile[] = "restart.commands";
+         FILE *outp = fopen(outfile,"a");
+         if (outp == NULL) {
+            fprintf(stderr,"Could not open output file %s\n",outfile);
+            fflush(stderr);
+            exit(0);
          }
-         fprintf(stderr," -vf restart_vort.png");
-         fprintf(stderr," -vscale %g",wmax);
-         if (use_TEMP) fprintf(stderr," -tf restart_temp.png");
-         if (use_COLOR) fprintf(stderr," -cf restart_color.png");
-         fprintf(stderr,"\n");
+         fprintf(outp,"%s\n", cline);
+         fflush(outp);
+         fclose(outp);
       }
 
       // check end conditions
