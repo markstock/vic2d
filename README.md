@@ -55,3 +55,15 @@ This program can create digital output very similar to that made by the traditio
 
 This code uses [libpng](https://github.com/glennrp/libpng) and [mudpack](https://www2.cisl.ucar.edu/resources/legacy/mudpack), a multigrid solver. All the rest of this ugly, ugly code is mine.
 
+## Citing vic2d
+
+I don't get paid for writing or maintaining this, so if you find this tool useful or mention it in your writing, please please cite it by using the following BibTeX entry.
+
+```
+@Misc{vic2d2004,
+  author =       {Mark J.~Stock},
+  title =        {vic2d:  A command-line two-dimensional fluid simulator using a novel semi-Lagrangian advection technique},
+  howpublished = {\url{https://github.com/markstock/vic2d}},
+  year =         {2004}
+}
+```
