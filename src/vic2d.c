@@ -1774,6 +1774,21 @@ int main(int argc,char **argv) {
          }
       }
 
+      // debug print min and max variable diffusivities
+      if (false) {
+         float dmin = 9.e+9;
+         float dmax = 0.;
+         for (int i=0; i<nx; i++) {
+            for (int j=0; j<ny; j++) {
+               if (a[MD][i][j] > dmax) dmax = a[MD][i][j];
+               if (a[MD][i][j] < dmin) dmin = a[MD][i][j];
+            }
+         }
+         fprintf(stdout,"  min/max momentum diffusivities %g %g\n",dmin,dmax);
+         fprintf(stdout,"                         desired %g %g\n",mdlow,mdhigh);
+      }
+
+
       // calculate the total time elapsed, and the time for this last step
       gettimeofday(&t_curr, 0);
       walltime = (t_curr.tv_sec - t_last.tv_sec) + (t_curr.tv_usec - t_last.tv_usec)*1e-6;
