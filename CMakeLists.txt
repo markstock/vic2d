@@ -1,8 +1,8 @@
 #
 # vic2d CMake config file
 #
+CMAKE_MINIMUM_REQUIRED ( VERSION 3.5 )
 PROJECT ( vic2d )
-CMAKE_MINIMUM_REQUIRED ( VERSION 2.8.12 )
 ENABLE_LANGUAGE (Fortran)
 
 SET_PROPERTY(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo")
@@ -122,11 +122,15 @@ SET(SRCS2D ${HEADERS}
             "src/vic2d.c"
             "src/particles.c"
             "src/inout.c" )
+
 SET(LIBSRCS3D ${HEADERS}
             "src/libvicmoc3d.c"
             "src/gr3.f"
             "src/utility.c"
             "src/mud3sp.f" )
+SET(SRCS3D ${HEADERS}
+            "src/vic3d.c"
+            "src/inout.c" )
 
 # targets
 ADD_LIBRARY ( "vicmoc2d" STATIC ${LIBSRCS2D} )
@@ -134,3 +138,5 @@ ADD_EXECUTABLE ( "vic2d" ${SRCS2D} )
 TARGET_LINK_LIBRARIES( "vic2d" "vicmoc2d" ${EXTERNAL_LIBS} )
 
 ADD_LIBRARY ( "vicmoc3d" STATIC ${LIBSRCS3D} )
+ADD_EXECUTABLE ( "vic3d" ${SRCS3D} )
+TARGET_LINK_LIBRARIES( "vic3d" "vicmoc3d" ${EXTERNAL_LIBS} )

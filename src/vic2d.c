@@ -173,7 +173,6 @@ int main(int argc,char **argv) {
    struct Particles pts;		// collection of particles
 
    // bookkeeping
-   unsigned long int tics,last_tics;
    struct timeval t_curr, t_last;
    char progname[MAXCHARS];
    char outfileroot[MAXCHARS];
