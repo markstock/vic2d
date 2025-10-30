@@ -110,25 +110,33 @@ ENDIF ()
 INCLUDE_DIRECTORIES ( "src" )
 ADD_DEFINITIONS (${CPREPROCDEFS})
 
-FILE(GLOB HEADERS "src/*.h" )
-SET(LIBSRCS2D ${HEADERS}
+SET(HEADERSS2D "src/vicmoc.h"
+			"src/libvicmoc2d.h"
+			"src/particles.h"
+			"src/inout.h"
+			"src/utility.h" )
+SET(LIBSRCS2D ${HEADERS2D}
             "src/libvicmoc2d.c"
             "src/gr2.f"
             "src/utility.c"
             "src/maskops.c"
             "src/mud2sp_extern.c"
             "src/mud2sp_full.f" )
-SET(SRCS2D ${HEADERS}
+SET(SRCS2D ${HEADERS2D}
             "src/vic2d.c"
             "src/particles.c"
             "src/inout.c" )
 
-SET(LIBSRCS3D ${HEADERS}
+SET(HEADERSS3D "src/vicmoc.h"
+			"src/libvicmoc3d.h"
+			"src/inout.h"
+			"src/utility.h" )
+SET(LIBSRCS3D ${HEADERS3D}
             "src/libvicmoc3d.c"
             "src/gr3.f"
             "src/utility.c"
             "src/mud3sp.f" )
-SET(SRCS3D ${HEADERS}
+SET(SRCS3D ${HEADERS3D}
             "src/vic3d.c"
             "src/inout.c" )
 

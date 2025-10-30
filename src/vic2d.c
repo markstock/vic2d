@@ -26,6 +26,7 @@
 #include "inout.h"
 #include "particles.h"
 #include "vicmoc.h"
+#include "libvicmoc2d.h"
 
 float compute_and_write_stats(int, int, float, float, double, int, int, int, int, float***,float**);
 void paint_splat (float,float,float,float,float,float,float,float,float,int,int,int,float**,float**,float**);

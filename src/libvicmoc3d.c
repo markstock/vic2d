@@ -7,89 +7,33 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
+
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+
 #include "vicmoc.h"
+#include "libvicmoc3d.h"
+#include "utility.h"
 
 #define SCALE 1.0
 
-
-int add_sharp_circular_blob(int,int,int,int,float**,float,float,float,float);
-int add_smooth_circular_blob(int,int,int,int,float**,float,float,float,float);
-int add_smooth_circular_blob_3d(int,int,int,int,int,int,int,float***,float,float,float,float);
-int add_smooth_spherical_blob(int,int,int,int,int,int,float***,float,float,float,float,float);
-int add_singular_blob_3d(int,int,int,int,int,int,float***,float,float,float,float,float);
-int add_cube_3d(int,int,int,int,int,int,float***,float,float,float,float,float);
-int add_vortex_ring_3d(int,int,int,int,int,int,float***,float***,float***,float,float,float,float,float,float,float,float,float);
-int explicit_particle_move_3d(int,int,int,int,int,int,float****,float,float,int,float**,float**);
-float step_forward_3d(int,int,int,int,int,int,int,int,float****,float****,float****,int,int*,float*,float,float);
 
 int create_baroclinic_vorticity_3d(int,int,int,int,int,int,float***,float***,float***,float***,float,float);
 int create_vorticity_stretch_3d(int,int,int,int,int,int,float***,float***,float***,float***,float***,float***,float);
 int create_boundary_vorticity_3d(int,int,int,int,int,int,float***,float***,float***,float***,float***,float***,float);
 float diffuse_scalar_3d(int,int,int,int,int,int,float***,float***,float,float);
-float find_vels_3d(int,int,int,int,int,int,int,float***,float***,float***,float***,float***,float***);
-int make_solenoidal_3d(int,int,int,int,int,int,float***,float***,float***);
 int find_gradient_of_scalar_3d(int,int,int,int,int,int,float***,float****);
 int moc_advect_3d(int,int,int,int,int,int,float****,float****,float****,int,float);
 float compute_divergence_3d(int,int,int,int,int,int,float***,float***,float***,float***);
 int compute_curl_3d(int,int,int,int,int,int,float***,float***,float***,float***,float***,float***);
-float find_energy_3d(int,int,int,int,int,int,float***,float***,float***);
 float find_biot_savart_u (float,float,int,int,float,float,float**);
 float find_biot_savart_v (float,float,int,int,float,float,float**);
 int find_biot_savart (float,float,int,int,float,float,float**,float*);
 int find_open_boundary_psi (int,int,float**,float,float*,float**);
 float interpolate_array_using_CIC_3d(int,int,int,int,int,int,float****,float,float,float,int,float*);
 float interpolate_array_using_M4p_3d(int,int,int,int,int,int,float****,float,float,float,int,float*);
-float find_vmax(float***, float***, float***,int,int,int);
-
-
-/*
- * For whatever reason, add a chunk of scalar stuff
- */
-int add_sharp_circular_blob(int nx,int ny,int xbdry,int ybdry,float **addto,float xpos,float ypos,float rad,float val) {
-
-   int ix,iy;
-   float px,py;
-
-   for (ix=0; ix<nx; ix++) {
-      px = (float)ix/(float)(nx-1);
-      for (iy=0; iy<ny; iy++) {
-         py = (float)iy/(float)(nx-1);
-         if (sqrt(pow(SCALE*(px-xpos),2)+pow(py-ypos,2)) < rad) addto[ix][iy] += val;
-      }
-   }
-
-   return(0);
-}
-
-
-/*
- * For whatever reason, add a chunk of scalar stuff
- */
-int add_smooth_circular_blob(int nx,int ny,int xbdry,int ybdry,float **addto,float xpos,float ypos,float rad,float val) {
-
-   int ix,iy;
-   float px,py;
-   float rad_inner = 0.8*rad;
-   float dist;
-
-   for (ix=0; ix<nx; ix++) {
-      px = (float)ix/(float)(nx-1);
-      for (iy=0; iy<ny; iy++) {
-         py = (float)iy/(float)(nx-1);
-         dist = sqrt(pow(SCALE*(px-xpos),2)+pow(py-ypos,2));
-         if (dist < rad_inner) {
-            addto[ix][iy] += val;
-         } else if (dist < rad) {
-            addto[ix][iy] += val*(0.5+0.5*cos(M_PI*(dist-rad_inner)/(rad-rad_inner)));
-         }
-      }
-   }
-
-   return(0);
-}
 
 
 /*
@@ -272,50 +216,49 @@ int add_vortex_ring_3d(int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
     float ***wx,float ***wy,float ***wz,float xloc,float yloc,float zloc,
     float xn,float yn,float zn,float majrad,float minrad,float str) {
 
-   int ix,iy,iz;
-   float px,py,pz;
-   float rx,ry,rz,lx,ly,lz,zl,rl;
-   float dist,temp,len,cx,cy,cz;
+   float temp,cx,cy,cz;
+   //printf("normal is %g %g %g\n",xn,yn,zn);
 
    // just to be safe, normalize the normal
-   len = sqrt(xn*xn+yn*yn+zn*zn);
+   const float len = sqrtf(xn*xn+yn*yn+zn*zn);
    xn /= len;
    yn /= len;
    zn /= len;
+   //printf("normal is %g %g %g\n",xn,yn,zn);
 
    // just loop over all positions
-   for (ix=0; ix<nx; ix++) {
-     px = (float)ix/(float)(nx-1);
-     for (iy=0; iy<ny; iy++) {
-       py = (float)iy/(float)(ny-1);
-       for (iz=0; iz<nz; iz++) {
-         pz = (float)iz/(float)(nz-1);
+   for (int ix=0; ix<nx; ix++) {
+     const float px = (float)ix/(float)(nx-1);
+     for (int iy=0; iy<ny; iy++) {
+       const float py = (float)iy/(float)(ny-1);
+       for (int iz=0; iz<nz; iz++) {
+         const float pz = (float)iz/(float)(nz-1);
 
          // now, figure out where we are!
          //printf("point at %g %g %g\n",px,py,pz);
 
          // relative vector to the ring center
-         rx = px-xloc;
-         ry = py-yloc;
-         rz = pz-zloc;
+         const float rx = px-xloc;
+         const float ry = py-yloc;
+         const float rz = pz-zloc;
          //printf("  rel pos %g %g %g\n",rx,ry,rz);
 
          // distance from the plane
-         zl = rx*xn + ry*yn + rz*zn;
+         const float zl = rx*xn + ry*yn + rz*zn;
          //printf("  dist from plane %g\n",zl);
 
          // location on the plane
-         lx = rx-zl*xn;
-         ly = ry-zl*yn;
-         lz = rz-zl*zn;
+         const float lx = rx-zl*xn;
+         const float ly = ry-zl*yn;
+         const float lz = rz-zl*zn;
          //printf("  inplane pos %g %g %g\n",lx,ly,lz);
 
          // distance (in the plane) from the ring axis
-         rl = sqrt(lx*lx+ly*ly+lz*lz);
+         const float rl = sqrt(lx*lx+ly*ly+lz*lz);
          //printf("  dist from axis %g\n",rl);
 
          // distance from the ring core
-         dist = sqrt(zl*zl+pow(rl-majrad,2));
+         float dist = sqrt(zl*zl+pow(rl-majrad,2));
          //printf("  dist from core %g\n",dist);
 
          if (dist < minrad) {
@@ -326,6 +269,7 @@ int add_vortex_ring_3d(int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
            cx = yn*lz - zn*ly;
            cy = zn*lx - xn*lz;
            cz = xn*ly - yn*lx;
+           //printf("  xp %g %g %g  str %g %g %g\n",px,py,pz,cx,cy,cz);
            //printf("  str dir %g %g %g\n",cx,cy,cz);
            //exit(0);
 
@@ -362,7 +306,8 @@ float step_forward_3d (int step,int isStam,
 
    int i,j,k,l;
    int sfi = -1;
-   float Re,coeff;
+   float Re = -1.f;
+   float coeff = 1.f;
    //static float ***t[MAX_SCALARS];
    static bool set_temp = false;
 
@@ -396,6 +341,7 @@ float step_forward_3d (int step,int isStam,
    // Yes, projecting onto solenoidal doesn't create stretch either!
    create_vorticity_stretch_3d(nx,ny,nz,xbdry,ybdry,zbdry,u[XV],u[YV],u[ZV],t[WX],t[WY],t[WZ],dt);
    // Maybe a better idea is solving a poisson equation to project
+   // latest: save origin points from moc_advect and use them to reproject the vorticity vector
 
    // these divergent vorticity vectors onto a divergence-free field?
    make_solenoidal_3d(nx,ny,nz,xbdry,ybdry,zbdry,t[WX],t[WY],t[WZ]);

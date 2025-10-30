@@ -15,23 +15,15 @@
 #include "utility.h"
 #include "inout.h"
 #include "vicmoc.h"
+#include "libvicmoc2d.h"
 
-// setup routines
-int add_sharp_circular_blob (int,int,int,int,float**,float,float,float,float);
-int add_smooth_circular_blob (int,int,int,int,float**,float,float,float,float);
-int add_smooth_spherical_blob (int,int,int,int,int,int,float***,float,float,float,float,float);
-
-// simulation routines
-float step_forward_2d (int,int,int,int,int,int,int,int,float*,float*,int,int,float***,float***,float***,int,float**,float,float*,int,float*,float,int,float,float,float***);
 
 int create_baroclinic_vorticity_2d (int,int,int,int,float**,float**,float**,float,int,float*,float);
 int create_boundary_vorticity_2d (int,int,int,int,float**,float**,float**,float);
 float diffuse_scalar_2d (int,int,int,int,int,float**,float**,float,int,float**,float);
 float variable_diffuse_scalar_2d (int,int,int,int,float**,float**,float**,int,float**,float);
-int find_vels_2d (int,int,int,int,int,int,int,float*,float*,float**,float**,float**,const int,float**,const float);
 int find_gradient_of_scalar_2d (int,int,int,int,float**,float**,float,float**,float);
 int find_gradient_of_scalar_2nd_2d (int,int,int,int,float**,float**,float**,float,float**,float);
-int find_shear_magnitude (int, int, int, int, float**, float, float**, float, float **);
 int find_curl_of_vel_2d (int,int,int,int,float**,float**,float**);
 int moc_advect_2d (int,int,int,int,float**,float**,float**,float*,float***,float***,float,int,int);
 int find_open_boundary_psi (int,int,float**,float,float*,float**);
@@ -88,37 +80,6 @@ int add_smooth_circular_blob(int nx,int ny,int xbdry,int ybdry,float **addto,flo
             addto[ix][iy] += val;
          } else if (dist < rad) {
             addto[ix][iy] += val*(0.5+0.5*cos(M_PI*(dist-rad_inner)/(rad-rad_inner)));
-         }
-      }
-   }
-
-   return(0);
-}
-
-
-/*
- * For whatever reason, add a chunk of scalar stuff
- */
-int add_smooth_spherical_blob(int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
-   float ***addto,float xpos,float ypos,float zpos,float rad,float val) {
-
-   int ix,iy,iz;
-   float px,py,pz;
-   float rad_inner = 0.8*rad;
-   float dist;
-
-   for (ix=0; ix<nx; ix++) {
-      px = (float)ix/(float)(nx-1);
-      for (iy=0; iy<ny; iy++) {
-         py = (float)iy/(float)(nx-1);
-         for (iz=0; iz<nz; iz++) {
-            pz = (float)iz/(float)(nx-1);
-            dist = sqrt(pow(px-xpos,2)+pow(py-ypos,2)+pow(pz-zpos,2));
-            if (dist < rad_inner) {
-               addto[ix][iy][iz] += val;
-            } else if (dist < rad) {
-               addto[ix][iy][iz] += val*(0.5+0.5*cos(M_PI*(dist-rad_inner)/(rad-rad_inner)));
-            }
          }
       }
    }

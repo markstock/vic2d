@@ -29,6 +29,7 @@
 #endif
 
 #include "vicmoc.h"
+#include "libvicmoc3d.h"
 #include "utility.h"
 #include "inout.h"
 
@@ -45,8 +46,8 @@ int main(int argc,char **argv) {
    int writeOutput = true;
    int maxStep;
    int writeevery;
-   float vmax;
-   float simtime = 0.;
+   float vmax = 1.f;
+   float simtime = 0.f;
 
    int sc_cnt = 3;			// all 3 vorticities
    int sc_type[MAX_SCALARS];
@@ -59,7 +60,7 @@ int main(int argc,char **argv) {
    float Re = 1000.f;
    float dt = -1.f;
    float bn = 1.f;
-   float effRe;
+   float effRe = -1.f;
    //float yf,zf;
    float px,py,pz,temp,tottemp;
    float courant = 10.f;
@@ -69,11 +70,11 @@ int main(int argc,char **argv) {
    float ***u[3];			// all velocities, vorticity, etc
    float ***a[MAX_SCALARS];	// all velocities, vorticity, etc
    float ***t[MAX_SCALARS];	// all velocities, vorticity, etc
-   float ***xo[3];			// origin points from moc
-   float ke = 0.;
-   float ke_last = 0.;
-   float enst = 0.;
-   float nu_eff;
+   //float ***xo[3];			// origin points from moc
+   float ke = 0.f;
+   float ke_last = 0.f;
+   float enst = -1.f;
+   float nu_eff = -1.f;
    float vortscale,velscale,scalescale;
    float ccnvmax[VMAXAVG];
 
@@ -103,8 +104,8 @@ int main(int argc,char **argv) {
    gravity[0] = 0.0;
    gravity[1] = 0.0;
    gravity[2] = 1.0;
-   vortscale = 20.0;
-   velscale = 0.3;
+   vortscale = 100.0;
+   velscale = 1.0;
    scalescale = 1.0;
    writeevery = 1;
    maxStep = 9999;
@@ -186,9 +187,9 @@ int main(int argc,char **argv) {
    t[WY] = allocate_3d_array_f(nx,ny,nz);
    t[WZ] = allocate_3d_array_f(nx,ny,nz);
    // origin points from moc
-   xo[XV] = allocate_3d_array_f(nx,ny,nz);
-   xo[YV] = allocate_3d_array_f(nx,ny,nz);
-   xo[ZV] = allocate_3d_array_f(nx,ny,nz);
+   //xo[XV] = allocate_3d_array_f(nx,ny,nz);
+   //xo[YV] = allocate_3d_array_f(nx,ny,nz);
+   //xo[ZV] = allocate_3d_array_f(nx,ny,nz);
    for (int i=0; i<3; i++) sc_diffus[i] = 1.0/Re;
    if (use_SF) {
       sc_type[sc_cnt] = SF;
@@ -222,9 +223,9 @@ int main(int argc,char **argv) {
    for (int ix=0; ix<nx; ix++) {
       for (int iy=0; iy<ny; iy++) {
          for (int iz=0; iz<nz; iz++) {
-            a[WX][ix][iy][iz] = 0.0;
-            a[WY][ix][iy][iz] = 0.0;
-            a[WZ][ix][iy][iz] = 0.0;
+            a[WX][ix][iy][iz] = 0.f;
+            a[WY][ix][iy][iz] = 0.f;
+            a[WZ][ix][iy][iz] = 0.f;
          }
       }
    }
@@ -271,6 +272,7 @@ int main(int argc,char **argv) {
       // add a blob, similar to Hill's spherical vortex?
       // add_hills_spherical_vortex(nx,ny,nz,xbdry,ybdry,zbdry,a,0.6,0.2,0.3,0.1,10.0);
    }
+
    if (false) {
       // create a tube of vorticity along x
       for (int ix=0; ix<nx; ix++) {
@@ -326,17 +328,16 @@ int main(int argc,char **argv) {
       add_smooth_circular_blob_3d(nx,ny,nz,xbdry,ybdry,zbdry,1,a[WY],0.56,0.5,0.04,-20.0);
    }
    if (false) {
-      // create a thick vortex ring
       // two oblique colliding rings:
-      add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],
-         0.6,0.6,0.7,-1.,-1.,-1.,0.12,0.06,20.);
-      add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],
-         0.4,0.4,0.7,1.,1.,-1.,0.12,0.06,20.);
+      add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],0.6,0.6,0.7,-1.,-1.,-1.,0.12,0.06,20.);
+      add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],0.4,0.4,0.7,1.,1.,-1.,0.12,0.06,20.);
+   }
+   if (true) {
       // two normal colliding rings:
-      //add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],
-      //   0.2,0.5,0.5,1.,0.,0.,0.15,0.075,20.);
-      //add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],
-      //   0.8,0.5,0.52,-1.,0.,0.,0.15,0.075,20.);
+      //add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],0.4,0.5,0.5,1.,0.,0.,0.15,0.075,20.);
+      //add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],0.6,0.5,0.52,-1.,0.,0.,0.15,0.075,20.);
+      add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],0.5,0.5,0.4,0.f,0.f,1.f,0.2,0.075,177.);
+      add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],0.5,0.5,0.6,0.f,0.f,-1.f,0.2,0.075,177.);
    }
 
    // set initial scalar
@@ -441,7 +442,7 @@ int main(int argc,char **argv) {
    fprintf(stdout,"Initial velocity solution\n");
 
    // project the vorticity onto a divergence-free field
-   make_solenoidal_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ]);
+   //make_solenoidal_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ]);
 
    // if you want to show velocity on the first step, solve for it here
    vmax = find_vels_3d(step,nx,ny,nz,xbdry,ybdry,zbdry,u[XV],u[YV],u[ZV],a[WX],a[WY],a[WZ]);
@@ -466,30 +467,46 @@ int main(int argc,char **argv) {
       // write output
       if (writeOutput && step%writeevery == 0) {
          if (true) {
+            const int midplane = nx/2;
             sprintf(outfileroot,"wx_%04d",step);
             //write_output_3d(outfileroot,nx,ny,nz,a[WY],-10.0,20.0,outscale,false);
             write_png (outfileroot,ny,nz,false,false,
-                       a[WX][3],-vortscale,2.*vortscale,
+                       a[WX][midplane],-vortscale,2.*vortscale,
+                       NULL,0.0,1.0,
+                       NULL,0.0,1.0);
+         }
+         if (true) {
+            const int midplane = nx/2;
+            sprintf(outfileroot,"wy_%04d",step);
+            write_png (outfileroot,ny,nz,false,false,
+                       a[WY][midplane],-vortscale,2.*vortscale,
+                       NULL,0.0,1.0,
+                       NULL,0.0,1.0);
+            sprintf(outfileroot,"wz_%04d",step);
+            write_png (outfileroot,ny,nz,false,false,
+                       a[WZ][midplane],-vortscale,2.*vortscale,
                        NULL,0.0,1.0,
                        NULL,0.0,1.0);
          }
 
          if (true) {
+            const int midplane = nx/2;
             sprintf(outfileroot,"ux_%04d",step);
             write_png (outfileroot,ny,nz,false,false,
-                       u[XV][3],-velscale,2.*velscale,
+                       u[XV][midplane],-velscale,2.*velscale,
                        NULL,0.0,1.0,
                        NULL,0.0,1.0);
          }
-         if (false) {
+         if (true) {
+            const int midplane = nx/2;
             sprintf(outfileroot,"uy_%04d",step);
             write_png (outfileroot,ny,nz,false,false,
-                       u[YV][3],-velscale,2.*velscale,
+                       u[YV][midplane],-velscale,2.*velscale,
                        NULL,0.0,1.0,
                        NULL,0.0,1.0);
             sprintf(outfileroot,"uz_%04d",step);
             write_png (outfileroot,ny,nz,false,false,
-                       u[ZV][3],-velscale,2.*velscale,
+                       u[ZV][midplane],-velscale,2.*velscale,
                        NULL,0.0,1.0,
                        NULL,0.0,1.0);
          }

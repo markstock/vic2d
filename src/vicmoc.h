@@ -68,23 +68,6 @@ typedef enum interpMeth {
    cic3
 } INTERP;
 
-// in libvicmoc.c
-extern int find_vels_2d (int,int,int,int,int,int,int,float*,float*,float**,float**,float**,const int,float**,const float);
-extern int add_sharp_circular_blob(int,int,int,int,float**,float,float,float,float);
-extern int add_smooth_circular_blob(int,int,int,int,float**,float,float,float,float);
-extern int add_smooth_circular_blob_3d(int,int,int,int,int,int,int,float***,float,float,float,float);
-extern int add_smooth_spherical_blob(int,int,int,int,int,int,float***,float,float,float,float,float);
-extern int add_singular_blob_3d(int,int,int,int,int,int,float***,float,float,float,float,float);
-extern int add_cube_3d(int,int,int,int,int,int,float***,float,float,float,float,float);
-extern int add_vortex_ring_3d(int,int,int,int,int,int,float***,float***,float***,float,float,float,float,float,float,float,float,float);
-extern int find_shear_magnitude (int, int, int, int, float**, float, float**, float, float **);
-
-extern int explicit_particle_move_3d(int,int,int,int,int,int,float****,float,float,int,float**,float**);
-extern float step_forward_2d(int,int,int,int,int,int,int,int,float*,float*,int,int,float***,float***,float***,const int,float**,const float,float*,int,float*,float,int,float,float,float***);
-extern float step_forward_3d(int,int,int,int,int,int,int,int,float****,float****,float****,int,int*,float*,float,float);
-extern int make_solenoidal_3d(int,int,int,int,int,int,float***,float***,float***);
-extern float find_energy_3d(int,int,int,int,int,int,float***,float***,float***);
-extern float find_vmax(float***, float***, float***,int,int,int);
 
 // from mud2sp_extern.c
 extern void funcbndyc (int*, float*, float*, float*);
