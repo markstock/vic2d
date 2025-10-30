@@ -981,13 +981,30 @@ int main(int argc,char **argv) {
          read_png(heatfilename,nx,ny,false,false,1.0,false,
             heat,-1.0,2.0,NULL,0.0,1.0,NULL,0.0,1.0);
 
+         // problem - grey isn't always interpreted as 0.0 in this scheme!
+         // maybe we can linearly scale every value so they sum to 0.0?
+
+         //for (int iy=0; iy<ny; iy++) {
+         //   printf("heat at y=%d is %g\n", iy, heat[10][iy]);
+         //}
+         //for (int ix=0; ix<nx; ix++) {
+         //   for (int iy=0; iy<ny; iy++) {
+         //      a[SF][ix][iy] += heat[ix][iy];
+         //      if (a[SF][ix][iy] > 1.0) a[SF][ix][iy] = 1.0;
+         //      if (a[SF][ix][iy] < -1.0) a[SF][ix][iy] = -1.0;
+         //   }
+         //}
+      }
+
+      if (false) {
+         // reset heat to warm up on the bottom and cool down from the top
          for (int ix=0; ix<nx; ix++) {
             for (int iy=0; iy<ny; iy++) {
-               a[SF][ix][iy] += heat[ix][iy];
-               if (a[SF][ix][iy] > 1.0) a[SF][ix][iy] = 1.0;
-               if (a[SF][ix][iy] < -1.0) a[SF][ix][iy] = -1.0;
+               heat[ix][iy] = 0.0;
             }
          }
+         for (int ix=0; ix<nx; ix++) heat[ix][0] = 1.0;
+         for (int ix=0; ix<nx; ix++) heat[ix][ny-1] = -1.0;
       }
 
       if (false) {
@@ -1681,23 +1698,23 @@ int main(int argc,char **argv) {
          }
       }
 
-      // clamp the temperature field
-      if (use_TEMP && true) {
-         #pragma omp parallel for
-         for (int ix=0; ix<nx; ix++) {
-            for (int iy=0; iy<ny; iy++) {
-               if (a[SF][ix][iy] > 1.0) a[SF][ix][iy] = 1.0;
-               if (a[SF][ix][iy] < -1.0) a[SF][ix][iy] = -1.0;
-            }
-         }
-      }
-
       // overlay the heat map
       if (use_heat_img) {
          #pragma omp parallel for
          for (int ix=0; ix<nx; ix++) {
             for (int iy=0; iy<ny; iy++) {
                a[SF][ix][iy] += dt * heat_coeff * heat[ix][iy];
+               //if (a[SF][ix][iy] > 1.0) a[SF][ix][iy] = 1.0;
+               //if (a[SF][ix][iy] < -1.0) a[SF][ix][iy] = -1.0;
+            }
+         }
+      }
+
+      // clamp the temperature field
+      if (use_TEMP && false) {
+         #pragma omp parallel for
+         for (int ix=0; ix<nx; ix++) {
+            for (int iy=0; iy<ny; iy++) {
                if (a[SF][ix][iy] > 1.0) a[SF][ix][iy] = 1.0;
                if (a[SF][ix][iy] < -1.0) a[SF][ix][iy] = -1.0;
             }
