@@ -12,6 +12,7 @@
 #include "png.h"
 
 #include <stdlib.h>
+#include <math.h>
 
 /*
  * allocate memory for arrays of png_byte

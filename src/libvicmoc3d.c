@@ -25,7 +25,7 @@ int create_vorticity_stretch_3d(int,int,int,int,int,int,float***,float***,float*
 int create_boundary_vorticity_3d(int,int,int,int,int,int,float***,float***,float***,float***,float***,float***,float);
 float diffuse_scalar_3d(int,int,int,int,int,int,float***,float***,float,float);
 int find_gradient_of_scalar_3d(int,int,int,int,int,int,float***,float****);
-int moc_advect_3d(int,int,int,int,int,int,float****,float****,float****,int,float);
+int moc_advect_3d(const int,const int,const int,const int,const int,const int,float****,float****,float****,const int,const float);
 float compute_divergence_3d(int,int,int,int,int,int,float***,float***,float***,float***);
 int compute_curl_3d(int,int,int,int,int,int,float***,float***,float***,float***,float***,float***);
 float find_biot_savart_u (float,float,int,int,float,float,float**);
@@ -644,13 +644,13 @@ float diffuse_scalar_3d(int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    float ***in,float ***out,float diffus,float dt) {
 
    int i,j,k;
-   int nxm1 = nx-1;
-   int nxm2 = nx-2;
-   int nym1 = ny-1;
-   int nym2 = ny-2;
-   int nzm1 = nz-1;
-   int nzm2 = nz-2;
-   int xs,xf,ys,yf,zs,zf;
+   const int nxm1 = nx-1;
+   const int nxm2 = nx-2;
+   const int nym1 = ny-1;
+   const int nym2 = ny-2;
+   const int nzm1 = nz-1;
+   const int nzm2 = nz-2;
+   //int xs,xf,ys,yf,zs,zf;
    int istep,numsteps;
    float mult;
 
@@ -2320,13 +2320,13 @@ int find_gradient_of_scalar_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbd
 /*
  * moc_advect_3d is the implicit scheme for updating the vorticity values
  */
-int moc_advect_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
-   float ****u,float ****in,float ****out,int sc_cnt,float dt) {
+int moc_advect_3d (const int nx,const int ny,const int nz,const int xbdry,const int ybdry,const int zbdry,
+   float ****u,float ****in,float ****out,const int sc_cnt,const float dt) {
 
-   int i,j,k,l;
-   float yf = (float)(ny-1)/(float)(nx-1);
-   float zf = (float)(nz-1)/(float)(nx-1);
-   float px,py,pz,newx,newy,newz,temp;
+   // time-order (spatial order is always 4th)
+   const int order = 2;
+   const float yf = (float)(ny-1)/(float)(nx-1);
+   const float zf = (float)(nz-1)/(float)(nx-1);
    float u0,u1,v0,v1,w0,w1;
    float outvels[MAX_SCALARS];
    float outvals[MAX_SCALARS];
@@ -2334,74 +2334,80 @@ int moc_advect_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    fprintf(stderr,"  in moc_advect_3d\n"); fflush(stderr);
 
    // for each point, march backwards in space and time to find the value
-   // use a two-step method
-   #pragma omp parallel for private(i,j,k,l,px,py,pz,u0,v0,w0,newx,newy,newz,u1,v1,w1,outvels,outvals)
-   for (i=0;i<nx;i++) {
-      px = (float)i/(float)(nx-1);
-      for (j=0;j<ny;j++) {
-         py = (float)j/(float)(nx-1);
-         for (k=0;k<nz;k++) {
-            pz = (float)k/(float)(nx-1);
-            //fprintf(stdout,"\n    px %g %g %g\n",px,py,pz);
 
-            // find vel at px,py,pz
-            u0 = u[XV][i][j][k];
-            v0 = u[YV][i][j][k];
-            w0 = u[ZV][i][j][k];
-            //fprintf(stdout,"    u0 %g %g %g\n",u0,v0,w0);
+   if (order == 1) {
+      // use a one-step method
+   } else if (order == 2) {
+      // use a two-step method
+      #pragma omp parallel for private(u0,v0,w0,u1,v1,w1,outvels,outvals)
+      for (int i=0;i<nx;i++) {
+         const float px = (float)i/(float)(nx-1);
+         for (int j=0;j<ny;j++) {
+            const float py = (float)j/(float)(nx-1);
+            for (int k=0;k<nz;k++) {
+               const float pz = (float)k/(float)(nx-1);
+               //fprintf(stdout,"\n    px %g %g %g\n",px,py,pz);
 
-            // find position 1 explicit Euler step backwards
-            newx = px-dt*u0;
-            if (xbdry == WALL) {
-               if (newx > 1.0-EPSILON) newx = 1.0-EPSILON;
-               if (newx < 0.0+EPSILON) newx = EPSILON;
-            }
-            newy = py-dt*v0;
-            if (ybdry == WALL) {
-               if (newy > yf-EPSILON) newy = yf-EPSILON;
-               if (newy < 0.0+EPSILON) newy = EPSILON;
-            }
-            newz = pz-dt*w0;
-            if (zbdry == WALL) {
-               if (newz > zf-EPSILON) newz = zf-EPSILON;
-               if (newz < 0.0+EPSILON) newz = EPSILON;
-            }
-            //fprintf(stdout,"    newx %g %g %g\n",newx,newy,newz);
+               // find vel at px,py,pz
+               u0 = u[XV][i][j][k];
+               v0 = u[YV][i][j][k];
+               w0 = u[ZV][i][j][k];
+               //fprintf(stdout,"    u0 %g %g %g\n",u0,v0,w0);
 
-            // find vel at newx,newy
-            //interpolate_array_using_CIC_3d(nx,ny,nz,xbdry,ybdry,zbdry,u,newx,newy,newz,3,outvels);
-            interpolate_array_using_M4p_3d(nx,ny,nz,xbdry,ybdry,zbdry,u,newx,newy,newz,3,outvels);
-            u1 = outvels[0];
-            v1 = outvels[1];
-            w1 = outvels[2];
-            //fprintf(stdout,"    u1 %g %g %g\n",u1,v1,w1);
+               // find position 1 explicit Euler step backwards
+               float newx = px-dt*u0;
+               if (xbdry == WALL) {
+                  if (newx > 1.f-EPSILON) newx = 1.f-EPSILON;
+                  if (newx < 0.f+EPSILON) newx = EPSILON;
+               }
+               float newy = py-dt*v0;
+               if (ybdry == WALL) {
+                  if (newy > yf-EPSILON) newy = yf-EPSILON;
+                  if (newy < 0.f+EPSILON) newy = EPSILON;
+               }
+               float newz = pz-dt*w0;
+               if (zbdry == WALL) {
+                  if (newz > zf-EPSILON) newz = zf-EPSILON;
+                  if (newz < 0.f+EPSILON) newz = EPSILON;
+               }
+               //fprintf(stdout,"    newx %g %g %g\n",newx,newy,newz);
 
-            // find position back 1 step using average of two velocities
-            newx = px-dt*0.5*(u0+u1);
-            if (xbdry == WALL) {
-               if (newx > 1.0-EPSILON) newx = 1.0-EPSILON;
-               if (newx < 0.0+EPSILON) newx = EPSILON;
-            }
-            newy = py-dt*0.5*(v0+v1);
-            if (ybdry == WALL) {
-               if (newy > yf-EPSILON) newy = yf-EPSILON;
-               if (newy < 0.0+EPSILON) newy = EPSILON;
-            }
-            newz = pz-dt*0.5*(w0+w1);
-            if (zbdry == WALL) {
-               if (newz > zf-EPSILON) newz = zf-EPSILON;
-               if (newz < 0.0+EPSILON) newz = EPSILON;
-            }
-            //fprintf(stdout,"    newx %g %g %g\n",newx,newy,newz);
+               // find vel at newx,newy
+               //interpolate_array_using_CIC_3d(nx,ny,nz,xbdry,ybdry,zbdry,u,newx,newy,newz,3,outvels);
+               interpolate_array_using_M4p_3d(nx,ny,nz,xbdry,ybdry,zbdry,u,newx,newy,newz,3,outvels);
+               u1 = outvels[0];
+               v1 = outvels[1];
+               w1 = outvels[2];
+               //fprintf(stdout,"    u1 %g %g %g\n",u1,v1,w1);
 
-            // finally, return scalar-valued vorticity from there
-            //interpolate_array_using_CIC_3d(nx,ny,nz,xbdry,ybdry,zbdry,in,newx,newy,newz,sc_cnt,outvals);
-            interpolate_array_using_M4p_3d(nx,ny,nz,xbdry,ybdry,zbdry,in,newx,newy,newz,sc_cnt,outvals);
+               // find position back 1 step using average of two velocities
+               newx = px-dt*0.5f*(u0+u1);
+               if (xbdry == WALL) {
+                  if (newx > 1.f-EPSILON) newx = 1.f-EPSILON;
+                  if (newx < 0.f+EPSILON) newx = EPSILON;
+               }
+               newy = py-dt*0.5f*(v0+v1);
+               if (ybdry == WALL) {
+                  if (newy > yf-EPSILON) newy = yf-EPSILON;
+                  if (newy < 0.f+EPSILON) newy = EPSILON;
+               }
+               newz = pz-dt*0.5f*(w0+w1);
+               if (zbdry == WALL) {
+                  if (newz > zf-EPSILON) newz = zf-EPSILON;
+                  if (newz < 0.f+EPSILON) newz = EPSILON;
+               }
+               //fprintf(stdout,"    newx %g %g %g\n",newx,newy,newz);
 
-            // add those to the output
-            for (l=0; l<sc_cnt; l++) out[l][i][j][k] = outvals[l];
+               // finally, return scalar-valued vorticity from there
+               //interpolate_array_using_CIC_3d(nx,ny,nz,xbdry,ybdry,zbdry,in,newx,newy,newz,sc_cnt,outvals);
+               interpolate_array_using_M4p_3d(nx,ny,nz,xbdry,ybdry,zbdry,in,newx,newy,newz,sc_cnt,outvals);
+
+               // add those to the output
+               for (int l=0; l<sc_cnt; l++) out[l][i][j][k] = outvals[l];
+            }
          }
       }
+   } else if (order == 4) {
    }
 
    return(0);
@@ -2497,10 +2503,10 @@ float compute_divergence_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    float ***u,float ***v,float ***w,float ***out) {
 
    int i,j,k;
-   int nxm1 = nx-1;
-   int nym1 = ny-1;
-   int nzm1 = nz-1;
-   int xs,xf,ys,yf,zs,zf;
+   const int nxm1 = nx-1;
+   const int nym1 = ny-1;
+   const int nzm1 = nz-1;
+   //int xs,xf,ys,yf,zs,zf;
    float mult = 0.5*nxm1;
    float maxdiv = 0.;
 
