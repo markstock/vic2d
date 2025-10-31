@@ -1,7 +1,7 @@
 /*
  * VIC-MOC - inout.c - routines for input and output
  *
- * Copyright 2004-7,20,23 Mark J. Stock <mstock@umich.edu>
+ * Copyright 2004-7,20,23,25 Mark J. Stock <mstock@umich.edu>
  */
 
 #include "inout.h"
@@ -13,10 +13,46 @@
 
 #include <stdlib.h>
 
-// local functions
-png_byte** allocate_2d_array_pb (int,int,int);
-png_byte** allocate_2d_rgb_array_pb (int,int,int);
-int free_2d_array_pb (png_byte**);
+/*
+ * allocate memory for arrays of png_byte
+ */
+png_byte** allocate_2d_array_pb(int nx, int ny, int depth) {
+
+   int i,bytesperpixel;
+   png_byte **array;
+
+   if (depth <= 8) bytesperpixel = 1;
+   else bytesperpixel = 2;
+   array = (png_byte **)malloc(ny * sizeof(png_byte *));
+   array[0] = (png_byte *)malloc(bytesperpixel * nx * ny * sizeof(png_byte));
+
+   for (i=1; i<ny; i++)
+      array[i] = array[0] + i * bytesperpixel * nx;
+
+   return(array);
+}
+
+png_byte** allocate_2d_rgb_array_pb(int nx, int ny, int depth) {
+
+   int i,bytesperpixel;
+   png_byte **array;
+
+   if (depth <= 8) bytesperpixel = 3;
+   else bytesperpixel = 6;
+   array = (png_byte **)malloc(ny * sizeof(png_byte *));
+   array[0] = (png_byte *)malloc(bytesperpixel * nx * ny * sizeof(png_byte));
+
+   for (i=1; i<ny; i++)
+      array[i] = array[0] + i * bytesperpixel * nx;
+
+   return(array);
+}
+
+int free_2d_array_pb(png_byte** array){
+   free(array[0]);
+   free(array);
+   return(0);
+}
 
 
 /*
@@ -899,7 +935,6 @@ int write_output_3d(char *outfileroot, int nx, int ny, int nz,
    float ***in, float minrange, float range,
    int outscale, const bool integrated) {
 
-   int i,j,k;
    static float **plane;
    static bool set_plane = false;
 
@@ -911,10 +946,10 @@ int write_output_3d(char *outfileroot, int nx, int ny, int nz,
 
    if (integrated) {
       // integrate the 3D values onto the x-z plane
-      for (i=0; i<nx; i++) {
-         for (k=0; k<nz; k++) {
+      for (int i=0; i<nx; i++) {
+         for (int k=0; k<nz; k++) {
             plane[i][k] = 0.0;
-            for (j=0; j<ny; j++) {
+            for (int j=0; j<ny; j++) {
                plane[i][k] += in[i][j][k];
             }
             plane[i][k] /= (ny-1);
@@ -922,8 +957,8 @@ int write_output_3d(char *outfileroot, int nx, int ny, int nz,
       }
    } else {
       // cut a plane from the 3D field
-      for (i=0; i<nx; i++) {
-         for (k=0; k<nz; k++) {
+      for (int i=0; i<nx; i++) {
+         for (int k=0; k<nz; k++) {
             plane[i][k] = in[i][ny/2][k];
          }
       }
@@ -931,6 +966,41 @@ int write_output_3d(char *outfileroot, int nx, int ny, int nz,
 
    // now, call the subroutine to write the 2D field
    write_output(outfileroot,nx,nz,plane,minrange,range,outscale);
+
+   return(0);
+}
+
+
+int write_vortmag_3d(char *outfileroot, int nx, int ny, int nz,
+   float ***inx, float ***iny, float ***inz, float minrange, float range,
+   int outscale) {
+
+   static float **plane;
+   static bool set_plane = false;
+
+   // allocate the memory
+   if (!set_plane) {
+      plane = allocate_2d_array_f(nx,nz);
+      set_plane = true;
+   }
+
+   // integrate the 3D values onto the x-z plane
+   for (int i=0; i<nx; i++) {
+      for (int k=0; k<nz; k++) {
+         plane[i][k] = 0.f;
+         for (int j=0; j<ny; j++) {
+            plane[i][k] += sqrt(inx[i][j][k]*inx[i][j][k] + iny[i][j][k]*iny[i][j][k] + inz[i][j][k]*inz[i][j][k]);
+         }
+         plane[i][k] /= (ny-1);
+      }
+   }
+
+   // now, call the subroutine to write the 2D field
+   //write_output(outfileroot,nx,nz,plane,minrange,range,outscale);
+   write_png (outfileroot,ny,nz,false,false,
+              plane,minrange,range,
+              NULL,0.0,1.0,
+              NULL,0.0,1.0);
 
    return(0);
 }
@@ -1017,43 +1087,3 @@ int write_output_particles_rad(char *outfileroot,int pnum,
 }
 
 
-/*
- * allocate memory for a two-dimensional array of png_byte
- */
-png_byte** allocate_2d_array_pb(int nx, int ny, int depth) {
-
-   int i,bytesperpixel;
-   png_byte **array;
-
-   if (depth <= 8) bytesperpixel = 1;
-   else bytesperpixel = 2;
-   array = (png_byte **)malloc(ny * sizeof(png_byte *));
-   array[0] = (png_byte *)malloc(bytesperpixel * nx * ny * sizeof(png_byte));
-
-   for (i=1; i<ny; i++)
-      array[i] = array[0] + i * bytesperpixel * nx;
-
-   return(array);
-}
-
-png_byte** allocate_2d_rgb_array_pb(int nx, int ny, int depth) {
-
-   int i,bytesperpixel;
-   png_byte **array;
-
-   if (depth <= 8) bytesperpixel = 3;
-   else bytesperpixel = 6;
-   array = (png_byte **)malloc(ny * sizeof(png_byte *));
-   array[0] = (png_byte *)malloc(bytesperpixel * nx * ny * sizeof(png_byte));
-
-   for (i=1; i<ny; i++)
-      array[i] = array[0] + i * bytesperpixel * nx;
-
-   return(array);
-}
-
-int free_2d_array_pb(png_byte** array){
-   free(array[0]);
-   free(array);
-   return(0);
-}

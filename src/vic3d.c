@@ -336,8 +336,10 @@ int main(int argc,char **argv) {
       // two normal colliding rings:
       //add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],0.4,0.5,0.5,1.,0.,0.,0.15,0.075,20.);
       //add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],0.6,0.5,0.52,-1.,0.,0.,0.15,0.075,20.);
-      add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],0.5,0.5,0.4,0.f,0.f,1.f,0.2,0.075,177.);
-      add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],0.5,0.5,0.6,0.f,0.f,-1.f,0.2,0.075,177.);
+      //add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],0.5,0.5,0.4,0.f,0.f,1.f,0.2,0.075,177.);
+      //add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],0.5,0.5,0.6,0.f,0.f,-1.f,0.2,0.075,177.);
+      add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],0.5,0.62,0.4,0.f,0.f,1.f,0.2,0.075,177.);
+      add_vortex_ring_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ],0.5,0.58,0.6,0.f,0.f,-1.f,0.2,0.075,177.);
    }
 
    // set initial scalar
@@ -467,6 +469,11 @@ int main(int argc,char **argv) {
       // write output
       if (writeOutput && step%writeevery == 0) {
          if (true) {
+            const float magscale = 10.f * vortscale / nx;
+            sprintf(outfileroot,"wm_%04d",step);
+            write_vortmag_3d(outfileroot,nx,ny,nz,a[WX],a[WY],a[WZ],0.f,magscale,outscale);
+         }
+         if (true) {
             const int midplane = nx/2;
             sprintf(outfileroot,"wx_%04d",step);
             //write_output_3d(outfileroot,nx,ny,nz,a[WY],-10.0,20.0,outscale,false);
@@ -475,7 +482,7 @@ int main(int argc,char **argv) {
                        NULL,0.0,1.0,
                        NULL,0.0,1.0);
          }
-         if (true) {
+         if (false) {
             const int midplane = nx/2;
             sprintf(outfileroot,"wy_%04d",step);
             write_png (outfileroot,ny,nz,false,false,
@@ -489,7 +496,7 @@ int main(int argc,char **argv) {
                        NULL,0.0,1.0);
          }
 
-         if (true) {
+         if (false) {
             const int midplane = nx/2;
             sprintf(outfileroot,"ux_%04d",step);
             write_png (outfileroot,ny,nz,false,false,
