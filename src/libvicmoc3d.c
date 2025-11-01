@@ -22,6 +22,7 @@
 
 int create_baroclinic_vorticity_3d(int,int,int,int,int,int,float***,float***,float***,float***,float,float);
 int create_vorticity_stretch_3d(int,int,int,int,int,int,float***,float***,float***,float***,float***,float***,float);
+int apply_stretch_from_xo_3d( const int, const int, const int, float ***, float ***, float ***, float ***, float ***, float ***);
 int create_boundary_vorticity_3d(int,int,int,int,int,int,float***,float***,float***,float***,float***,float***,float);
 float diffuse_scalar_3d(int,int,int,int,int,int,float***,float***,float,float);
 int find_gradient_of_scalar_3d(int,int,int,int,int,int,float***,float****);
@@ -340,9 +341,10 @@ float step_forward_3d (int step,int isStam,
    // moc routine automatically scales vorticity.
    // WRONG: MOC does not account for stretch! Must do this:
    // Yes, projecting onto solenoidal doesn't create stretch either!
-   create_vorticity_stretch_3d(nx,ny,nz,xbdry,ybdry,zbdry,u[XV],u[YV],u[ZV],t[WX],t[WY],t[WZ],dt);
+   //create_vorticity_stretch_3d(nx,ny,nz,xbdry,ybdry,zbdry,u[XV],u[YV],u[ZV],t[WX],t[WY],t[WZ],dt);
    // Maybe a better idea is solving a poisson equation to project
    // latest: save origin points from moc_advect and use them to reproject the vorticity vector
+   apply_stretch_from_xo_3d(nx,ny,nz,xo[0],xo[1],xo[2],t[WX],t[WY],t[WZ]);
 
    // these divergent vorticity vectors onto a divergence-free field?
    make_solenoidal_3d(nx,ny,nz,xbdry,ybdry,zbdry,t[WX],t[WY],t[WZ]);
@@ -485,6 +487,10 @@ int create_vorticity_stretch_3d(int nx,int ny,int nz,
    for (int i=0;i<nx;i++) {
       for (int j=0;j<ny;j++) {
          for (int k=0;k<nz;k++) {
+            if (i==(int)(0.5*nx) && j==(int)(0.37*ny) && k==(int)(0.6*nz)) {
+            //if (i==(int)(0.5*nx) && k==(int)(0.6*nz)) {
+               printf("  orig vort %d  %g %g %g\n", j, wx[i][j][k], wy[i][j][k], wz[i][j][k]);
+            }
             wcgu[0] = wx[i][j][k]*grad[0][0][i][j][k] +
                       wy[i][j][k]*grad[1][0][i][j][k] +
                       wz[i][j][k]*grad[2][0][i][j][k];
@@ -497,6 +503,100 @@ int create_vorticity_stretch_3d(int nx,int ny,int nz,
             wx[i][j][k] += dt*wcgu[0];
             wy[i][j][k] += dt*wcgu[1];
             wz[i][j][k] += dt*wcgu[2];
+            if (i==(int)(0.5*nx) && j==(int)(0.37*ny) && k==(int)(0.6*nz)) {
+               printf("     grad x %g %g %g\n", grad[0][0][i][j][k],grad[1][0][i][j][k],grad[2][0][i][j][k]);
+               printf("     grad y %g %g %g\n", grad[0][1][i][j][k],grad[1][1][i][j][k],grad[2][1][i][j][k]);
+               printf("     grad z %g %g %g\n", grad[0][2][i][j][k],grad[1][2][i][j][k],grad[2][2][i][j][k]);
+               printf("       wcgu %g %g %g\n", wcgu[0], wcgu[1], wcgu[2]);
+               printf("   new vort %g %g %g\n", wx[i][j][k], wy[i][j][k], wz[i][j][k]);
+               exit(1);
+            }
+         }
+      }
+      // fprintf(stderr,"%g %g %g\n",wy[i][32][0],wy[i][32][1],wy[i][32][2]);
+   }
+
+   // nah, just keep it. it's OK. it needs to diffuse, anyway
+   return(0);
+}
+
+/*
+ * create vorticity due to vortex stretching
+ *
+ * use original (source) MOC positions as proxy for vel grad
+ */
+int apply_stretch_from_xo_3d(
+      const int nx, const int ny, const int nz,
+      float ***xo, float ***yo, float ***zo,
+      float ***wx, float ***wy, float ***wz) {
+
+   fprintf(stderr,"  in apply_stretch_from_xo_3d\n"); fflush(stderr);
+
+   // fac serves to turn each basis vector to unit length in pure translation
+   const float fac = 0.5f * nx;
+
+   // then, dot the vorticity with the velocity gradient
+   #pragma omp parallel for
+   for (int i=0;i<nx;i++) {
+      const int im1 = (i>0) ? i-1 : nx-2;
+      const int ip1 = (i<nx-2) ? i+1 : 0;
+      for (int j=0;j<ny;j++) {
+         const int jm1 = (j>0) ? j-1 : ny-2;
+         const int jp1 = (j<ny-2) ? j+1 : 0;
+         for (int k=0;k<nz;k++) {
+            const int km1 = (k>0) ? k-1 : nz-2;
+            const int kp1 = (k<nz-2) ? k+1 : 0;
+            // find projection of target vorticity in coord system given by triad of original (source) MOC points
+            const float origwx = wx[i][j][k];
+            const float origwy = wy[i][j][k];
+            const float origwz = wz[i][j][k];
+            // and the original basis vectors
+            float bxx = fac * (xo[ip1][j][k] - xo[im1][j][k]);
+            float bxy = fac * (yo[ip1][j][k] - yo[im1][j][k]);
+            float bxz = fac * (zo[ip1][j][k] - zo[im1][j][k]);
+            float byx = fac * (xo[i][jp1][k] - xo[i][jm1][k]);
+            float byy = fac * (yo[i][jp1][k] - yo[i][jm1][k]);
+            float byz = fac * (zo[i][jp1][k] - zo[i][jm1][k]);
+            float bzx = fac * (xo[i][j][kp1] - xo[i][j][km1]);
+            float bzy = fac * (yo[i][j][kp1] - yo[i][j][km1]);
+            float bzz = fac * (zo[i][j][kp1] - zo[i][j][km1]);
+            // normalize to be volume-preserving
+            const float oodet = 1.f / (bxx*(byy*bzz-byz*bzy) + bxy*(byz*bzx-byx*bzz) + bxz*(byx*bzy-byy*bzx));
+            bxx *= oodet;
+            bxy *= oodet;
+            bxz *= oodet;
+            byx *= oodet;
+            byy *= oodet;
+            byz *= oodet;
+            bzx *= oodet;
+            bzy *= oodet;
+            bzz *= oodet;
+            // now compute the projection of the original vorticity in each of these directions
+            wx[i][j][k] = bxx*origwx + bxy*origwy + bxz*origwz;
+            wy[i][j][k] = byx*origwx + byy*origwy + byz*origwz;
+            wz[i][j][k] = bzx*origwx + bzy*origwy + bzz*origwz;
+            //if (i==(int)(0.5*nx) && j==(int)(0.37*ny) && k==(int)(0.6*nz)) {
+            if (i==(int)(0.5*nx) && j==(int)(0.37*ny) && k>=(int)(0.5*nz) && k<=(int)(0.7*nz)) {
+               printf("\n  cell %d %d %d\n", i, j, k);
+               printf("  orig vort %g %g %g\n", origwx, origwy, origwz);
+               //printf("   orig ip1 %g %g %g\n", xo[ip1][j][k], yo[ip1][j][k], zo[ip1][j][k]);
+               //printf("   orig im1 %g %g %g\n", xo[im1][j][k], yo[im1][j][k], zo[im1][j][k]);
+               //printf("   orig jp1 %g %g %g\n", xo[i][jp1][k], yo[i][jp1][k], zo[i][jp1][k]);
+               //printf("   orig jm1 %g %g %g\n", xo[i][jm1][k], yo[i][jm1][k], zo[i][jm1][k]);
+               //printf("   orig kp1 %g %g %g\n", xo[i][j][kp1], yo[i][j][kp1], zo[i][j][kp1]);
+               //printf("   orig km1 %g %g %g\n", xo[i][j][km1], yo[i][j][km1], zo[i][j][km1]);
+               //printf("   orig ip1 %g %g %g\n", xo[ip1][j][k]-xo[i][j][k], yo[ip1][j][k]-yo[i][j][k], zo[ip1][j][k]-zo[i][j][k]);
+               //printf("   orig im1 %g %g %g\n", xo[im1][j][k]-xo[i][j][k], yo[im1][j][k]-yo[i][j][k], zo[im1][j][k]-zo[i][j][k]);
+               //printf("   orig jp1 %g %g %g\n", xo[i][jp1][k]-xo[i][j][k], yo[i][jp1][k]-yo[i][j][k], zo[i][jp1][k]-zo[i][j][k]);
+               //printf("   orig jm1 %g %g %g\n", xo[i][jm1][k]-xo[i][j][k], yo[i][jm1][k]-yo[i][j][k], zo[i][jm1][k]-zo[i][j][k]);
+               //printf("   orig kp1 %g %g %g\n", xo[i][j][kp1]-xo[i][j][k], yo[i][j][kp1]-yo[i][j][k], zo[i][j][kp1]-zo[i][j][k]);
+               //printf("   orig km1 %g %g %g\n", xo[i][j][km1]-xo[i][j][k], yo[i][j][km1]-yo[i][j][k], zo[i][j][km1]-zo[i][j][k]);
+               printf("         bx %g %g %g\n", bxx, bxy, bxz);
+               printf("         by %g %g %g\n", byx, byy, byz);
+               printf("         bz %g %g %g\n", bzx, bzy, bzz);
+               printf("   new vort %g %g %g\n", wx[i][j][k], wy[i][j][k], wz[i][j][k]);
+               //exit(1);
+            }
          }
       }
       // fprintf(stderr,"%g %g %g\n",wy[i][32][0],wy[i][32][1],wy[i][32][2]);
