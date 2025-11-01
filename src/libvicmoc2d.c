@@ -40,6 +40,18 @@ int interpolate_vel_using_TSC_2d (int,int,int,int,float**,float**,float,float,fl
 float interpolate_array_using_M4p_2d (int,int,int,int,float**,float***,float,float,int,float*);
 int interpolate_vel_using_M4p_2d (int,int,int,int,float**,float**,float**,float,float,float*,float*);
 
+// in gr2.f
+extern void hwscrt_(float *a, float *b, int *m, int *mbdcnd,
+               float *bda, float *bdb,
+               float *c__, float *d__, int *n, int *nbdcnd,
+               float *bdc, float *bdd,
+               float *elmbda, float *f, int *idimf, float *pertrb,
+               int *ierror, float *w);
+
+// in mud2sp_full.f
+extern void mud2sp_(int *iparm, float *fparm, float *work, void *cfx, void *cfy,
+                    void *bndyc, float *rhs, float *phi, int *mgopt, int *ierror);
+
 
 /*
  * For whatever reason, add a chunk of scalar stuff
@@ -97,7 +109,7 @@ float step_forward_2d (int silent, int step, int isStam, int mocOrder,
     float *freestream, float *wallvel, int recalc_vel, int move_colors,
     float ***u, float ***a, float ***t,
     const int use_MASK, float **mask, const float maskerr,
-    float sc_diffus[MAX_SCALARS],
+    float *sc_diffus,
     int gravtype, float *grav,
     float dt,
     int use_strong_strat, float bn, float dens_ratio, float ***acc) {
@@ -2532,7 +2544,7 @@ int moc_advect_2d (int nx,int ny,int xbdry,int ybdry,
  * out is the vector value interpolated from the field
  */
 float interpolate_array_using_CIC_2d(int nx,int ny,int xbdry,int ybdry,
-   float ***zeta,float px,float py,int numout,float out[MAX_SCALARS]) {
+   float ***zeta,float px,float py,int numout,float *out) {
 
    int i,j,k,ii,ji,ir,jr;
    int si[2];           // start index
@@ -2627,7 +2639,7 @@ float interpolate_array_using_CIC_2d(int nx,int ny,int xbdry,int ybdry,
  * out is the vector value interpolated from the field
  */
 float interpolate_array_using_TSC_2d(int nx,int ny,int xbdry,int ybdry,
-   float ***zeta,float px,float py,int numout,float out[MAX_SCALARS]) {
+   float ***zeta,float px,float py,int numout,float *out) {
 
    int i,j,k,ii,ji,ir,jr;
    int si[2];           // start index
@@ -2733,7 +2745,7 @@ float interpolate_array_using_TSC_2d(int nx,int ny,int xbdry,int ybdry,
  */
 float interpolate_array_using_M4p_2d(int nx,int ny,int xbdry,int ybdry,
       float **mask,float ***zeta,
-      float px,float py,int numout,float out[MAX_SCALARS]) {
+      float px,float py,int numout,float *out) {
 
    int i,j,k,ii,ji,ir,jr,nm1;
    int si[2];           // start index

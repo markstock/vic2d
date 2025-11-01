@@ -77,38 +77,3 @@ extern void funccfy (float*, float*, float*, float*);
 // from, well, color stuff
 extern void get_random_color (float***, int, int, float*);
 
-// in gr23.c
-//extern int hwscrt_(real *a, real *b, integer *m, integer *mbdcnd,
-//                   real *bda, real *bdb,
-//                   real *c__, real *d__, integer *n, integer *nbdcnd,
-//                   real *bdc, real *bdd,
-//                   real *elmbda, real *f, integer *idimf, real *pertrb,
-//                   integer *ierror, real *w);
-
-//extern int hw3crt_(real *xs, real *xf, integer *l, integer *lbdcnd, real *bdxs, real *bdxf,
-//                   real *ys, real *yf, integer *m, integer *mbdcnd, real *bdys, real *bdyf,
-//                   real *zs, real *zf, integer *n, integer *nbdcnd, real *bdzs, real *bdzf,
-//                   real *elmbda, integer *ldimf, integer *mdimf, real *f, real *pertrb,
-//                   integer *ierror, real *w);
-
-// in mud3sp_full.f
-extern
-  void mud3sp_(int *iparm, float *fparm, float *work, char *cfx, char* cfy, char* cfz,
-               char *bndyc, float *rhs, float *phi, int *mgopt, int *ierror);
-
-// in mud2sp_full.f
-extern
-  void mud2sp_(int *iparm, float *fparm, float *work, void *cfx, void *cfy,
-               void *bndyc, float *rhs, float *phi, int *mgopt, int *ierror);
-
-// in gr2.f
-extern
-  void hwscrt_(float *a, float *b, int *m, int *mbdcnd,
-               float *bda, float *bdb,
-               float *c__, float *d__, int *n, int *nbdcnd,
-               float *bdc, float *bdd,
-               float *elmbda, float *f, int *idimf, float *pertrb,
-               int *ierror, float *w);
-
-//extern void MAIN__() {}
-

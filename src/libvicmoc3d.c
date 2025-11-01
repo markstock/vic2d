@@ -36,6 +36,16 @@ int find_open_boundary_psi (int,int,float**,float,float*,float**);
 float interpolate_array_using_CIC_3d(int,int,int,int,int,int,float****,float,float,float,int,float*);
 float interpolate_array_using_M4p_3d(int,int,int,int,int,int,float****,float,float,float,int,float*);
 
+// in gr23.c
+extern int hw3crt_(float *xs, float *xf, int *l, int *lbdcnd, float *bdxs, float *bdxf,
+                   float *ys, float *yf, int *m, int *mbdcnd, float *bdys, float *bdyf,
+                   float *zs, float *zf, int *n, int *nbdcnd, float *bdzs, float *bdzf,
+                   float *elmbda, int *ldimf, int *mdimf, float *f, float *pertrb,
+                   int *ierror, float *w);
+
+// in mud3sp_full.f
+extern void mud3sp_(int *iparm, float *fparm, float *work, char *cfx, char* cfy, char* cfz,
+                   char *bndyc, float *rhs, float *phi, int *mgopt, int *ierror);
 
 /*
  * add the same thing, but with wy vorticity
@@ -300,10 +310,8 @@ int add_vortex_ring_3d(int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
 float step_forward_3d (int step,int isStam,
    int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    float ****u, float ****a, float ****t,
-   int sc_cnt,
-   int sc_type[MAX_SCALARS],float sc_diffus[MAX_SCALARS],
-   float dt,
-   float bn) {
+   int sc_cnt, int *sc_type, float *sc_diffus,
+   float dt, float bn) {
 
    int i,j,k,l;
    int sfi = -1;
@@ -572,25 +580,13 @@ int apply_stretch_from_xo_3d(
             bzy *= oodet;
             bzz *= oodet;
             // now compute the projection of the original vorticity in each of these directions
-            wx[i][j][k] = bxx*origwx + bxy*origwy + bxz*origwz;
-            wy[i][j][k] = byx*origwx + byy*origwy + byz*origwz;
-            wz[i][j][k] = bzx*origwx + bzy*origwy + bzz*origwz;
+            wx[i][j][k] = (bxx*origwx + bxy*origwy + bxz*origwz) / (bxx*bxx + bxy*bxy + bxz*bxz);
+            wy[i][j][k] = (byx*origwx + byy*origwy + byz*origwz) / (byx*byx + byy*byy + byz*byz);
+            wz[i][j][k] = (bzx*origwx + bzy*origwy + bzz*origwz) / (bzx*bzx + bzy*bzy + bzz*bzz);
             //if (i==(int)(0.5*nx) && j==(int)(0.37*ny) && k==(int)(0.6*nz)) {
             if (i==(int)(0.5*nx) && j==(int)(0.37*ny) && k>=(int)(0.5*nz) && k<=(int)(0.7*nz)) {
                printf("\n  cell %d %d %d\n", i, j, k);
                printf("  orig vort %g %g %g\n", origwx, origwy, origwz);
-               //printf("   orig ip1 %g %g %g\n", xo[ip1][j][k], yo[ip1][j][k], zo[ip1][j][k]);
-               //printf("   orig im1 %g %g %g\n", xo[im1][j][k], yo[im1][j][k], zo[im1][j][k]);
-               //printf("   orig jp1 %g %g %g\n", xo[i][jp1][k], yo[i][jp1][k], zo[i][jp1][k]);
-               //printf("   orig jm1 %g %g %g\n", xo[i][jm1][k], yo[i][jm1][k], zo[i][jm1][k]);
-               //printf("   orig kp1 %g %g %g\n", xo[i][j][kp1], yo[i][j][kp1], zo[i][j][kp1]);
-               //printf("   orig km1 %g %g %g\n", xo[i][j][km1], yo[i][j][km1], zo[i][j][km1]);
-               //printf("   orig ip1 %g %g %g\n", xo[ip1][j][k]-xo[i][j][k], yo[ip1][j][k]-yo[i][j][k], zo[ip1][j][k]-zo[i][j][k]);
-               //printf("   orig im1 %g %g %g\n", xo[im1][j][k]-xo[i][j][k], yo[im1][j][k]-yo[i][j][k], zo[im1][j][k]-zo[i][j][k]);
-               //printf("   orig jp1 %g %g %g\n", xo[i][jp1][k]-xo[i][j][k], yo[i][jp1][k]-yo[i][j][k], zo[i][jp1][k]-zo[i][j][k]);
-               //printf("   orig jm1 %g %g %g\n", xo[i][jm1][k]-xo[i][j][k], yo[i][jm1][k]-yo[i][j][k], zo[i][jm1][k]-zo[i][j][k]);
-               //printf("   orig kp1 %g %g %g\n", xo[i][j][kp1]-xo[i][j][k], yo[i][j][kp1]-yo[i][j][k], zo[i][j][kp1]-zo[i][j][k]);
-               //printf("   orig km1 %g %g %g\n", xo[i][j][km1]-xo[i][j][k], yo[i][j][km1]-yo[i][j][k], zo[i][j][km1]-zo[i][j][k]);
                printf("         bx %g %g %g\n", bxx, bxy, bxz);
                printf("         by %g %g %g\n", byx, byy, byz);
                printf("         bz %g %g %g\n", bzx, bzy, bzz);
@@ -2092,7 +2088,7 @@ int make_solenoidal_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    // or scaled?
    maxAllowedDiv = 1.f / nx;
    // or absolute?
-   maxAllowedDiv = 0.1f;
+   maxAllowedDiv = 1.0f;
    if (maxAllowedDiv < 1.e-5) maxAllowedDiv = 1.e-5;
    printf("    pre-solenoidal divergence %g, iterating to %g\n",maxdiv,maxAllowedDiv);
 
@@ -2281,7 +2277,7 @@ int make_solenoidal_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
    //write_3d_vtk(outfileroot,nx,ny,nz,gradphi[0],gradphi[1],gradphi[2]);
 
    // subtract them off of the input vector field
-   relaxConst = 1.5;	// over-relax?
+   relaxConst = 1.25;	// over-relax?
    #pragma omp parallel for private(i,j,k)
    for (i=0; i<nx; i++) {
    for (j=0; j<ny; j++) {
@@ -2295,7 +2291,7 @@ int make_solenoidal_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
 
    // recompute divergence before checking again
    maxdiv = compute_divergence_3d (nx,ny,nz,xbdry,ybdry,zbdry,u,v,w,rhs);
-   //printf("    max div in div3d %g\n",maxdiv);
+   printf("    max div in div3d %g\n",maxdiv);
    printf(".");
 
    }  // end loop over iter
@@ -3169,7 +3165,7 @@ float find_energy_3d(int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
 float interpolate_array_using_CIC_3d(int nx,int ny,int nz,
          int xbdry,int ybdry,int zbdry,float ****zeta,
          float px,float py,float pz,
-         int numout,float out[MAX_SCALARS]) {
+         int numout,float* out) {
 
    int i,l,ci[3],oci[3];
    double x,y,z,omx,omy,omz;
@@ -3244,7 +3240,7 @@ float interpolate_array_using_CIC_3d(int nx,int ny,int nz,
  */
 float interpolate_array_using_M4p_3d(int nx,int ny,int nz,
          int xbdry,int ybdry,int zbdry,float ****zeta,
-         float px,float py,float pz,int numout,float out[MAX_SCALARS]) {
+         float px,float py,float pz,int numout,float *out) {
 
    int i,j,k,l,ii,ji,ki,ir,jr,kr;
    int si[3];           // start index
