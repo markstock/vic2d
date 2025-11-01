@@ -648,7 +648,7 @@ float compute_and_write_stats(const int silent, const int step,
          exit(0);
       }
       initialized = true;
-      fprintf(outp,"# step, sim time, KE, vort max, vel max, CN, cpu time step, cpu time total\n");
+      fprintf(outp,"# step, sim time, vel max, vort max, KE, enst, CNw, cpu time step, cpu time total\n");
       fflush(outp);
    }
 
