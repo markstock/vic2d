@@ -558,16 +558,47 @@ int apply_stretch_from_xo_3d(
             const float origwx = wx[i][j][k];
             const float origwy = wy[i][j][k];
             const float origwz = wz[i][j][k];
-            // and the original basis vectors
-            float bxx = fac * (xo[ip1][j][k] - xo[im1][j][k]);
-            float bxy = fac * (yo[ip1][j][k] - yo[im1][j][k]);
-            float bxz = fac * (zo[ip1][j][k] - zo[im1][j][k]);
-            float byx = fac * (xo[i][jp1][k] - xo[i][jm1][k]);
-            float byy = fac * (yo[i][jp1][k] - yo[i][jm1][k]);
-            float byz = fac * (zo[i][jp1][k] - zo[i][jm1][k]);
-            float bzx = fac * (xo[i][j][kp1] - xo[i][j][km1]);
-            float bzy = fac * (yo[i][j][kp1] - yo[i][j][km1]);
-            float bzz = fac * (zo[i][j][kp1] - zo[i][j][km1]);
+
+            // find relative distances to 6 neighboring origin points
+            float bxx = xo[ip1][j][k] - xo[im1][j][k];
+            if (bxx > 0.5f) bxx -= 1.f;
+            if (bxx < -0.5f) bxx += 1.f;
+            bxx *= fac;
+            float bxy = yo[ip1][j][k] - yo[im1][j][k];
+            if (bxy > 0.5f) bxy -= 1.f;
+            if (bxy < -0.5f) bxy += 1.f;
+            bxy *= fac;
+            float bxz = zo[ip1][j][k] - zo[im1][j][k];
+            if (bxz > 0.5f) bxz -= 1.f;
+            if (bxz < -0.5f) bxz += 1.f;
+            bxz *= fac;
+
+            float byx = xo[i][jp1][k] - xo[i][jm1][k];
+            if (byx > 0.5f) byx -= 1.f;
+            if (byx < -0.5f) byx += 1.f;
+            byx *= fac;
+            float byy = yo[i][jp1][k] - yo[i][jm1][k];
+            if (byy > 0.5f) byy -= 1.f;
+            if (byy < -0.5f) byy += 1.f;
+            byy *= fac;
+            float byz = zo[i][jp1][k] - zo[i][jm1][k];
+            if (byz > 0.5f) byz -= 1.f;
+            if (byz < -0.5f) byz += 1.f;
+            byz *= fac;
+
+            float bzx = xo[i][j][kp1] - xo[i][j][km1];
+            if (bzx > 0.5f) bzx -= 1.f;
+            if (bzx < -0.5f) bzx += 1.f;
+            bzx *= fac;
+            float bzy = yo[i][j][kp1] - yo[i][j][km1];
+            if (bzy > 0.5f) bzy -= 1.f;
+            if (bzy < -0.5f) bzy += 1.f;
+            bzy *= fac;
+            float bzz = zo[i][j][kp1] - zo[i][j][km1];
+            if (bzz > 0.5f) bzz -= 1.f;
+            if (bzz < -0.5f) bzz += 1.f;
+            bzz *= fac;
+
             // normalize to be volume-preserving
             const float oodet = 1.f / (bxx*(byy*bzz-byz*bzy) + bxy*(byz*bzx-byx*bzz) + bxz*(byx*bzy-byy*bzx));
             bxx *= oodet;
@@ -584,7 +615,8 @@ int apply_stretch_from_xo_3d(
             wy[i][j][k] = (byx*origwx + byy*origwy + byz*origwz) / (byx*byx + byy*byy + byz*byz);
             wz[i][j][k] = (bzx*origwx + bzy*origwy + bzz*origwz) / (bzx*bzx + bzy*bzy + bzz*bzz);
             //if (i==(int)(0.5*nx) && j==(int)(0.37*ny) && k==(int)(0.6*nz)) {
-            if (i==(int)(0.5*nx) && j==(int)(0.37*ny) && k>=(int)(0.5*nz) && k<=(int)(0.7*nz)) {
+            //if (i==(int)(0.5*nx) && j==(int)(0.37*ny) && k>=(int)(0.5*nz) && k<=(int)(0.7*nz)) {
+            if (false) {
                printf("\n  cell %d %d %d\n", i, j, k);
                printf("  orig vort %g %g %g\n", origwx, origwy, origwz);
                printf("         bx %g %g %g\n", bxx, bxy, bxz);
@@ -2291,7 +2323,7 @@ int make_solenoidal_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
 
    // recompute divergence before checking again
    maxdiv = compute_divergence_3d (nx,ny,nz,xbdry,ybdry,zbdry,u,v,w,rhs);
-   printf("    max div in div3d %g\n",maxdiv);
+   //printf("    max div in div3d %g\n",maxdiv);
    printf(".");
 
    }  // end loop over iter
