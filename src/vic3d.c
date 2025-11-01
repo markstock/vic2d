@@ -436,7 +436,7 @@ int main(int argc,char **argv) {
    fprintf(stdout,"Initial velocity solution\n");
 
    // project the vorticity onto a divergence-free field
-   //make_solenoidal_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ]);
+   make_solenoidal_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ]);
 
    // if you want to show velocity on the first step, solve for it here
    (void) find_vels_3d(step,nx,ny,nz,xbdry,ybdry,zbdry,u[XV],u[YV],u[ZV],a[WX],a[WY],a[WZ]);
