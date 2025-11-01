@@ -1,7 +1,7 @@
 /*
  * VIC-MOC - libvicmoc3d.c - the library for the 2D and 3D routines
  *
- * Copyright 2004-8,20,23 Mark J. Stock <mstock@umich.edu>
+ * Copyright 2004-8,20,23,25 Mark J. Stock <markjstock@gmail.com>
  */
 
 #include <stdlib.h>
@@ -25,7 +25,7 @@ int create_vorticity_stretch_3d(int,int,int,int,int,int,float***,float***,float*
 int create_boundary_vorticity_3d(int,int,int,int,int,int,float***,float***,float***,float***,float***,float***,float);
 float diffuse_scalar_3d(int,int,int,int,int,int,float***,float***,float,float);
 int find_gradient_of_scalar_3d(int,int,int,int,int,int,float***,float****);
-int moc_advect_3d(const int,const int,const int,const int,const int,const int,float****,float****,float****,const int,const float);
+int moc_advect_3d(const int,const int,const int,const int,const int,const int,float****,float****,float****,float****,const int,const float);
 float compute_divergence_3d(int,int,int,int,int,int,float***,float***,float***,float***);
 int compute_curl_3d(int,int,int,int,int,int,float***,float***,float***,float***,float***,float***);
 float find_biot_savart_u (float,float,int,int,float,float,float**);
@@ -310,6 +310,7 @@ float step_forward_3d (int step,int isStam,
    float coeff = 1.f;
    //static float ***t[MAX_SCALARS];
    static bool set_temp = false;
+   static float ***xo[3];			// origin points from moc
 
    // die if isStam
    if (isStam) {
@@ -318,16 +319,16 @@ float step_forward_3d (int step,int isStam,
    }
 
    // malloc temporary arrays
-   //if (!set_temp) {
-   //   for (i=0; i<sc_cnt; i++) {
-   //      t[i] = allocate_3d_array_f(nx,ny,nz);
-   //   }
-   //   set_temp = true;
-   //}
+   if (!set_temp) {
+      for (i=0; i<3; i++) {
+         xo[i] = allocate_3d_array_f(nx,ny,nz);
+      }
+      set_temp = true;
+   }
 
    // ----------------------------
    // project forward to find the new vorticities
-   moc_advect_3d(nx,ny,nz,xbdry,ybdry,zbdry,u,a,t,sc_cnt,dt);
+   moc_advect_3d(nx,ny,nz,xbdry,ybdry,zbdry,u,a,t,xo,sc_cnt,dt);
    //printf(" after moc advect %g %g %g\n",t[WY][8][8][0],t[WY][8][8][1],t[WY][8][8][2]);
    //printf(" after moc_advect_3d %g %g %g\n",t[WY][7][0][8],t[WY][7][8][8],t[WY][7][16][8]);
    //printf(" after moc_advect_3d %g %g %g\n",t[WY][8][0][8],t[WY][8][8][8],t[WY][8][16][8]);
@@ -403,7 +404,6 @@ int create_baroclinic_vorticity_3d (int nx,int ny,int nz,
    float ***scalar,float ***wx,float ***wy,float ***wz,
    float dt, float bn) {
 
-   int i,j,k;
    float g[3] = {0.0,0.0,-1.0};
    static float ***grad[3];
    static bool set_grad = false;
@@ -413,7 +413,7 @@ int create_baroclinic_vorticity_3d (int nx,int ny,int nz,
    // if no boussinesq number (bn ~ 0), skip this!
    if (fabs(bn) < EPSILON) return(0);
 
-   for (i=0; i<3; i++) g[i] = bn*g[i];
+   for (int i=0; i<3; i++) g[i] = bn*g[i];
 
    // allocate memory for the gradient
    if (!set_grad) {
@@ -427,10 +427,10 @@ int create_baroclinic_vorticity_3d (int nx,int ny,int nz,
    find_gradient_of_scalar_3d (nx,ny,nz,xbdry,ybdry,zbdry,scalar,grad);
 
    // then, cross with the gravity vector (what about wall boundaries?)
-   #pragma omp parallel for private(i,j,k)
-   for (i=0;i<nx;i++) {
-      for (j=0;j<ny;j++) {
-         for (k=0;k<nz;k++) {
+   #pragma omp parallel for
+   for (int i=0;i<nx;i++) {
+      for (int j=0;j<ny;j++) {
+         for (int k=0;k<nz;k++) {
             wx[i][j][k] += dt*(grad[1][i][j][k]*g[2] - grad[2][i][j][k]*g[1]);
             wy[i][j][k] += dt*(grad[2][i][j][k]*g[0] - grad[0][i][j][k]*g[2]);
             wz[i][j][k] += dt*(grad[0][i][j][k]*g[1] - grad[1][i][j][k]*g[0]);
@@ -455,7 +455,6 @@ int create_vorticity_stretch_3d(int nx,int ny,int nz,
    float ***u,float ***v,float ***w,
    float ***wx,float ***wy,float ***wz,float dt) {
 
-   int i,j,k;
    float wcgu[3];
    static float ***grad[3][3];
    static bool set_grad = false;
@@ -482,10 +481,10 @@ int create_vorticity_stretch_3d(int nx,int ny,int nz,
    find_gradient_of_scalar_3d (nx,ny,nz,xbdry,ybdry,zbdry,w,grad[2]);
 
    // then, dot the vorticity with the velocity gradient
-   #pragma omp parallel for private(i,j,k,wcgu)
-   for (i=0;i<nx;i++) {
-      for (j=0;j<ny;j++) {
-         for (k=0;k<nz;k++) {
+   #pragma omp parallel for private(wcgu)
+   for (int i=0;i<nx;i++) {
+      for (int j=0;j<ny;j++) {
+         for (int k=0;k<nz;k++) {
             wcgu[0] = wx[i][j][k]*grad[0][0][i][j][k] +
                       wy[i][j][k]*grad[1][0][i][j][k] +
                       wz[i][j][k]*grad[2][0][i][j][k];
@@ -924,9 +923,9 @@ float diffuse_scalar_3d(int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
       }
    }
 
-   if (istep > 1) fprintf(stdout,"."); fflush(stdout);
+   if (istep > 1) { fprintf(stdout,"."); fflush(stdout); }
    }	// end loop over numsteps
-   if (numsteps > 1) fprintf(stdout,"\n"); fflush(stdout);
+   if (numsteps > 1) { fprintf(stdout,"\n"); fflush(stdout); }
 
    return(mult*numsteps);
 }
@@ -1687,10 +1686,7 @@ float find_vels_3d (int step,int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
 
    } // end if not multigrid
 
-   vmax = find_vmax(u,v,w,nx,ny,nz);
-   fprintf(stdout,"    vmax %g\n",vmax);
-
-   return(vmax);
+   return(0.f);
 }
 
 
@@ -1991,15 +1987,17 @@ int make_solenoidal_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbdry,
 
    // test the divergence right now---it might be good enough
    maxdiv = compute_divergence_3d (nx,ny,nz,xbdry,ybdry,zbdry,u,v,w,rhs);
-   //printf("    max div in div3d %g\n",maxdiv);
-   maxAllowedDiv = 0.01*maxdiv;
+   // relative?
+   maxAllowedDiv = 0.005*maxdiv;
+   // or absolute?
+   maxAllowedDiv = 1.f / nx;
    if (maxAllowedDiv < 1.e-5) maxAllowedDiv = 1.e-5;
+   printf("    pre-solenoidal divergence %g, iterating to %g\n",maxdiv,maxAllowedDiv);
 
    // iterate this whole thing a few times
    iter = 0;
    printf("    ");
    while (iter < maxIter && maxdiv > maxAllowedDiv) {
-   //while (iter < 100) {
 
       iter++;
 
@@ -2320,8 +2318,10 @@ int find_gradient_of_scalar_3d (int nx,int ny,int nz,int xbdry,int ybdry,int zbd
 /*
  * moc_advect_3d is the implicit scheme for updating the vorticity values
  */
-int moc_advect_3d (const int nx,const int ny,const int nz,const int xbdry,const int ybdry,const int zbdry,
-   float ****u,float ****in,float ****out,const int sc_cnt,const float dt) {
+int moc_advect_3d (const int nx, const int ny, const int nz,
+      const int xbdry, const int ybdry, const int zbdry,
+      float ****u, float ****in, float ****out, float ****xo,
+      const int sc_cnt, const float dt) {
 
    // time-order (spatial order is always 4th)
    const int order = 2;
@@ -2337,6 +2337,54 @@ int moc_advect_3d (const int nx,const int ny,const int nz,const int xbdry,const 
 
    if (order == 1) {
       // use a one-step method
+      #pragma omp parallel for private(u0,v0,w0,outvals)
+      for (int i=0;i<nx;i++) {
+         const float px = (float)i/(float)(nx-1);
+         for (int j=0;j<ny;j++) {
+            const float py = (float)j/(float)(nx-1);
+            for (int k=0;k<nz;k++) {
+               const float pz = (float)k/(float)(nx-1);
+               //fprintf(stdout,"\n    px %g %g %g\n",px,py,pz);
+
+               // find vel at px,py,pz
+               u0 = u[XV][i][j][k];
+               v0 = u[YV][i][j][k];
+               w0 = u[ZV][i][j][k];
+               //fprintf(stdout,"    u0 %g %g %g\n",u0,v0,w0);
+
+               // find position 1 explicit Euler step backwards
+               float newx = px-dt*u0;
+               if (xbdry == WALL) {
+                  if (newx > 1.f-EPSILON) newx = 1.f-EPSILON;
+                  if (newx < 0.f+EPSILON) newx = EPSILON;
+               }
+               float newy = py-dt*v0;
+               if (ybdry == WALL) {
+                  if (newy > yf-EPSILON) newy = yf-EPSILON;
+                  if (newy < 0.f+EPSILON) newy = EPSILON;
+               }
+               float newz = pz-dt*w0;
+               if (zbdry == WALL) {
+                  if (newz > zf-EPSILON) newz = zf-EPSILON;
+                  if (newz < 0.f+EPSILON) newz = EPSILON;
+               }
+               //fprintf(stdout,"    newx %g %g %g\n",newx,newy,newz);
+
+               // return scalar-valued vorticity from there
+               //interpolate_array_using_CIC_3d(nx,ny,nz,xbdry,ybdry,zbdry,in,newx,newy,newz,sc_cnt,outvals);
+               interpolate_array_using_M4p_3d(nx,ny,nz,xbdry,ybdry,zbdry,in,newx,newy,newz,sc_cnt,outvals);
+
+               // add those to the output
+               for (int l=0; l<sc_cnt; l++) out[l][i][j][k] = outvals[l];
+
+               // and save the point from which these came
+               xo[0][i][j][k] = newx;
+               xo[1][i][j][k] = newy;
+               xo[2][i][j][k] = newz;
+            }
+         }
+      }
+
    } else if (order == 2) {
       // use a two-step method
       #pragma omp parallel for private(u0,v0,w0,u1,v1,w1,outvels,outvals)
@@ -2404,10 +2452,92 @@ int moc_advect_3d (const int nx,const int ny,const int nz,const int xbdry,const 
 
                // add those to the output
                for (int l=0; l<sc_cnt; l++) out[l][i][j][k] = outvals[l];
+
+               // and save the point from which these came
+               xo[0][i][j][k] = newx;
+               xo[1][i][j][k] = newy;
+               xo[2][i][j][k] = newz;
             }
          }
       }
    } else if (order == 4) {
+      // use RK4 to project backwards
+      #pragma omp parallel for private(u0,v0,w0,u1,v1,w1,outvels,outvals)
+      for (int i=0;i<nx;i++) {
+         const float px = (float)i/(float)(nx-1);
+         for (int j=0;j<ny;j++) {
+            const float py = (float)j/(float)(nx-1);
+            for (int k=0;k<nz;k++) {
+               const float pz = (float)k/(float)(nx-1);
+               //fprintf(stdout,"\n    px %g %g %g\n",px,py,pz);
+
+               // find vel at px,py,pz
+               u0 = u[XV][i][j][k];
+               v0 = u[YV][i][j][k];
+               w0 = u[ZV][i][j][k];
+               //fprintf(stdout,"    u0 %g %g %g\n",u0,v0,w0);
+
+               // find position 1 explicit Euler step backwards
+               float newx = px-dt*u0;
+               if (xbdry == WALL) {
+                  if (newx > 1.f-EPSILON) newx = 1.f-EPSILON;
+                  if (newx < 0.f+EPSILON) newx = EPSILON;
+               }
+               float newy = py-dt*v0;
+               if (ybdry == WALL) {
+                  if (newy > yf-EPSILON) newy = yf-EPSILON;
+                  if (newy < 0.f+EPSILON) newy = EPSILON;
+               }
+               float newz = pz-dt*w0;
+               if (zbdry == WALL) {
+                  if (newz > zf-EPSILON) newz = zf-EPSILON;
+                  if (newz < 0.f+EPSILON) newz = EPSILON;
+               }
+               //fprintf(stdout,"    newx %g %g %g\n",newx,newy,newz);
+
+               // find vel at newx,newy
+               //interpolate_array_using_CIC_3d(nx,ny,nz,xbdry,ybdry,zbdry,u,newx,newy,newz,3,outvels);
+               interpolate_array_using_M4p_3d(nx,ny,nz,xbdry,ybdry,zbdry,u,newx,newy,newz,3,outvels);
+               u1 = outvels[0];
+               v1 = outvels[1];
+               w1 = outvels[2];
+               //fprintf(stdout,"    u1 %g %g %g\n",u1,v1,w1);
+
+               // find position back 1 step using average of two velocities
+               newx = px-dt*0.5f*(u0+u1);
+               if (xbdry == WALL) {
+                  if (newx > 1.f-EPSILON) newx = 1.f-EPSILON;
+                  if (newx < 0.f+EPSILON) newx = EPSILON;
+               }
+               newy = py-dt*0.5f*(v0+v1);
+               if (ybdry == WALL) {
+                  if (newy > yf-EPSILON) newy = yf-EPSILON;
+                  if (newy < 0.f+EPSILON) newy = EPSILON;
+               }
+               newz = pz-dt*0.5f*(w0+w1);
+               if (zbdry == WALL) {
+                  if (newz > zf-EPSILON) newz = zf-EPSILON;
+                  if (newz < 0.f+EPSILON) newz = EPSILON;
+               }
+               //fprintf(stdout,"    newx %g %g %g\n",newx,newy,newz);
+
+               // finally, return scalar-valued vorticity from there
+               //interpolate_array_using_CIC_3d(nx,ny,nz,xbdry,ybdry,zbdry,in,newx,newy,newz,sc_cnt,outvals);
+               interpolate_array_using_M4p_3d(nx,ny,nz,xbdry,ybdry,zbdry,in,newx,newy,newz,sc_cnt,outvals);
+
+               // add those to the output
+               for (int l=0; l<sc_cnt; l++) out[l][i][j][k] = outvals[l];
+
+               // and save the point from which these came
+               xo[0][i][j][k] = newx;
+               xo[1][i][j][k] = newy;
+               xo[2][i][j][k] = newz;
+            }
+         }
+      }
+   } else {
+      fprintf(stderr,"Error (moc_advect_3d): order %d not supported!\n", order);
+      exit(1);
    }
 
    return(0);
@@ -3099,17 +3229,15 @@ float interpolate_array_using_M4p_3d(int nx,int ny,int nz,
 
 // find vmax (might need this frequently)
 float find_vmax (float ***ux, float ***uy, float ***uz,
-                int nx, int ny, int nz) {
+                const int nx, const int ny, const int nz) {
 
-   int i,j,k;
-   float vmax,velsq;
+   float vmax = 0.f;
 
-   vmax = 0.;
-   #pragma omp parallel for private(i,j,k)
-   for (i=0; i<nx; i++) {
-      for (j=0; j<ny; j++) {
-         for (k=0; k<nz; k++) {
-            velsq =  ux[i][j][k]*ux[i][j][k];
+   #pragma omp parallel for reduction(max:vmax)
+   for (int i=0; i<nx; i++) {
+      for (int j=0; j<ny; j++) {
+         for (int k=0; k<nz; k++) {
+            float velsq =  ux[i][j][k]*ux[i][j][k];
             velsq += uy[i][j][k]*uy[i][j][k];
             velsq += uz[i][j][k]*uz[i][j][k];
             if (velsq > vmax) vmax = velsq;

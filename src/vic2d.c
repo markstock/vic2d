@@ -1,12 +1,11 @@
 /*
  * vic2d.c - driver file for two-dimensional vortex-in-cell method-of-characteristics
  *
- * Copyright 2004-23 Mark J. Stock <mstock@umich.edu>
+ * Copyright 2004-25 Mark J. Stock <markjstock@gmail.com>
  *
  * a 2D vortex-in-cell method which uses the method of characteristics for the
  * convection step, and a single explicit step for diffusion and vorticity
  * creation from walls and masks
- *
  */
 
 #include <stdlib.h>

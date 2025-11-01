@@ -6,13 +6,6 @@
  * a 3D vortex method which uses the method of characteristics for the
  * convection step, and a single explicit step for diffusion and vorticity
  * creation from walls
- *
- * other files needed: gr3.c and f2c.h
- *
- * gcc -o vic3d -lf2c -lm vic3d.c libvicmoc.c gr23.c
- * gcc -o vic3d -O3 -march=pentium4 -mno-ieee-fp -ffast-math -lf2c -lm vic3d.c libvicmoc.c gr23.c
- * gcc -o vic3d -O3 -march=athlon-xp -mno-ieee-fp -ffast-math -lf2c -lm vic3d.c libvicmoc.c gr23.c
- * make
  */
 
 #include <stddef.h>
@@ -28,26 +21,32 @@
 #include <omp.h>
 #endif
 
-#include "vicmoc.h"
-#include "libvicmoc3d.h"
 #include "utility.h"
 #include "inout.h"
+#include "vicmoc.h"
+#include "libvicmoc3d.h"
 
+float compute_and_write_stats(const int, const int, const float, const float, const float, const double, const int, const int, const int, const int, const int, const int, float****, float****);
 int Usage(char[MAXCHARS],int);
 
 int main(int argc,char **argv) {
 
-   int isStam = false;			// set to true to run Stable Fluids calc
-   int nx,ny,nz;
+   //static bool first_time = true;
+   bool isStam = false;
+   int nx = 33;
+   int ny = 33;
+   int nz = 33;
    int xbdry,ybdry,zbdry;
    int step = 0;
    int ccnidx = 0;
    int outscale = 1;
    int writeOutput = true;
-   int maxStep;
-   int writeevery;
+   int maxstep = 9999;
+   int writeevery = 1;
    float vmax = 1.f;
    float simtime = 0.f;
+   //bool use_16bpp = false;
+   bool silent = true;
 
    int sc_cnt = 3;			// all 3 vorticities
    int sc_type[MAX_SCALARS];
@@ -62,7 +61,7 @@ int main(int argc,char **argv) {
    float bn = 1.f;
    float effRe = -1.f;
    //float yf,zf;
-   float px,py,pz,temp,tottemp;
+   float px,py,pz,temp;
    float courant = 10.f;
    float courantconst = -1.f;
    float *gravity;
@@ -70,11 +69,6 @@ int main(int argc,char **argv) {
    float ***u[3];			// all velocities, vorticity, etc
    float ***a[MAX_SCALARS];	// all velocities, vorticity, etc
    float ***t[MAX_SCALARS];	// all velocities, vorticity, etc
-   //float ***xo[3];			// origin points from moc
-   float ke = 0.f;
-   float ke_last = 0.f;
-   float enst = -1.f;
-   float nu_eff = -1.f;
    float vortscale,velscale,scalescale;
    float ccnvmax[VMAXAVG];
 
@@ -94,9 +88,6 @@ int main(int argc,char **argv) {
 
 
    // set default simulation properties
-   nx = 33;
-   ny = 33;
-   nz = 33;
    xbdry = WALL;
    ybdry = WALL;
    zbdry = WALL;
@@ -108,7 +99,6 @@ int main(int argc,char **argv) {
    velscale = 1.0;
    scalescale = 1.0;
    writeevery = 1;
-   maxStep = 9999;
 
    // only necessary scalar type is vorticity, always at position 0
    sc_type[0] = WX;
@@ -153,11 +143,13 @@ int main(int argc,char **argv) {
          writeevery = atoi(argv[++i]);
          if (writeevery < 1) writeevery = 1;
       } else if (strncmp(argv[i], "-step", 5) == 0) {
-         maxStep = atoi(argv[++i]);
+         maxstep = atoi(argv[++i]);
       } else if (strncmp(argv[i], "-noout", 6) == 0) {
          writeOutput = false;
-      } else
+      } else {
+         fprintf(stderr,"Unknown option (%s)\n",argv[i]);
          (void) Usage(progname,0);
+      }
    }
 
    // set y max bound (if square, yf=1.0, otherwise scale it as xmax=1.0
@@ -447,10 +439,10 @@ int main(int argc,char **argv) {
    //make_solenoidal_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ]);
 
    // if you want to show velocity on the first step, solve for it here
-   vmax = find_vels_3d(step,nx,ny,nz,xbdry,ybdry,zbdry,u[XV],u[YV],u[ZV],a[WX],a[WY],a[WZ]);
+   (void) find_vels_3d(step,nx,ny,nz,xbdry,ybdry,zbdry,u[XV],u[YV],u[ZV],a[WX],a[WY],a[WZ]);
 
    // find vmax (might need this)
-   //vmax = find_vmax(u[XV],u[YV],u[ZV],nx,ny,nz);
+   vmax = find_vmax(u[XV],u[YV],u[ZV],nx,ny,nz);
    // initialize the vmax averaging array
    vmax = courantconst / (dt*(nx+1));
    for (int i=0; i<VMAXAVG; i++) ccnvmax[i] = vmax;
@@ -460,7 +452,6 @@ int main(int argc,char **argv) {
 
    // iterate through time
    step = 0;
-   tottemp = 0.0;
    while (true) {
 
       fprintf(stdout,"\nBegin step %d\n",step);
@@ -469,7 +460,7 @@ int main(int argc,char **argv) {
       // write output
       if (writeOutput && step%writeevery == 0) {
          if (true) {
-            const float magscale = 10.f * vortscale / nx;
+            const float magscale = 0.2f * vortscale;
             sprintf(outfileroot,"wm_%04d",step);
             write_vortmag_3d(outfileroot,nx,ny,nz,a[WX],a[WY],a[WZ],0.f,magscale,outscale);
          }
@@ -559,7 +550,7 @@ int main(int argc,char **argv) {
       }
 
       // check end conditions
-      if (step >= maxStep) break;
+      if (step >= maxstep) break;
 
       // accept input (only if interactive scheme)
 
@@ -594,20 +585,6 @@ int main(int argc,char **argv) {
               dt,
               bn);
 
-      // find vmax (might need this)
-      vmax = find_vmax (u[XV],u[YV],u[ZV],nx,ny,nz);
-      printf("  effective CN %g\n",vmax*dt*(float)nx);
-
-      // calculate energy and enstrophy
-      ke_last = ke;
-      ke = find_energy_3d(nx,ny,nz,xbdry,ybdry,zbdry,u[XV],u[YV],u[ZV]);
-      enst = find_energy_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ]);
-      printf("  ke %g  enst %g\n",ke,enst);
-
-      // find effective diffusion
-      nu_eff = (ke_last-ke)/(2.*enst*dt);
-      printf("  effective nu %g  explicit nu %g\n",nu_eff,1./Re);
-
       // move the particles
       if (useParticles) {
         explicit_particle_move_3d(nx,ny,nz,xbdry,ybdry,zbdry,u,dt,effRe,pnum,ploc,pvel);
@@ -617,13 +594,18 @@ int main(int argc,char **argv) {
       gettimeofday(&t_curr, 0);
       walltime = (t_curr.tv_sec - t_last.tv_sec) + (t_curr.tv_usec - t_last.tv_usec)*1e-6;
 
-      if (writeOutput) {
-         tottemp += walltime;
+      //if (writeOutput) {
+         //tottemp += walltime;
          //float avgtemp = tottemp/(step+1);
          // fprintf(stdout,"  took %g sec\n",temp);
          // fprintf(stdout,"  total %g and mean %g sec\n",tottemp,avgtemp);
          //fprintf(stdout,"  mean step time: %.3g sec, effective Re %g\n",avgtemp,effRe);
-         fprintf(stdout,"  step time: %.4g sec, effective Re %g\n", walltime, effRe);
+         //fprintf(stdout,"  step time: %.4g sec, effective Re %g\n", walltime, effRe);
+      //}
+
+      // write statistics
+      if (writeOutput) {
+         vmax = compute_and_write_stats(silent,step,dt,Re,simtime,walltime,nx,ny,nz,xbdry,ybdry,zbdry,u,a);
       }
 
       // ----------------------------
@@ -633,6 +615,77 @@ int main(int argc,char **argv) {
 
    fprintf(stderr,"\nDone.\n");
    exit(0);
+}
+
+
+/*
+ * Do just what it says
+ */
+float compute_and_write_stats(const int silent, const int step,
+      const float dt, const float Re, const float simtime, const double walltime,
+      const int nx, const int ny, const int nz, const int xbdry, const int ybdry, const int zbdry,
+      float ****u, float ****a) {
+
+   static float ke_last = -1.f;
+   static double total_time = 0.0;
+   static char outfile[MAXCHARS];
+   static bool initialized = false;
+   static FILE *outp;
+
+   // if last time through, close file pointer and RETURN
+   if (step == -1) {
+      fclose(outp);
+      return(0.f);
+   }
+
+   // if first time through, prep stuff
+   if (!initialized) {
+      sprintf(outfile,"stat.dat");
+      outp = fopen(outfile,"w");
+      if (outp == NULL) {
+         fprintf(stderr,"Could not open input file %s\n",outfile);
+         fflush(stderr);
+         exit(0);
+      }
+      initialized = true;
+      fprintf(outp,"# step, sim time, KE, vort max, vel max, CN, cpu time step, cpu time total\n");
+      fflush(outp);
+   }
+
+   // find vmax
+   const float vmax = find_vmax(u[XV],u[YV],u[ZV],nx,ny,nz);
+
+   // find vort max
+   const float wmax = find_vmax(a[WX],a[WY],a[WZ],nx,ny,nz);
+
+   // compute CN
+   const float cn = vmax*dt*(float)nx;
+   const float cnw = wmax*dt*(float)nx;
+   printf("  CNv %g  CNw %g\n", cn, cnw);
+
+   // calculate energy and enstrophy
+   const float ke = find_energy_3d(nx,ny,nz,xbdry,ybdry,zbdry,u[XV],u[YV],u[ZV]);
+   const float enst = find_energy_3d(nx,ny,nz,xbdry,ybdry,zbdry,a[WX],a[WY],a[WZ]);
+   //printf("  ke %g  enst %g\n",ke,enst);
+
+   // find effective diffusion
+   const float nu_eff = (ke_last < 0.f) ? 0.f : (ke_last-ke)/(2.*enst*dt);
+   ke_last = ke;
+   printf("  effective nu %g  explicit nu %g\n",nu_eff,1./Re);
+
+   // and time
+   total_time += walltime;
+
+   // write the stats here
+   if (!silent) {
+      if (step%10 == 0) fprintf(stdout,"# step, sim time, vel max, vort max, KE, enst, CNw, cpu step time, cpu total time\n");
+      fprintf(stdout,"%d %g %g %g %g %g %g %g %g\n",step,simtime,vmax,wmax,ke,enst,cnw,walltime,total_time);
+      fflush(stdout);
+   }
+   fprintf(outp,"%d %g %g %g %g %g %g %g %g\n",step,simtime,vmax,wmax,ke,enst,cnw,walltime,total_time);
+   fflush(outp);
+
+   return(vmax);
 }
 
 
