@@ -25,10 +25,10 @@ png_byte** allocate_2d_array_pb(int nx, int ny, int depth) {
    if (depth <= 8) bytesperpixel = 1;
    else bytesperpixel = 2;
    array = (png_byte **)malloc(ny * sizeof(png_byte *));
-   array[0] = (png_byte *)malloc(bytesperpixel * nx * ny * sizeof(png_byte));
+   array[0] = (png_byte *)malloc(bytesperpixel * (size_t)nx * (size_t)ny * sizeof(png_byte));
 
    for (i=1; i<ny; i++)
-      array[i] = array[0] + i * bytesperpixel * nx;
+      array[i] = array[0] + (size_t)i * (size_t)bytesperpixel * (size_t)nx;
 
    return(array);
 }
@@ -41,10 +41,10 @@ png_byte** allocate_2d_rgb_array_pb(int nx, int ny, int depth) {
    if (depth <= 8) bytesperpixel = 3;
    else bytesperpixel = 6;
    array = (png_byte **)malloc(ny * sizeof(png_byte *));
-   array[0] = (png_byte *)malloc(bytesperpixel * nx * ny * sizeof(png_byte));
+   array[0] = (png_byte *)malloc(bytesperpixel * (size_t)nx * (size_t)ny * sizeof(png_byte));
 
    for (i=1; i<ny; i++)
-      array[i] = array[0] + i * bytesperpixel * nx;
+      array[i] = array[0] + (size_t)i * (size_t)bytesperpixel * (size_t)nx;
 
    return(array);
 }
