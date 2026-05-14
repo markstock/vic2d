@@ -1,12 +1,13 @@
 /*
  * VIC-MOC - libvicmoc2d.c - the library for the 2D routines
  *
- * Copyright 2004-23 Mark J. Stock <mstock@umich.edu>
+ * Copyright 2004-26 Mark J. Stock <mstock@umich.edu>
  */
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <stdint.h>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -49,7 +50,7 @@ extern void hwscrt_(float *a, float *b, int *m, int *mbdcnd,
                int *ierror, float *w);
 
 // in mud2sp_full.f
-extern void mud2sp_(int *iparm, float *fparm, float *work, void *cfx, void *cfy,
+extern void mud2sp_(int64_t *iparm, float *fparm, float *work, void *cfx, void *cfy,
                     void *bndyc, float *rhs, float *phi, int *mgopt, int *ierror);
 
 
@@ -804,7 +805,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    float elmbda = 0.0;
    float pert;
    // these are for mud2sp, MUDPACK
-   static int iparm[17];
+   static int64_t iparm[17];
    static float fparm[6];
    static float **rhs;
    static int mgopt[4];
@@ -812,7 +813,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
    float muderr = 1.e-5;
    // these are for both
    int ierr;
-   long int iworksize = 3.67*nx*ny+100*nx+2000;	// OK for all?
+   int64_t iworksize = 3.67*(int64_t)nx*(int64_t)ny+100*(int64_t)nx+2000;	// OK for all?
    static float *work;	// increasing this does not fix hwscrt's problem
    float xs,xf,ys,yf;
    static float **psi;
@@ -1027,12 +1028,12 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
          // catch an error in the setup or input
          if (ierr != 0) {
             fprintf(stderr,"ERROR (mud2sp_): ierr = %d\n",ierr);
-            if (ierr == 9) fprintf(stderr,"  iparm[14] (%d) too small, must be > %d\n",iparm[14],iparm[15]);
+            if (ierr == 9) fprintf(stderr,"  iparm[14] (%ld) too small, must be > %ld\n",iparm[14],iparm[15]);
             if (ierr > 0) { fprintf(stderr,"Quitting.\n"); exit(0); }
          }
 
          // read workspace requirements!
-         if (!silent) fprintf(stderr,"work array needs %d\n",iparm[15]);
+         if (!silent) fprintf(stderr,"work array needs %ld\n",iparm[15]);
          if (!silent) fprintf(stderr,"  we currently allocate %ld\n",iworksize);
          if (iparm[15] > iworksize) {
            free_1d_array_f(work);
@@ -1098,7 +1099,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
       if (!silent) { fprintf(stderr,"    running mud2sp\n"); fflush(stderr); }
       mud2sp_(iparm, fparm, work, &funccfx, &funccfy,
               &funcbndyc, rhs[0], psi[0], mgopt, &ierr);
-      if (!silent) fprintf(stdout,"    mud2sp solved in %d cycles\n",iparm[16]);
+      if (!silent) fprintf(stdout,"    mud2sp solved in %ld cycles\n",iparm[16]);
 
       // debug print the resulting streamfunctions
       //for (i=0; i<8; i++) {
@@ -1110,7 +1111,7 @@ int find_vels_2d (int silent, int step,const int isStam,const int nx,const int n
 
       // catch a runtime error (see mud2sp.d:952)
       if (ierr == -1) {
-         fprintf(stderr,"  warning (mud2sp_): error after %d cycles is %g, desired is %g\n",iparm[12],fparm[5],fparm[4]);
+         fprintf(stderr,"  warning (mud2sp_): error after %ld cycles is %g, desired is %g\n",iparm[12],fparm[5],fparm[4]);
       } else if (ierr < 0) {
          fprintf(stderr,"  warning (mud2sp_): ierr = %d\n",ierr);
       } else if (ierr > 0) {
